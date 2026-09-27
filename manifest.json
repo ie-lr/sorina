@@ -1,17 +1,17 @@
 {
-  "name": "Sorina School System Portal",
-  "short_name": "Sorina Portal",
-  "description": "Sorina School Management System — Students, Grades, Finance, Teachers & Report Cards.",
+  "name": "IE School Management System",
+  "short_name": "IE School",
+  "description": "IE School Management System — Students, Grades, Finance, Teachers & Report Cards.",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#082f50",
-  "theme_color": "#082f50",
+  "background_color": "#003366",
+  "theme_color": "#003366",
   "icons": [
     {
-      "src": "assets/images/school-logo.jpeg",
+      "src": "assets/images/school-logo.png",
       "sizes": "192x192 512x512",
-      "type": "image/jpeg"
+      "type": "image/png"
     }
   ]
 }

@@ -3,22 +3,34 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Sorina School Portal</title>
+  <title>IE School Management System</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#082f50">
-  <link rel="apple-touch-icon" href="assets/images/school-logo.jpeg">
-  <link rel="icon" type="image/jpeg" href="assets/images/school-logo.jpeg">
+  <meta name="theme-color" content="#003366">
+  <link rel="apple-touch-icon" href="assets/images/school-logo.png">
+  <link rel="icon" type="image/png" href="assets/images/school-logo.png">
   <link rel="stylesheet" href="assets/css/tokens.css">
   <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
 
+  <!-- Offline Status Bar -->
+  <div id="offlineIndicator" class="offline-bar hidden">You are currently offline. Changes are saved locally and will auto-sync when connected.</div>
+
+  <!-- Global Loader Overlay for Every Action -->
+  <div id="globalLoader" class="global-loader-overlay hidden">
+    <div class="loader-spinner"></div>
+    <div class="loader-text">Processing...</div>
+  </div>
+
+  <!-- Subtle {Success} Toast -->
+  <div id="globalToast" class="global-toast hidden"></div>
+
   <!-- Site Header -->
   <header id="siteHeader" class="site-header">
     <div class="brand-wrap">
-      <img id="headerLogo" src="assets/images/school-logo.jpeg" alt="School Logo" class="brand-logo">
+      <img id="headerLogo" src="assets/images/school-logo.png" alt="School Logo" class="brand-logo">
       <div class="brand-text">
-        <h1 id="headerSchoolName">Sorina School System</h1>
+        <h1 id="headerSchoolName">IE School Management System</h1>
         <div id="headerMotto" class="motto">Excellence in Knowledge, Character &amp; Integrity</div>
       </div>
     </div>
@@ -52,7 +64,7 @@
           <!-- Identifier Input -->
           <div class="form-group">
             <label class="form-label" id="usernameLabel" for="loginUsername">Student ID</label>
-            <input type="text" id="loginUsername" class="input-field" placeholder="e.g. STU-2026-001" required autocomplete="username">
+            <input type="text" id="loginUsername" class="input-field" placeholder="e.g. SPSS001" required autocomplete="username">
           </div>
 
           <!-- Password Input -->
@@ -64,7 +76,7 @@
           <!-- Admin Verified Email (Admin Only) -->
           <div class="form-group hidden" id="adminEmailGroup">
             <label class="form-label" for="loginEmail">Verified Admin Email <span style="color: var(--color-danger);">*</span></label>
-            <input type="email" id="loginEmail" class="input-field" placeholder="admin@sorinaschool.edu" autocomplete="email">
+            <input type="email" id="loginEmail" class="input-field" placeholder="admin@ieschools.edu" autocomplete="email">
             <div class="form-hint">Admin sign-in requires matching the verified administrator email address.</div>
           </div>
 
@@ -79,22 +91,21 @@
             Sign In to Portal
           </button>
 
-          <!-- Links -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 18px; font-size: 13px;">
+          <!-- Links (Endpoint removed) -->
+          <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 18px; font-size: 13px;">
             <a href="#" id="forgotPasswordLink">Forgot Password?</a>
-            <a href="#" id="backendSettingsLink" style="color: var(--color-text-dim); font-size: 11.5px;">⚙️ Endpoint</a>
           </div>
         </form>
       </div>
 
       <!-- Right: Branded School Panel -->
       <div class="gateway-brand-pane">
-        <img id="paneLogo" src="assets/images/school-logo.jpeg" alt="School Crest" class="pane-logo">
-        <div class="pane-title" id="paneSchoolName">Sorina School System</div>
+        <img id="paneLogo" src="assets/images/school-logo.png" alt="School Crest" class="pane-logo">
+        <div class="pane-title" id="paneSchoolName">IE School Management System</div>
         <div class="pane-motto" id="paneMotto">Excellence in Knowledge, Character &amp; Integrity</div>
         <div class="pane-badge">Academic Year 2026–2027</div>
-        <div style="margin-top: 25px; font-size: 12px; opacity: 0.85; z-index: 1;">
-          Universal School Management System (USMS)
+        <div style="margin-top: 25px; font-size: 12.5px; opacity: 0.9; z-index: 1; font-weight: 600;">
+          (IE School Management System)
         </div>
       </div>
 
@@ -102,7 +113,10 @@
   </main>
 
   <!-- PWA Install Button (Fixed) -->
-  <button id="installAppBtn" class="hidden" type="button" aria-label="Install Sorina App">📲 Install App</button>
+  <button id="installAppBtn" class="hidden" type="button" aria-label="Install App" style="display: flex; align-items: center; gap: 6px;">
+    <img src="assets/icons/download (2).png" style="width: 16px; height: 16px;" alt="">
+    <span>Install App</span>
+  </button>
 
   <!-- Role-specific Panel Mount Point (Loaded post-auth) -->
   <div id="appRoot"></div>
@@ -110,10 +124,11 @@
   <!-- Modal Container -->
   <div id="modalContainer"></div>
 
-  <!-- Configuration: Paste your deployed Google Apps Script Web App URL below -->
+  <!-- Configuration: Google Apps Script Web App URL -->
   <script>
     window.APP_CONFIG = {
-      backendUrl: "https://script.google.com/macros/s/AKfycbyZu_zF7Art3-ESITSghS2jbN9jNcDb3LU6FPYMHmWBGuEmCLPqk7Pl057dZ8DbVAbpUQ/exec"
+      // Paste your deployed Google Apps Script Web App URL here (ends in /exec):
+      backendUrl: ""
     };
   </script>
 
