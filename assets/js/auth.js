@@ -35,7 +35,7 @@ const Auth = (function () {
           mfaGroup.classList.remove('hidden');
         } else if (activeRole === 'teacher') {
           userLabel.textContent = 'Teacher ID or Name';
-          userInput.placeholder = 'e.g. TCH-101';
+          userInput.placeholder = 'e.g. SPST001';
           heading.textContent = 'Teacher Portal Sign In';
           subtitle.textContent = 'Access your assigned classes, enter grades, and submit lesson plans.';
           emailGroup.classList.add('hidden');
@@ -43,7 +43,7 @@ const Auth = (function () {
         } else {
           // Student
           userLabel.textContent = 'Student ID';
-          userInput.placeholder = 'e.g. STU-2026-001';
+          userInput.placeholder = 'e.g. SPSS001';
           heading.textContent = 'Student Portal Sign In';
           subtitle.textContent = 'Enter your Student ID and password to access your grades and records.';
           emailGroup.classList.add('hidden');
@@ -189,8 +189,8 @@ const Auth = (function () {
     if (!container) return;
 
     container.innerHTML = `
-      <div class="user-badge">
-        <span>👤</span>
+      <div class="user-badge" style="display: flex; align-items: center; gap: 6px;">
+        <img src="assets/icons/circle-user-round.png" style="width: 16px; height: 16px;" alt="">
         <b>${escapeHtml(user.name || user.username)}</b>
         <span style="opacity: 0.8; font-size: 11px;">(${escapeHtml(user.role)})</span>
       </div>

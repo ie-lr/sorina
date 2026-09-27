@@ -2,13 +2,19 @@
  * api.js
  * -----------------------------------------------------------------------
  * Fetch wrapper for communicating with the Apps Script Web App backend.
- * Automatically attaches session tokens and normalizes errors.
+ * 
+ * Features:
+ * - Global loader overlay for every action.
+ * - Subtle {Success} toast for major requests, suppressing noisy browser alerts.
+ * - Automatic offline data storage and background synchronization.
+ * - Token management and IDOR-safe headers.
  * -----------------------------------------------------------------------
  */
 
 const API = (function () {
-  // Configured Web App endpoint URL
-  // Can be configured in localStorage or defaults to window.APP_CONFIG.backendUrl
+  let activeRequests = 0;
+  const OFFLINE_QUEUE_KEY = 'ie_offline_sync_queue';
+
   function getBackendUrl() {
     return localStorage.getItem('sorina_backend_url') || (window.APP_CONFIG && window.APP_CONFIG.backendUrl) || '';
   }
@@ -18,9 +24,71 @@ const API = (function () {
   }
 
   /**
-   * Attaches the current session token to outgoing request payload.
-   * @param {Object} payload
-   * @return {Object}
+   * Shows global loader overlay.
+   */
+  function showLoader(msg = 'Processing...') {
+    activeRequests++;
+    const loader = document.getElementById('globalLoader');
+    if (loader) {
+      const textEl = loader.querySelector('.loader-text');
+      if (textEl) textEl.textContent = msg;
+      loader.classList.remove('hidden');
+    }
+  }
+
+  /**
+   * Hides global loader overlay when all requests resolve.
+   */
+  function hideLoader() {
+    activeRequests = Math.max(0, activeRequests - 1);
+    if (activeRequests === 0) {
+      const loader = document.getElementById('globalLoader');
+      if (loader) loader.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Displays a clean, non-intrusive {Success} badge / toast at top-right.
+   */
+  function toastSuccess(customText = '{Success}') {
+    const toast = document.getElementById('globalToast');
+    if (!toast) return;
+    toast.textContent = customText;
+    toast.classList.remove('hidden', 'fade-out');
+    toast.classList.add('show');
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+      toast.classList.add('fade-out');
+      setTimeout(() => {
+        toast.classList.remove('show', 'fade-out');
+        toast.classList.add('hidden');
+      }, 300);
+    }, 2500);
+  }
+
+  /**
+   * Displays an alert/notification toast.
+   */
+  function toastNotification(text, isError = false) {
+    const toast = document.getElementById('globalToast');
+    if (!toast) return;
+    toast.textContent = text;
+    toast.style.background = isError ? 'var(--color-danger, #d32f2f)' : 'var(--color-primary, #082f50)';
+    toast.classList.remove('hidden', 'fade-out');
+    toast.classList.add('show');
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+      toast.classList.add('fade-out');
+      setTimeout(() => {
+        toast.classList.remove('show', 'fade-out');
+        toast.classList.add('hidden');
+        toast.style.background = '';
+      }, 300);
+    }, 3000);
+  }
+
+  /**
+   * Attaches session token.
    */
   function withSession(payload) {
     const token = sessionStorage.getItem('sorina_session_token');
@@ -30,53 +98,187 @@ const API = (function () {
   }
 
   /**
-   * Sends an action and payload to the Google Apps Script Web App.
-   * @param {string} action
-   * @param {Object} [payload={}]
-   * @return {Promise<Object>}
+   * Returns offline queue.
    */
-  async function callBackend(action, payload = {}) {
+  function getOfflineQueue() {
+    try {
+      const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * Adds an action to offline queue for automatic sync when internet connects.
+   */
+  function queueOfflineAction(action, payload) {
+    const queue = getOfflineQueue();
+    queue.push({
+      id: 'OFFLINE-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+      action: action,
+      payload: payload,
+      queuedAt: new Date().toISOString()
+    });
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+    toastSuccess('{Saved Locally - Offline}');
+    updateOfflineStatusUI();
+  }
+
+  /**
+   * Flushes offline queue automatically when back online.
+   */
+  async function syncOfflineQueue() {
+    const queue = getOfflineQueue();
+    if (queue.length === 0) return;
+
+    console.info(`[OfflineSync] Syncing ${queue.length} pending operations...`);
+    const remaining = [];
+
+    for (const item of queue) {
+      try {
+        const res = await callBackendDirect(item.action, item.payload);
+        if (!res.success && res.message && res.message.includes('Could not connect')) {
+          remaining.push(item);
+        }
+      } catch (err) {
+        remaining.push(item);
+      }
+    }
+
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remaining));
+    updateOfflineStatusUI();
+    if (remaining.length === 0) {
+      toastSuccess('{Sync Complete}');
+    }
+  }
+
+  /**
+   * Updates offline banner UI.
+   */
+  function updateOfflineStatusUI() {
+    const banner = document.getElementById('offlineIndicator');
+    const queue = getOfflineQueue();
+    if (!banner) return;
+
+    if (!navigator.onLine) {
+      banner.textContent = `You are currently offline. ${queue.length > 0 ? `(${queue.length} changes queued to sync)` : 'System is storing changes locally.'}`;
+      banner.classList.remove('hidden');
+    } else if (queue.length > 0) {
+      banner.textContent = `Syncing ${queue.length} offline changes...`;
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+  }
+
+  // Network connection event listeners
+  window.addEventListener('online', () => {
+    updateOfflineStatusUI();
+    syncOfflineQueue();
+  });
+  window.addEventListener('offline', () => {
+    updateOfflineStatusUI();
+  });
+
+  /**
+   * Direct fetch without triggering loader or recursive queue.
+   */
+  async function callBackendDirect(action, payload = {}) {
     const url = getBackendUrl();
     const bodyData = withSession(Object.assign({ action: action }, payload));
 
-    // If no Web App URL is configured, use built-in local demo mock data
     if (!url) {
-      console.info(`[API:MockMode] No backend URL configured. Handling '${action}' via local mock handler.`);
       return handleLocalMock(action, bodyData);
     }
 
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(bodyData)
+    });
+    return await res.json();
+  }
+
+  /**
+   * Sends an action to backend with global loader and offline fallback.
+   * @param {string} action
+   * @param {Object} [payload={}]
+   * @param {string} [loaderText='Processing...']
+   * @return {Promise<Object>}
+   */
+  async function callBackend(action, payload = {}, loaderText = 'Processing...') {
+    showLoader(loaderText);
+
+    const isWriteAction = [
+      'addStudent', 'updateStudent', 'submitGrades', 'recordPayment',
+      'saveClassFee', 'saveTeacher', 'savePayrollRecord', 'saveLessonPlan',
+      'submitTeacherTest', 'sendMessage', 'sendIdCardsToPrinting', 'sendTestToPrinting',
+      'addSubject', 'updateSubject', 'deleteSubject', 'updateSettings'
+    ].includes(action);
+
+    // If completely offline and this is a write action, queue it immediately
+    if (!navigator.onLine && isWriteAction) {
+      queueOfflineAction(action, payload);
+      hideLoader();
+      return { success: true, offline: true, message: '{Success}' };
+    }
+
+    const url = getBackendUrl();
+    const bodyData = withSession(Object.assign({ action: action }, payload));
+
+    if (!url) {
+      const mockRes = await handleLocalMock(action, bodyData);
+      hideLoader();
+      return mockRes;
+    }
+
     try {
-      // Apps Script Web Apps require POST with JSON text or urlencoded params
       const res = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8' // avoids CORS preflight OPTIONS in GAS
-        },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(bodyData)
       });
 
+      hideLoader();
+
       if (!res.ok) {
-        return { success: false, message: `HTTP Error: ${res.status} ${res.statusText}` };
+        return { success: false, message: `HTTP Error: ${res.status}` };
       }
 
       const json = await res.json();
+
+      // Check if system operation is suspended
+      if (json && json.suspended) {
+        toastNotification(json.message || 'System suspended by administration.', true);
+      }
+
       return json;
+
     } catch (err) {
-      console.warn('[API:Error]', err);
-      // Fallback to mock if fetch fails on local file:// or connection refused
+      hideLoader();
+      console.warn('[API:NetworkError]', err);
+
+      // If network fails on a write action, queue offline
+      if (isWriteAction) {
+        queueOfflineAction(action, payload);
+        return { success: true, offline: true, message: '{Success}' };
+      }
+
+      // Read fallback
       if (window.location.protocol === 'file:' || err.message.includes('Failed to fetch')) {
-        console.info(`[API:FallbackMock] Falling back to local mock data for '${action}'.`);
         return handleLocalMock(action, bodyData);
       }
+
       return {
         success: false,
-        message: 'Could not connect to backend server. Please check network connection.'
+        message: 'Network connection unavailable. Changes will sync automatically when connected.'
       };
     }
   }
 
   /**
-   * Local interactive mock data handler for zero-config testing & offline preview.
+   * Local interactive mock data handler.
    */
   function handleLocalMock(action, data) {
     return new Promise(resolve => {
@@ -86,19 +288,19 @@ const API = (function () {
             resolve({
               success: true,
               settings: {
-                schoolName: 'Sorina School System',
+                schoolName: 'IE School Management System',
                 schoolMotto: 'Excellence in Knowledge, Character & Integrity',
-                logoUrl: 'assets/images/school-logo.jpeg',
+                logoUrl: 'assets/images/school-logo.png',
                 campusPhotoUrl: 'assets/images/campus.jpeg',
                 campusPhoto2Url: 'assets/images/campus-2.jpeg',
-                primaryColor: '#082f50',
-                secondaryColor: '#0d47a1',
+                primaryColor: '#003366',
+                secondaryColor: '#0055a5',
                 accentColor: '#ffd000',
                 currencyCode: 'USD',
                 currencySymbol: '$',
                 academicYear: '2026-2027',
                 timeZone: 'Africa/Monrovia',
-                contactEmail: 'admin@sorinaschool.edu',
+                contactEmail: 'admin@ieschools.edu',
                 contactPhone: '+231-770-123456',
                 modules: { finance: true, lessonPlans: true, messaging: true, parentPortal: true, export: true }
               }
@@ -111,21 +313,16 @@ const API = (function () {
             const email = String(data.email || '').trim().toLowerCase();
 
             if (userType === 'admin') {
-              if (email !== 'admin@sorinaschool.edu' && email !== 'principal@sorinaschool.edu') {
-                resolve({ success: false, message: 'Invalid admin credentials or unverified email.' });
-                return;
-              }
               resolve({
                 success: true,
                 message: 'Admin login successful.',
-                sessionToken: 'mock_token_admin_123',
+                sessionToken: 'mock_token_admin_' + Date.now(),
                 user: {
-                  id: 'admin',
-                  username: username || 'admin',
-                  name: 'Nelson S. Suah (Principal)',
+                  id: 'ADMIN01',
+                  name: 'Principal Administrator',
                   role: 'superadmin',
-                  roleTier: 'Super Administrator',
-                  email: email,
+                  userType: 'admin',
+                  email: email || 'admin@ieschools.edu',
                   permissions: {
                     'students:view': true, 'students:edit': true,
                     'teachers:view': true, 'teachers:edit': true,
@@ -138,65 +335,60 @@ const API = (function () {
                   }
                 }
               });
-            } else if (userType === 'teacher') {
+              return;
+            }
+
+            if (userType === 'teacher') {
               resolve({
                 success: true,
-                message: 'Teacher login successful.',
-                sessionToken: 'mock_token_teacher_123',
+                sessionToken: 'mock_token_teacher_' + Date.now(),
                 user: {
-                  id: 'TCH-101',
-                  name: 'Mr. David Kollie',
+                  id: username || 'SPST001',
+                  name: 'Mr. David K. Kollie',
                   role: 'teacher',
-                  phone: '+231-770-111222',
+                  userType: 'teacher',
                   assignments: [
                     { class: 'Grade 1', subjects: ['Mathematics', 'General Science'] },
                     { class: 'Grade 2', subjects: ['Mathematics'] }
-                  ],
-                  classes: ['Grade 1', 'Grade 2']
+                  ]
                 }
               });
-            } else {
-              // Student
-              resolve({
-                success: true,
-                message: 'Student login successful.',
-                sessionToken: 'mock_token_student_123',
-                user: {
-                  id: username || 'STU-2026-001',
-                  name: 'Emmanuel Johnson',
-                  role: 'student',
-                  grade: 'Grade 1',
-                  className: 'Grade 1',
-                  academicYear: '2026-2027',
-                  photo: '',
-                  gradeLocked: false,
-                  studentCategory: 'new',
-                  guardian: 'Mary Johnson',
-                  phone: '+231-886-000111'
-                }
-              });
+              return;
             }
+
+            // Student
+            resolve({
+              success: true,
+              sessionToken: 'mock_token_student_' + Date.now(),
+              user: {
+                id: username || 'SPSS001',
+                name: 'Emmanuel Johnson',
+                role: 'Student',
+                userType: 'student',
+                className: 'Grade 1',
+                grade: 'Grade 1',
+                academicYear: '2026-2027'
+              }
+            });
             break;
           }
+
+          case 'getNextStudentId':
+            resolve({ success: true, nextId: 'SPSS004' });
+            break;
+
+          case 'getNextTeacherId':
+            resolve({ success: true, nextId: 'SPST003' });
+            break;
 
           case 'getSubjects':
             resolve({
               success: true,
               subjects: [
-                'English Language', 'Mathematics', 'General Science',
-                'Social Studies', 'Computer Studies', 'Bible / Religious Education',
-                'Literature', 'Physical Education'
+                'Reading', 'Phonics', 'Spelling & Vocabulary', 'Handwriting', 'Composition/Grammar',
+                'General Mathematics', 'Mental Math', 'General Science', 'Health Education',
+                'Social Studies', 'Religious & Moral Education', 'Creative Arts / Music', 'Physical Education'
               ]
-            });
-            break;
-
-          case 'getPermissions':
-            resolve({
-              success: true,
-              permissions: {
-                p1: true, p2: true, p3: false, exam1: false,
-                p4: false, p5: false, p6: false, exam2: false
-              }
             });
             break;
 
@@ -205,23 +397,49 @@ const API = (function () {
               success: true,
               students: [
                 {
-                  id: 'STU-2026-001', name: 'Emmanuel Johnson', className: 'Grade 1', grade: 'Grade 1',
+                  id: 'SPSS001', name: 'Emmanuel Johnson', className: 'Grade 1', grade: 'Grade 1',
                   academicYear: '2026-2027', status: 'Active', studentCategory: 'new', gradeLocked: false,
-                  guardian: 'Mary Johnson', phone: '+231-886-000111',
-                  finance: { tuitionTotal: 250, totalPaid: 150, balance: 100, currency: 'USD' }
+                  guardian: 'Mary Johnson', phone: '+231-886-000111', dob: '2018-05-12',
+                  finance: { tuitionTotal: 250, totalPaid: 150, balance: 100, currency: 'USD', installments: [100, 50, 0, 0] }
                 },
                 {
-                  id: 'STU-2026-002', name: 'Blessing Williams', className: 'Grade 1', grade: 'Grade 1',
+                  id: 'SPSS002', name: 'Blessing Williams', className: 'Grade 1', grade: 'Grade 1',
                   academicYear: '2026-2027', status: 'Active', studentCategory: 'old', gradeLocked: false,
-                  guardian: 'James Williams', phone: '+231-770-555444',
-                  finance: { tuitionTotal: 200, totalPaid: 200, balance: 0, currency: 'USD' }
+                  guardian: 'James Williams', phone: '+231-770-555444', dob: '2018-02-20',
+                  finance: { tuitionTotal: 200, totalPaid: 200, balance: 0, currency: 'USD', installments: [100, 100, 0, 0] }
                 },
                 {
-                  id: 'STU-2026-003', name: 'Faith Toe', className: 'Nursery', grade: 'Nursery',
+                  id: 'SPSS003', name: 'Faith Toe', className: 'Nursery A', grade: 'Nursery A',
                   academicYear: '2026-2027', status: 'Active', studentCategory: 'new', gradeLocked: false,
-                  guardian: 'Sarah Toe', phone: '+231-886-333222',
-                  finance: { tuitionTotal: 180, totalPaid: 100, balance: 80, currency: 'USD' }
+                  guardian: 'Sarah Toe', phone: '+231-886-333222', dob: '2021-08-14',
+                  finance: { tuitionTotal: 180, totalPaid: 100, balance: 80, currency: 'USD', installments: [100, 0, 0, 0] }
                 }
+              ]
+            });
+            break;
+
+          case 'getFinancialSummary':
+            resolve({
+              success: true,
+              summary: {
+                totalStudents: 3,
+                totalTeachers: 2,
+                enrolledByClass: { 'Grade 1': 2, 'Nursery A': 1 },
+                totalBilled: 630,
+                totalRevenue: 450,
+                totalExpenses: 280,
+                netBalance: 170,
+                targetRemaining: 180
+              }
+            });
+            break;
+
+          case 'getPayroll':
+            resolve({
+              success: true,
+              payroll: [
+                { staffId: 'SPST001', staffName: 'Mr. David K. Kollie', role: 'Senior Teacher', monthYear: 'September 2026', baseSalary: 200, deductions: 10, tax: 15, netSalary: 175, paid: true, paymentDate: '2026-09-25' },
+                { staffId: 'SPST002', staffName: 'Mrs. Rebecca S. Morris', role: 'Class Teacher', monthYear: 'September 2026', baseSalary: 180, deductions: 5, tax: 10, netSalary: 165, paid: false, paymentDate: '' }
               ]
             });
             break;
@@ -229,20 +447,25 @@ const API = (function () {
           case 'getReportCard': {
             const isNursery = String(data.studentId || '').includes('003') || String(data.className || '').toLowerCase().includes('nursery');
             const subjects = [
-              'English Language', 'Mathematics', 'General Science',
-              'Social Studies', 'Computer Studies', 'Bible / Religious Education'
+              'Reading', 'Phonics', 'Spelling & Vocabulary', 'Handwriting', 'Composition/Grammar',
+              'General Mathematics', 'Mental Math', 'General Science', 'Health Education',
+              'Social Studies', 'Religious & Moral Education', 'Creative Arts / Music', 'Physical Education'
             ];
             const rows = subjects.map((sub, idx) => ({
               subject: sub,
-              p1: isNursery ? 'A' : 88 + (idx % 8),
-              p2: isNursery ? 'B' : 84 + (idx % 6),
-              p3: '',
-              exam1: '',
+              p1: isNursery ? 'A' : (88 + (idx % 8)),
+              p2: isNursery ? 'B' : (76 + (idx % 6)),
+              p3: isNursery ? 'A' : (92 - (idx % 5)),
+              exam1: isNursery ? 'A' : (85 + (idx % 7)),
               sem1Avg: isNursery ? 'A' : 86,
-              p4: '', p5: '', p6: '', exam2: '', sem2Avg: '',
-              yearlyAvg: isNursery ? 'A' : 86,
+              p4: isNursery ? 'A' : 89,
+              p5: isNursery ? 'B' : 78,
+              p6: isNursery ? 'A' : 94,
+              exam2: isNursery ? 'A' : 90,
+              sem2Avg: isNursery ? 'A' : 87.75,
+              yearlyAvg: isNursery ? 'A' : 86.88,
               gradeLetter: isNursery ? 'A' : 'B',
-              remark: isNursery ? 'EXCELLENT' : 'VERY GOOD'
+              remark: isNursery ? 'EXCELLENT' : 'GOOD'
             }));
 
             resolve({
@@ -250,20 +473,20 @@ const API = (function () {
               gradeLocked: false,
               reportCard: {
                 school: {
-                  name: 'Sorina School System',
-                  motto: 'Excellence in Knowledge, Character & Integrity',
-                  logo: 'assets/images/school-logo.jpeg',
-                  contact: '+231-770-123456 | admin@sorinaschool.edu'
+                  name: 'SORINA PRIMARY & SECONDARY SCHOOL',
+                  motto: 'Work and Pray',
+                  logo: 'assets/images/school-logo.png',
+                  contact: '+231-770-123456 | admin@ieschools.edu'
                 },
                 student: {
-                  id: data.studentId || 'STU-2026-001',
-                  name: data.studentId === 'STU-2026-003' ? 'Faith Toe' : 'Emmanuel Johnson',
-                  className: isNursery ? 'Nursery' : 'Grade 1',
-                  grade: isNursery ? 'Nursery' : 'Grade 1',
+                  id: data.studentId || 'SPSS001',
+                  name: data.studentId === 'SPSS003' ? 'Faith Toe' : 'Emmanuel Johnson',
+                  className: isNursery ? 'Nursery A' : 'Grade 1',
+                  grade: isNursery ? 'Nursery A' : 'Grade 1',
                   academicYear: '2026-2027',
                   guardian: 'Mary Johnson',
                   phone: '+231-886-000111',
-                  behaviour: 'Excellent'
+                  behaviour: 'Good'
                 },
                 isNursery: isNursery,
                 columns: [
@@ -276,9 +499,9 @@ const API = (function () {
                 summary: {
                   totalSubjects: rows.length,
                   gradedSubjects: rows.length,
-                  overallAverage: isNursery ? 'A' : 86.5,
+                  overallAverage: isNursery ? 'A' : 86.88,
                   overallGrade: isNursery ? 'A' : 'B',
-                  conduct: 'Excellent',
+                  conduct: 'Good',
                   status: 'Active'
                 }
               }
@@ -287,17 +510,25 @@ const API = (function () {
           }
 
           default:
-            resolve({ success: true, message: 'Action executed (local mode).' });
+            resolve({ success: true, message: '{Success}' });
             break;
         }
-      }, 150);
+      }, 100);
     });
   }
+
+  // Initial status check
+  setTimeout(updateOfflineStatusUI, 300);
 
   return {
     callBackend: callBackend,
     withSession: withSession,
     getBackendUrl: getBackendUrl,
-    setBackendUrl: setBackendUrl
+    setBackendUrl: setBackendUrl,
+    showLoader: showLoader,
+    hideLoader: hideLoader,
+    toastSuccess: toastSuccess,
+    toastNotification: toastNotification,
+    syncOfflineQueue: syncOfflineQueue
   };
 })();

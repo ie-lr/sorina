@@ -36,12 +36,12 @@ const App = (function () {
       if (res && res.success && res.settings) {
         appSettings = res.settings;
 
-        const schoolName = appSettings.schoolName || 'Sorina School System';
+        const schoolName = appSettings.schoolName || 'IE School Management System';
         const motto = appSettings.schoolMotto || 'Excellence in Knowledge, Character & Integrity';
-        const logo = appSettings.logoUrl || 'assets/images/school-logo.jpeg';
+        const logo = appSettings.logoUrl || 'assets/images/school-logo.png';
 
         // Update document title
-        document.title = schoolName + ' — Portal';
+        document.title = schoolName;
 
         // Update Header elements
         const nameEl = document.getElementById('headerSchoolName');
