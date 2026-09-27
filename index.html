@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sorina School Portal</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#082f50">
+  <link rel="apple-touch-icon" href="assets/images/school-logo.jpeg">
+  <link rel="icon" type="image/jpeg" href="assets/images/school-logo.jpeg">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+  <!-- Site Header -->
+  <header id="siteHeader" class="site-header">
+    <div class="brand-wrap">
+      <img id="headerLogo" src="assets/images/school-logo.jpeg" alt="School Logo" class="brand-logo">
+      <div class="brand-text">
+        <h1 id="headerSchoolName">Sorina School System</h1>
+        <div id="headerMotto" class="motto">Excellence in Knowledge, Character &amp; Integrity</div>
+      </div>
+    </div>
+    <div class="header-actions" id="headerActions">
+      <!-- Injected post-login -->
+    </div>
+  </header>
+
+  <!-- Gateway Login Screen (Public) -->
+  <main id="loginScreen" class="gateway-container">
+    <div class="gateway-card">
+      
+      <!-- Left: Login Form -->
+      <div class="gateway-form-pane">
+        <!-- Role Switcher -->
+        <div class="role-tabs" role="tablist">
+          <button type="button" class="role-tab-btn active" data-role="student" role="tab">Student</button>
+          <button type="button" class="role-tab-btn" data-role="teacher" role="tab">Teacher</button>
+          <button type="button" class="role-tab-btn" data-role="admin" role="tab">Admin</button>
+        </div>
+
+        <h2 id="loginHeading" style="margin: 0 0 6px; color: var(--color-primary); font-size: 22px;">Student Portal Sign In</h2>
+        <p id="loginSubtitle" style="margin: 0 0 20px; font-size: 13.5px; color: var(--color-text-muted);">
+          Enter your Student ID and password to access your grades and records.
+        </p>
+
+        <!-- Feedback Alert Container -->
+        <div id="loginAlert" class="alert alert-danger hidden" role="alert"></div>
+
+        <form id="gatewayLoginForm" autocomplete="off" onsubmit="return false;">
+          <!-- Identifier Input -->
+          <div class="form-group">
+            <label class="form-label" id="usernameLabel" for="loginUsername">Student ID</label>
+            <input type="text" id="loginUsername" class="input-field" placeholder="e.g. STU-2026-001" required autocomplete="username">
+          </div>
+
+          <!-- Password Input -->
+          <div class="form-group">
+            <label class="form-label" for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" class="input-field" placeholder="Enter your password" required autocomplete="current-password">
+          </div>
+
+          <!-- Admin Verified Email (Admin Only) -->
+          <div class="form-group hidden" id="adminEmailGroup">
+            <label class="form-label" for="loginEmail">Verified Admin Email <span style="color: var(--color-danger);">*</span></label>
+            <input type="email" id="loginEmail" class="input-field" placeholder="admin@sorinaschool.edu" autocomplete="email">
+            <div class="form-hint">Admin sign-in requires matching the verified administrator email address.</div>
+          </div>
+
+          <!-- MFA Code (Admin Only) -->
+          <div class="form-group hidden" id="mfaCodeGroup">
+            <label class="form-label" for="loginMfa">MFA Verification Code (Optional)</label>
+            <input type="text" id="loginMfa" class="input-field" placeholder="6-digit TOTP / Auth Code" maxlength="8">
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" id="loginSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 8px;">
+            Sign In to Portal
+          </button>
+
+          <!-- Links -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 18px; font-size: 13px;">
+            <a href="#" id="forgotPasswordLink">Forgot Password?</a>
+            <a href="#" id="backendSettingsLink" style="color: var(--color-text-dim); font-size: 11.5px;">⚙️ Endpoint</a>
+          </div>
+        </form>
+      </div>
+
+      <!-- Right: Branded School Panel -->
+      <div class="gateway-brand-pane">
+        <img id="paneLogo" src="assets/images/school-logo.jpeg" alt="School Crest" class="pane-logo">
+        <div class="pane-title" id="paneSchoolName">Sorina School System</div>
+        <div class="pane-motto" id="paneMotto">Excellence in Knowledge, Character &amp; Integrity</div>
+        <div class="pane-badge">Academic Year 2026–2027</div>
+        <div style="margin-top: 25px; font-size: 12px; opacity: 0.85; z-index: 1;">
+          Universal School Management System (USMS)
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- PWA Install Button (Fixed) -->
+  <button id="installAppBtn" class="hidden" type="button" aria-label="Install Sorina App">📲 Install App</button>
+
+  <!-- Role-specific Panel Mount Point (Loaded post-auth) -->
+  <div id="appRoot"></div>
+
+  <!-- Modal Container -->
+  <div id="modalContainer"></div>
+
+  <!-- Scripts -->
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/reportCard.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/pwaInstall.js"></script>
+  <script src="assets/js/app.js"></script>
+
+</body>
+</html>

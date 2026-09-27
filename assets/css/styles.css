@@ -1,0 +1,759 @@
+/**
+ * styles.css
+ * -----------------------------------------------------------------------
+ * Core application styling using CSS design tokens.
+ * Mobile-first, fully responsive, accessible, with print stylesheet for report cards.
+ * -----------------------------------------------------------------------
+ */
+
+/* ==========================================================================
+   1. RESET & BASE
+   ========================================================================== */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+a {
+  color: var(--color-secondary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Accessibility Focus States */
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Utilities */
+.hidden { display: none !important; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* ==========================================================================
+   2. HEADER & BRANDING
+   ========================================================================== */
+.site-header {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  padding: var(--space-sm) var(--space-lg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--shadow-md);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.brand-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  background: #ffffff;
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  box-shadow: var(--shadow-sm);
+}
+
+.brand-text h1 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+}
+
+.brand-text .motto {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.user-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: rgba(255, 255, 255, 0.12);
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-sm);
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   3. BUTTONS & INPUTS
+   ========================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+.btn-primary:hover {
+  background-color: var(--color-primary-light);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary);
+  color: #ffffff;
+}
+.btn-secondary:hover {
+  background-color: #0b3c8a;
+}
+
+.btn-accent {
+  background-color: var(--color-accent);
+  color: var(--color-primary);
+}
+.btn-accent:hover {
+  background-color: var(--color-accent-hover);
+}
+
+.btn-light {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+.btn-light:hover {
+  background-color: var(--color-surface-hover);
+}
+
+.btn-danger {
+  background-color: var(--color-danger);
+  color: #ffffff;
+}
+.btn-danger:hover {
+  background-color: #b91c1c;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-xs);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.input-field, .select-field, .textarea-field {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.input-field:focus, .select-field:focus, .textarea-field:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(8, 47, 80, 0.15);
+}
+
+.form-group {
+  margin-bottom: var(--space-md);
+}
+
+.form-label {
+  display: block;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+  color: var(--color-text);
+}
+
+.form-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+/* ==========================================================================
+   4. GATEWAY LOGIN SCREEN
+   ========================================================================== */
+.gateway-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl) var(--space-md);
+  background: linear-gradient(135deg, rgba(8, 47, 80, 0.9) 0%, rgba(13, 71, 161, 0.82) 100%),
+              url('../images/campus.jpeg') center/cover no-repeat;
+  min-height: calc(100vh - 65px);
+}
+
+.gateway-card {
+  width: 100%;
+  max-width: 900px;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+}
+
+@media (max-width: 768px) {
+  .gateway-card {
+    flex-direction: column;
+  }
+}
+
+.gateway-form-pane {
+  flex: 1 1 55%;
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.gateway-brand-pane {
+  flex: 1 1 45%;
+  background: linear-gradient(145deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+  color: #ffffff;
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.gateway-brand-pane::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: url('../images/campus-2.jpeg') center/cover no-repeat;
+  opacity: 0.18;
+}
+
+.pane-logo {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  background: #ffffff;
+  border-radius: var(--radius-md);
+  padding: 6px;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: var(--space-md);
+  z-index: 1;
+}
+
+.pane-title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
+  z-index: 1;
+}
+
+.pane-motto {
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-accent);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  z-index: 1;
+}
+
+.pane-badge {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  z-index: 1;
+}
+
+/* User Type Switcher Tabs */
+.role-tabs {
+  display: flex;
+  background-color: var(--color-background);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  margin-bottom: var(--space-lg);
+  gap: 4px;
+}
+
+.role-tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.role-tab-btn.active {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Alert Boxes */
+.alert {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.alert-danger {
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+}
+
+.alert-success {
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+  border: 1px solid rgba(21, 128, 61, 0.2);
+}
+
+/* ==========================================================================
+   5. DASHBOARD LAYOUT & CARDS
+   ========================================================================== */
+.dashboard-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--space-lg) var(--space-md);
+  width: 100%;
+}
+
+.nav-tabs {
+  display: flex;
+  gap: var(--space-xs);
+  border-bottom: 2px solid var(--color-border);
+  margin-bottom: var(--space-lg);
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.nav-tab-item {
+  padding: 10px 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--color-text-muted);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.nav-tab-item:hover {
+  color: var(--color-primary);
+}
+
+.nav-tab-item.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.stat-card {
+  background: var(--color-surface);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-border);
+}
+
+.stat-card .stat-label {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  letter-spacing: 0.5px;
+}
+
+.stat-card .stat-value {
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
+  color: var(--color-primary);
+  margin-top: var(--space-xs);
+}
+
+.content-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-border);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.card-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* ==========================================================================
+   6. DATA TABLES & STATUS BADGES
+   ========================================================================== */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+  text-align: left;
+}
+
+.data-table th {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  padding: 12px 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.data-table tbody tr:hover {
+  background-color: var(--color-surface-hover);
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge-success { background: var(--color-success-bg); color: var(--color-success); }
+.badge-warning { background: var(--color-warning-bg); color: var(--color-warning); }
+.badge-danger { background: var(--color-danger-bg); color: var(--color-danger); }
+.badge-info { background: var(--color-info-bg); color: var(--color-info); }
+
+/* ==========================================================================
+   7. MODAL DIALOGS
+   ========================================================================== */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  z-index: 1000;
+}
+
+.modal-dialog {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 650px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--space-lg);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: var(--font-size-lg);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ==========================================================================
+   8. FULL REPORT CARD STYLES & PRINT MEDIA QUERY
+   ========================================================================== */
+.report-card-container {
+  background: #ffffff;
+  color: #172536;
+  padding: 35px 30px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  max-width: 1100px;
+  margin: 20px auto;
+  border: 2px solid #082f50;
+  font-family: Arial, -apple-system, sans-serif;
+}
+
+.rc-header {
+  text-align: center;
+  border-bottom: 2px solid #082f50;
+  padding-bottom: 15px;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.rc-logo {
+  width: 75px;
+  height: 75px;
+  object-fit: contain;
+  margin: 0 auto 10px;
+  display: block;
+}
+
+.rc-school-name {
+  font-size: 24px;
+  font-weight: 800;
+  color: #082f50;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.rc-motto {
+  font-size: 13px;
+  font-weight: 700;
+  color: #b45309;
+  margin: 0 0 6px;
+}
+
+.rc-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0d47a1;
+  margin: 6px 0 0;
+  text-decoration: underline;
+  letter-spacing: 0.5px;
+}
+
+.rc-student-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px 20px;
+  background: #f8fafc;
+  padding: 15px;
+  border-radius: var(--radius-sm);
+  border: 1px solid #e2e8f0;
+  margin-bottom: 25px;
+  font-size: 13.5px;
+}
+
+.rc-student-grid p {
+  margin: 2px 0;
+}
+
+.rc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  margin-bottom: 25px;
+}
+
+.rc-table th, .rc-table td {
+  border: 1px solid #cbd5e1;
+  padding: 7px 6px;
+  text-align: center;
+}
+
+.rc-table th {
+  background-color: #082f50;
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.rc-table td.subject-col {
+  text-align: left;
+  font-weight: bold;
+  padding-left: 10px;
+}
+
+.rc-table tr:nth-child(even) td {
+  background-color: #f8fafc;
+}
+
+.rc-table .pending-cell {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.rc-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #cbd5e1;
+  padding: 12px 18px;
+  border-radius: var(--radius-sm);
+  background: #f8fafc;
+  font-weight: bold;
+  margin-bottom: 30px;
+}
+
+.rc-signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 50px;
+  padding-top: 20px;
+}
+
+.rc-sign-box {
+  width: 220px;
+  text-align: center;
+  border-top: 1px solid #172536;
+  font-size: 12px;
+  font-weight: bold;
+  padding-top: 5px;
+}
+
+/* Print Stylesheet */
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+  .site-header, .btn, .dashboard-container > :not(.report-card-container), .modal-overlay, #installAppBtn {
+    display: none !important;
+  }
+  .report-card-container {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+  .rc-table th {
+    background-color: #082f50 !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* ==========================================================================
+   9. PWA INSTALL BANNER & MODAL
+   ========================================================================== */
+#installAppBtn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999;
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-pill);
+  padding: 12px 20px;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  background-color: var(--color-accent);
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+#installAppBtn:hover {
+  transform: translateY(-2px);
+}

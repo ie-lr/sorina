@@ -1,0 +1,93 @@
+/**
+ * tokens.css
+ * -----------------------------------------------------------------------
+ * Design-token layer (Section 7).
+ * Branding per school is a config change here or dynamically at runtime.
+ * -----------------------------------------------------------------------
+ */
+
+:root {
+  /* Brand colors (School-configurable) */
+  --color-primary: #082f50;
+  --color-primary-dark: #051d32;
+  --color-primary-light: #124d7f;
+  --color-secondary: #0d47a1;
+  --color-accent: #ffd000;
+  --color-accent-hover: #e5bb00;
+
+  /* Surfaces & Canvas */
+  --color-background: #f3f6fa;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f8fafc;
+  --color-card-header: #f8fafc;
+
+  /* Text & Content */
+  --color-text: #172536;
+  --color-text-light: #ffffff;
+  --color-text-muted: #64748b;
+  --color-text-dim: #94a3b8;
+
+  /* Borders & Dividers */
+  --color-border: #e2e8f0;
+  --color-border-dark: #cbd5e1;
+
+  /* Status Colors */
+  --color-success: #15803d;
+  --color-success-bg: #dcfce7;
+  --color-warning: #b45309;
+  --color-warning-bg: #fef3c7;
+  --color-danger: #dc2626;
+  --color-danger-bg: #fee2e2;
+  --color-info: #0284c7;
+  --color-info-bg: #e0f2fe;
+
+  /* Typography */
+  --font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-size-xs: 0.75rem;     /* 12px */
+  --font-size-sm: 0.875rem;    /* 14px */
+  --font-size-base: 1rem;      /* 16px */
+  --font-size-lg: 1.125rem;    /* 18px */
+  --font-size-xl: 1.25rem;     /* 20px */
+  --font-size-2xl: 1.5rem;     /* 24px */
+  --font-size-3xl: 1.875rem;   /* 30px */
+
+  /* Spacing Scale */
+  --space-2xs: 2px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* Border Radius */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
+  --shadow-card: 0 6px 20px rgba(0, 0, 0, 0.06);
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+}
+
+/* Dark mode token overrides */
+:root[data-theme="dark"] {
+  --color-background: #0b131f;
+  --color-surface: #142033;
+  --color-surface-hover: #1b2a42;
+  --color-card-header: #101a2b;
+  --color-text: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-text-dim: #64748b;
+  --color-border: #1e293b;
+  --color-border-dark: #334155;
+  --shadow-card: 0 6px 20px rgba(0, 0, 0, 0.35);
+}

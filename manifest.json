@@ -1,0 +1,17 @@
+{
+  "name": "Sorina School System Portal",
+  "short_name": "Sorina Portal",
+  "description": "Sorina School Management System — Students, Grades, Finance, Teachers & Report Cards.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#082f50",
+  "theme_color": "#082f50",
+  "icons": [
+    {
+      "src": "assets/images/school-logo.jpeg",
+      "sizes": "192x192 512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
