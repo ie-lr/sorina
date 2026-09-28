@@ -1,7 +1,7 @@
 {
-  "name": "IE School Management System",
-  "short_name": "IE School",
-  "description": "IE School Management System — Students, Grades, Finance, Teachers & Report Cards.",
+  "name": "Sorina Daycare & Primary School System",
+  "short_name": "Sorina School",
+  "description": "Sorina Daycare & Primary School System — Students, Grades, Finance, Teachers & Report Cards.",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait-primary",
