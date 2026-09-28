@@ -112,16 +112,6 @@ window.TeacherPanel = (function () {
                 </div>
               </div>
 
-              <div style="display: flex; gap: 8px;">
-                <button type="button" class="btn btn-primary btn-sm" id="quickLessonPlanBtn" style="display: flex; align-items: center; gap: 6px;">
-                  <img src="assets/icons/file-plus.png" style="width: 15px; height: 15px; filter: brightness(0) invert(1);" alt="">
-                  Upload Lesson Plan
-                </button>
-                <button type="button" class="btn btn-secondary btn-sm" id="quickTestSubmitBtn" style="display: flex; align-items: center; gap: 6px;">
-                  <img src="assets/icons/cloud-upload.png" style="width: 15px; height: 15px; filter: brightness(0) invert(1);" alt="">
-                  Submit Test to Admin
-                </button>
-              </div>
             </div>
 
             <!-- Teaching Load Badges -->
@@ -164,9 +154,6 @@ window.TeacherPanel = (function () {
         loadTab(currentTab);
       });
     });
-
-    document.getElementById('quickLessonPlanBtn').onclick = () => openLessonPlanModal();
-    document.getElementById('quickTestSubmitBtn').onclick = () => openTestSubmitModal();
 
     // Logout
     const logoutBtn = document.getElementById('teacherLogoutBtn');
@@ -781,11 +768,22 @@ window.TeacherPanel = (function () {
         <div class="content-card">
           <h3 class="card-title" style="margin-bottom: 12px;">Mobile Application (PWA)</h3>
           <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 14px;">
-            Install the IE School Management System app directly on your smartphone for offline grade sheets and attendance.
+            Install the app directly on your smartphone for offline grade sheets and attendance.
           </p>
           <button type="button" class="btn btn-light" id="teacherPwaBtn" style="display: flex; align-items: center; gap: 8px;">
             <img src="assets/icons/download (2).png" style="width: 16px; height: 16px;" alt="">
             Install App to Device
+          </button>
+        </div>
+
+        <div class="content-card" style="margin-top: 20px;">
+          <h3 class="card-title" style="margin-bottom: 12px;">Account Session</h3>
+          <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 14px;">
+            Sign out of your teacher portal session on this device.
+          </p>
+          <button type="button" class="btn btn-danger" id="teacherSettingsSignOutBtn" style="display: flex; align-items: center; gap: 8px;">
+            <img src="assets/icons/log-out.png" style="width: 16px; height: 16px; filter: brightness(0) invert(1);" alt="">
+            Sign Out
           </button>
         </div>
       </div>
@@ -852,6 +850,13 @@ window.TeacherPanel = (function () {
       if (btn) btn.click();
       else API.toastNotification('App install ready via browser menu (Add to Home Screen).');
     };
+
+    const signOutBtn = document.getElementById('teacherSettingsSignOutBtn');
+    if (signOutBtn) {
+      signOutBtn.onclick = () => {
+        if (window.Auth) window.Auth.logout();
+      };
+    }
   }
 
   async function viewStudentReport(studentId) {

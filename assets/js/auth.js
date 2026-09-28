@@ -284,6 +284,7 @@ const Auth = (function () {
   return {
     initLoginForm: initLoginForm,
     checkExistingSession: checkExistingSession,
-    handleLogout: handleLogout
+    handleLogout: handleLogout,
+    logout: handleLogout
   };
 })();

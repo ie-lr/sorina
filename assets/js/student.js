@@ -265,7 +265,7 @@ window.StudentPanel = (function () {
       <div id="printableFinanceStatement" class="content-card">
         <div style="border-bottom: 2px solid var(--color-primary); padding-bottom: 12px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <h2 style="margin: 0; color: var(--color-primary); font-size: 19px;">IE SCHOOL MANAGEMENT SYSTEM</h2>
+            <h2 style="margin: 0; color: var(--color-primary); font-size: 19px;">SORINA DAYCARE &amp; PRIMARY SCHOOL SYSTEM</h2>
             <div style="font-size: 12.5px; color: var(--color-text-muted);">Official Student Account Financial Statement</div>
           </div>
           <div style="text-align: right; font-size: 12.5px;">
@@ -347,6 +347,26 @@ window.StudentPanel = (function () {
         <div style="margin-top: 30px; display: flex; justify-content: space-between; font-size: 12px; color: var(--color-text-muted);">
           <div>School Business Office Registrar Signature: _________________________</div>
           <div>Official Seal</div>
+        </div>
+      </div>
+
+      <!-- Payment Receipt Section -->
+      <div class="content-card no-print" style="margin-top: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 class="card-title">Official Payment Receipt</h3>
+            <div style="font-size: 13px; color: var(--color-text-muted);">
+              Official school payment receipt slip showing recorded fees and balance.
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary" onclick="window.StudentPanel.printPaymentReceipt()" style="display: flex; align-items: center; gap: 6px;">
+            <img src="assets/icons/file-text.png" style="width: 15px; height: 15px; filter: brightness(0) invert(1);" alt="">
+            Print Payment Receipt
+          </button>
+        </div>
+
+        <div style="display: flex; justify-content: center; padding: 10px 0;">
+          ${buildReceiptCardHtml(currentStudent)}
         </div>
       </div>
     `;
@@ -498,6 +518,109 @@ window.StudentPanel = (function () {
       if (btn) btn.click();
       else API.toastNotification('App install ready via browser menu (Add to Home Screen).');
     };
+
+    const signOutBtn = document.getElementById('settingsSignOutBtn');
+    if (signOutBtn) {
+      signOutBtn.onclick = () => {
+        if (window.Auth) window.Auth.logout();
+      };
+    }
+  }
+
+  function printPaymentReceipt() {
+    if (!currentStudent) return;
+    const cardHtml = buildReceiptCardHtml(currentStudent);
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map(el => el.outerHTML).join('');
+    const printWin = window.open('', '_blank');
+    printWin.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Payment Receipt - ${escapeHtml(currentStudent.name)}</title>${styles}
+      <style>@page { size: A4 landscape; margin: 6mm; } body{background:#fff;margin:0;padding:4mm;display:flex;justify-content:center;}</style></head><body><div class="receiptPrintGrid">${cardHtml}</div></body></html>`);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => { printWin.print(); }, 400);
+  }
+
+  function buildReceiptRow(label, amount, currency, dateStr) {
+    if (!amount || Number(amount) <= 0) return '';
+    return `
+      <div class="receiptRow">
+        <div class="receiptRowCheck">✓</div>
+        <div class="receiptRowLabel">${escapeHtml(label)}</div>
+        <div class="receiptRowDate"><small>Payment Date</small>${escapeHtml(dateStr) || '—'}</div>
+        <div class="receiptRowAmount">${formatMoney(amount, currency)}</div>
+      </div>`;
+  }
+
+  function buildReceiptCardHtml(s) {
+    const f = s.finance || {};
+    const currency = f.currency || 'USD';
+    const installments = f.installments || [0, 0, 0, 0];
+    const fallbackDate = f.updatedAt || new Date().toLocaleDateString();
+    const rows = [];
+
+    if (f.entranceFeePaid) rows.push(buildReceiptRow('Entrance Fee', f.entranceFee, currency, fallbackDate));
+    if (f.registrationPaid) rows.push(buildReceiptRow('Registration Fee', f.registrationFee, currency, f.registrationDate || fallbackDate));
+    if (f.requirementsFeePaid) rows.push(buildReceiptRow('Requirements Fee', f.requirementsFee, currency, fallbackDate));
+    if (f.peSuitFeePaid) rows.push(buildReceiptRow('PE Suit Fee', f.peSuitFee, currency, fallbackDate));
+    if (f.portalFeePaid) rows.push(buildReceiptRow('Portal Fee', f.portalFee, currency, fallbackDate));
+    ['1st', '2nd', '3rd', '4th'].forEach((ord, i) => {
+      rows.push(buildReceiptRow(`${ord} Tuition Installment`, installments[i], currency, fallbackDate));
+    });
+    rows.push(buildReceiptRow('Other Payments', f.otherPayments, currency, fallbackDate));
+
+    const rowsHtml = rows.join('') || `<p class="muted" style="padding:10px 0; color:#64748b; font-size:12px;">No payments recorded yet.</p>`;
+
+    const totalPaid =
+      (f.entranceFeePaid ? toNum(f.entranceFee) : 0) +
+      (f.registrationPaid ? toNum(f.registrationFee) : 0) +
+      (f.requirementsFeePaid ? toNum(f.requirementsFee) : 0) +
+      (f.peSuitFeePaid ? toNum(f.peSuitFee) : 0) +
+      (f.portalFeePaid ? toNum(f.portalFee) : 0) +
+      installments.reduce((a, b) => a + toNum(b), 0) +
+      toNum(f.otherPayments);
+
+    const totalBalance = studentBalance(s);
+    return `
+      <div class="receiptCard">
+        <div class="receiptTopBrand">
+          <img class="receiptTopLogo" src="assets/images/school-logo.png" alt="Logo" onerror="this.style.display='none'">
+          <div class="receiptTopSchoolName">Sorina Daycare &amp; Primary School System</div>
+          <div class="receiptTopMotto">Excellence in Knowledge, Character &amp; Integrity</div>
+        </div>
+        <div class="receiptHeaderRule"></div>
+        <div class="receiptStudentPhotoRow">
+          <div class="receiptStudentPhotoBox">${s.photo ? `<img src="${escapeHtml(s.photo)}" alt="Photo">` : '👤'}</div>
+        </div>
+        <div class="receiptTitle">PAYMENT RECEIPT</div>
+        <div class="receiptMetaRow">
+          <div><small>Paid For</small><b>${escapeHtml(s.name)} (${escapeHtml(s.id)})</b></div>
+          <div><small>Date</small><b>${new Date().toLocaleDateString()}</b></div>
+        </div>
+        <div class="receiptRowsWrap">${rowsHtml}</div>
+        <div class="receiptTotalsBar">
+          <div><small>Total Paid</small><b>${formatMoney(totalPaid, currency)}</b></div>
+          <div class="receiptBalanceBlock"><small>Total Balance</small><b class="${totalBalance > 0 ? 'score-red' : 'score-green'}">${formatMoney(totalBalance, currency)}</b></div>
+        </div>
+        <div class="receiptFooterNote">Payments are record-only; no payment is processed online on this website.</div>
+      </div>`;
+  }
+
+  function studentBalance(s) {
+    const f = s.finance || {};
+    const installments = f.installments || [0, 0, 0, 0];
+    const tuitionPaid = installments.reduce((a, b) => a + toNum(b), 0);
+    const tuitionBalance = Math.max(0, toNum(f.tuitionTotal) - tuitionPaid);
+    const regBalance = f.registrationPaid ? 0 : toNum(f.registrationFee);
+    const reqBalance = f.requirementsFeePaid ? 0 : toNum(f.requirementsFee);
+    const peBalance = f.peSuitFeePaid ? 0 : toNum(f.peSuitFee);
+    const portalBalance = f.portalFeePaid ? 0 : toNum(f.portalFee);
+    const entranceBalance = f.entranceFeePaid ? 0 : toNum(f.entranceFee);
+    return tuitionBalance + regBalance + reqBalance + peBalance + portalBalance + entranceBalance;
+  }
+
+  function toNum(v) { const n = Number(v); return isNaN(n) ? 0 : n; }
+  function formatMoney(n, currency) {
+    const num = toNum(n);
+    return (currency || 'USD') + ' ' + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function switchTab(tab) {
@@ -524,6 +647,7 @@ window.StudentPanel = (function () {
 
   return {
     mount: mount,
-    switchTab: switchTab
+    switchTab: switchTab,
+    printPaymentReceipt: printPaymentReceipt
   };
 })();

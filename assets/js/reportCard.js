@@ -1,345 +1,243 @@
 /**
  * reportCard.js
  * -----------------------------------------------------------------------
- * Two-sided booklet report card renderer matching official school templates.
- * 
- * Side 1 (Front Cover):
- * - School Header, Transparent Logo, Motto
- * - Student Biographical Grid (Name, Class, Year, Student ID, DOB, Guardian)
- * - Parent / Guardian Signature Acknowledgment Grid (Periods 1-6)
- * 
- * Side 2 (Inside / Back Spread):
- * - Categorized subjects: Literacy, Numeracy, Natural Sciences, Social Studies
- * - Full 13-period × semester column matrix
- * - Dynamic score color coding:
- *   Standard: <70% Red, 70-90% Blue, 91-100% Deep Green
- *   Nursery: A Green, B/C Blue, D/F Red
- * - Attendance, Promotion Status, Grading Scale, and Official Signatures
+ * Two-Page (Front & Back) Report Card Template
+ * Customized with:
+ * - School Name: Sorina Daycare & Primary School System
+ * - Logo: assets/images/school-logo.png
+ * - Student details: Name, ID, Class, Academic Year, Conduct, Rank, Averages
  * -----------------------------------------------------------------------
  */
 
 const ReportCard = (function () {
 
-  const SUBJECT_CATEGORIES = [
-    {
-      category: 'LITERACY & LANGUAGE ARTS',
-      subjects: ['Reading', 'Phonics', 'Spelling & Vocabulary', 'Handwriting', 'Composition/Grammar', 'English Language', 'Literature']
-    },
-    {
-      category: 'NUMERACY & MATHEMATICS',
-      subjects: ['General Mathematics', 'Mental Math', 'Geometry', 'Algebra']
-    },
-    {
-      category: 'NATURAL & PHYSICAL SCIENCES',
-      subjects: ['General Science', 'Health Education', 'Biology', 'Chemistry', 'Physics']
-    },
-    {
-      category: 'SOCIAL STUDIES & MORAL CITIZENSHIP',
-      subjects: ['Social Studies', 'Religious & Moral Education', 'Creative Arts / Music', 'Physical Education', 'Civics', 'History', 'Geography']
-    }
+  const DEFAULT_SUBJECTS = [
+    'English Language',
+    'Mathematics',
+    'General Science',
+    'Social Studies',
+    'Biology',
+    'Chemistry',
+    'Physics',
+    'History',
+    'Geography',
+    'Civics'
   ];
 
-  /**
-   * Evaluates score class based on grade scale.
-   */
-  function getScoreColorClass(val, isNursery) {
-    if (val === null || val === undefined || val === '' || val === '—') return '';
-    if (isNursery) {
-      const letter = String(val).trim().toUpperCase();
-      if (letter === 'A' || letter === 'A+') return 'score-green';
-      if (letter === 'B' || letter === 'C') return 'score-blue';
-      if (letter === 'D' || letter === 'F') return 'score-red';
-      return '';
+  function formatScore(val) {
+    if (val === null || val === undefined || val === '' || val === '—' || val === '-') {
+      return '-';
     }
-
     const num = Number(val);
-    if (isNaN(num)) return '';
-    if (num < 70) return 'score-red';
-    if (num <= 90) return 'score-blue';
-    return 'score-green';
-  }
-
-  function formatScore(val, isNursery) {
-    if (val === null || val === undefined || val === '' || val === '—') {
-      return '<span style="color:#94a3b8;">—</span>';
+    if (isNaN(num)) {
+      const str = String(val).trim();
+      const upper = str.toUpperCase();
+      if (upper === 'A' || upper === 'A+') return `<span class="gradeGreen">${escapeHtml(str)}</span>`;
+      if (upper === 'B' || upper === 'C') return `<span class="gradeBlue">${escapeHtml(str)}</span>`;
+      if (upper === 'D' || upper === 'F') return `<span class="gradeRed">${escapeHtml(str)}</span>`;
+      return escapeHtml(str);
     }
-    const colorClass = getScoreColorClass(val, isNursery);
-    return `<span class="${colorClass}">${escapeHtml(String(val))}</span>`;
+    if (num >= 90) return `<span class="gradeGreen">${num}</span>`;
+    if (num >= 70) return `<span class="gradeBlue">${num}</span>`;
+    return `<span class="gradeRed">${num}</span>`;
   }
 
-  /**
-   * Groups rows into standardized categories.
-   */
-  function categorizeRows(rows) {
-    const grouped = [];
-    const usedSubjects = new Set();
-
-    SUBJECT_CATEGORIES.forEach(cat => {
-      const matched = rows.filter(r => {
-        const subName = String(r.subject || '').trim().toLowerCase();
-        return cat.subjects.some(cs => cs.toLowerCase() === subName || subName.includes(cs.toLowerCase()));
-      });
-
-      if (matched.length > 0) {
-        matched.forEach(m => usedSubjects.add(m.subject));
-        grouped.push({
-          categoryName: cat.category,
-          rows: matched
-        });
-      }
-    });
-
-    // Remainder subjects
-    const uncat = rows.filter(r => !usedSubjects.has(r.subject));
-    if (uncat.length > 0) {
-      grouped.push({
-        categoryName: 'GENERAL & ELECTIVE SUBJECTS',
-        rows: uncat
-      });
-    }
-
-    return grouped.length > 0 ? grouped : [{ categoryName: 'ALL SUBJECTS', rows: rows }];
-  }
-
-  /**
-   * Renders the two-sided booklet report card into target container.
-   */
   function render(rcData, target) {
     const container = typeof target === 'string' ? document.querySelector(target) : target;
     if (!container) return;
 
-    if (!rcData || !rcData.rows) {
-      container.innerHTML = '<div class="alert alert-danger">No report card records available for this student and academic year.</div>';
+    if (!rcData) {
+      container.innerHTML = '<div class="alert alert-danger">No report card records available for this student.</div>';
       return;
     }
 
     const school = rcData.school || {};
     const student = rcData.student || {};
     const summary = rcData.summary || {};
-    const isNursery = rcData.isNursery === true;
-    const groupedData = categorizeRows(rcData.rows);
+    const rows = Array.isArray(rcData.rows) && rcData.rows.length > 0 ? rcData.rows : DEFAULT_SUBJECTS.map(s => ({
+      subject: s,
+      p1: '-', p2: '-', p3: '-', exam1: '-', sem1Avg: '-',
+      p4: '-', p5: '-', p6: '-', exam2: '-', sem2Avg: '-', yearlyAvg: '-'
+    }));
 
+    const schoolName = 'Sorina Daycare & Primary School System';
+    const schoolMotto = school.motto || 'Excellence in Knowledge, Character & Integrity';
     const logoSrc = school.logo || 'assets/images/school-logo.png';
-    const schoolName = school.name || 'SORINA PRIMARY & SECONDARY SCHOOL';
-    const motto = school.motto || 'Work and Pray';
+
+    const studentName = student.name || '—';
+    const studentId = student.id || '—';
+    const className = student.className || student.grade || '—';
+    const academicYear = student.academicYear || '2026/2027';
+
+    const conduct1 = student.behaviour || summary.conduct1 || '-';
+    const conduct2 = student.behaviour || summary.conduct2 || '-';
+    const rank1 = summary.rankSem1 || summary.rank1 || '-';
+    const rank2 = summary.rankSem2 || summary.rank2 || '-';
+    const ave1 = summary.sem1Avg || summary.sem1Average || summary.sem1 || '-';
+    const aveYr = summary.overallAverage || summary.yearlyAverage || summary.average || '-';
 
     const html = `
       <div class="report-booklet-container">
 
-        <!-- Controls (Hidden in Print) -->
-        <div style="display: flex; justify-content: space-between; align-items: center;" class="no-print">
+        <!-- Top Action Bar (Hidden in Print) -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;" class="no-print">
           <div>
-            <span style="font-weight: 700; color: var(--color-primary); font-size: 15px;">Official Student Booklet Report Card</span>
-            <span style="font-size: 12px; color: var(--color-text-muted); margin-left: 8px;">(Two-Sided Academic Record)</span>
+            <span style="font-weight:700; color:var(--color-primary); font-size:15px;">Student Report Card</span>
+            <span style="font-size:12px; color:var(--color-text-muted); margin-left:8px;">(Two-Page Front &amp; Back Template)</span>
           </div>
-          <button type="button" class="btn btn-primary" onclick="window.print()" style="display: flex; align-items: center; gap: 6px;">
-            <img src="assets/icons/download (2).png" style="width: 16px; height: 16px; filter: brightness(0) invert(1);" alt="">
-            Print / Save Two-Sided PDF
+          <button type="button" class="btn btn-primary" onclick="window.print()" style="display:flex; align-items:center; gap:6px;">
+            <img src="assets/icons/download (2).png" style="width:16px; height:16px; filter:brightness(0) invert(1);" alt="">
+            Print / Save Two-Page Report Card
           </button>
         </div>
 
-        <!-- ========================================== -->
-        <!-- SIDE 1: FRONT COVER                       -->
-        <!-- ========================================== -->
-        <div class="booklet-side-card">
-          <div class="booklet-side-header">
-            <img src="${logoSrc}" alt="School Logo" style="width: 76px; height: 76px; object-fit: contain; margin-bottom: 6px; background: transparent;">
-            <div class="booklet-side-title">REPUBLIC OF LIBERIA &bull; MINISTRY OF EDUCATION</div>
-            <h1 class="booklet-school-name">${escapeHtml(schoolName)}</h1>
-            <div class="booklet-motto">&ldquo;${escapeHtml(motto)}&rdquo;</div>
-            <div class="booklet-report-type">${isNursery ? 'EARLY CHILDHOOD / NURSERY PROGRESS REPORT' : 'OFFICIAL ELEMENTARY &amp; SECONDARY REPORT CARD'}</div>
-            <div style="font-size: 13px; font-weight: 700; color: #0f2d59; margin-top: 4px;">
-              ACADEMIC YEAR: ${escapeHtml(student.academicYear || '2026–2027')}
+        <!-- ============ FRONT PAGE — ACADEMIC RECORD ============ -->
+        <div class="reportCardPage rcFrontPage">
+          <div class="rcPageLabel">Front — Academic Record</div>
+          <div class="rcSemesterGrid">
+
+            <!-- First Semester Table -->
+            <div class="rcSemTableWrap">
+              <div class="rcSemTitle">FIRST SEMESTER</div>
+              <table class="rcSemTable">
+                <thead>
+                  <tr>
+                    <th>SUBJECTS</th>
+                    <th>1st</th>
+                    <th>2nd</th>
+                    <th>3rd</th>
+                    <th>Exam</th>
+                    <th>S.Ave</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows.map(r => `
+                    <tr>
+                      <td class="rcSubjectCell">${escapeHtml(r.subject)}</td>
+                      <td>${formatScore(r.p1)}</td>
+                      <td>${formatScore(r.p2)}</td>
+                      <td>${formatScore(r.p3)}</td>
+                      <td>${formatScore(r.exam1)}</td>
+                      <td>${formatScore(r.sem1Avg)}</td>
+                    </tr>
+                  `).join('')}
+                  <tr class="rcSummaryRow">
+                    <td class="rcSubjectCell">Conduct</td>
+                    <td colspan="4"></td>
+                    <td>${escapeHtml(conduct1)}</td>
+                  </tr>
+                  <tr class="rcSummaryRow">
+                    <td class="rcSubjectCell">Rank</td>
+                    <td colspan="4"></td>
+                    <td>${escapeHtml(rank1)}</td>
+                  </tr>
+                  <tr class="rcSummaryRow">
+                    <td class="rcSubjectCell">Average</td>
+                    <td colspan="4"></td>
+                    <td>${formatScore(ave1)}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+
+            <!-- Second Semester Table -->
+            <div class="rcSemTableWrap">
+              <div class="rcSemTitle">SECOND SEMESTER</div>
+              <table class="rcSemTable">
+                <thead>
+                  <tr>
+                    <th>4th</th>
+                    <th>5th</th>
+                    <th>6th</th>
+                    <th>Exam</th>
+                    <th>S.Ave</th>
+                    <th>Yr.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows.map(r => `
+                    <tr>
+                      <td>${formatScore(r.p4)}</td>
+                      <td>${formatScore(r.p5)}</td>
+                      <td>${formatScore(r.p6)}</td>
+                      <td>${formatScore(r.exam2)}</td>
+                      <td>${formatScore(r.sem2Avg)}</td>
+                      <td>${formatScore(r.yearlyAvg)}</td>
+                    </tr>
+                  `).join('')}
+                  <tr class="rcSummaryRow">
+                    <td colspan="5"></td>
+                    <td>${escapeHtml(conduct2)}</td>
+                  </tr>
+                  <tr class="rcSummaryRow">
+                    <td colspan="5"></td>
+                    <td>${escapeHtml(rank2)}</td>
+                  </tr>
+                  <tr class="rcSummaryRow">
+                    <td colspan="5"></td>
+                    <td>${formatScore(aveYr)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
           </div>
 
-          <!-- Student Biographical Data -->
-          <div class="booklet-student-meta-grid">
-            <div class="booklet-meta-item">
-              <strong>Student Name:</strong>
-              <div class="booklet-meta-value">${escapeHtml(student.name || '—')}</div>
+          <div class="rcGradeKey">
+            <b>Method of Grading</b>
+            <div class="rcGradeKeyGrid">
+              <span class="gradeGreen">90 &amp; above — Excellent</span>
+              <span class="gradeBlue">70 – 89 — Passing</span>
+              <span class="gradeRed">Below 70 — Failing</span>
             </div>
-            <div class="booklet-meta-item">
-              <strong>Student ID:</strong>
-              <div class="booklet-meta-value">${escapeHtml(student.id || '—')}</div>
-            </div>
-            <div class="booklet-meta-item">
-              <strong>Class / Grade:</strong>
-              <div class="booklet-meta-value">${escapeHtml(student.className || student.grade || '—')}</div>
-            </div>
-            <div class="booklet-meta-item">
-              <strong>Date of Birth:</strong>
-              <div class="booklet-meta-value">${escapeHtml(student.dob || '—')}</div>
-            </div>
-            <div class="booklet-meta-item">
-              <strong>Parent / Guardian:</strong>
-              <div class="booklet-meta-value">${escapeHtml(student.guardian || '—')}</div>
-            </div>
-            <div class="booklet-meta-item">
-              <strong>Emergency Phone:</strong>
-              <div class="booklet-meta-value">${escapeHtml(student.phone || '—')}</div>
-            </div>
-            <div class="booklet-meta-item">
-              <strong>Student Conduct:</strong>
-              <div class="booklet-meta-value">${escapeHtml(student.behaviour || 'Good')}</div>
-            </div>
-            <div class="booklet-meta-item">
-              <strong>Status:</strong>
-              <div class="booklet-meta-value">${escapeHtml(student.status || 'Active Enrolled')}</div>
-            </div>
-          </div>
-
-          <!-- Parent / Guardian Acknowledgment Table -->
-          <h3 style="font-size: 13px; text-transform: uppercase; color: #0f2d59; margin: 24px 0 8px; font-weight: 800;">
-            Parent / Guardian Report Card Examination &amp; Signature
-          </h3>
-          <p style="font-size: 12px; color: #475569; margin: 0 0 12px;">
-            Parents/Guardians are requested to examine this report card carefully at each evaluation period, append signature, and return promptly.
-          </p>
-
-          <table class="booklet-parent-table">
-            <thead>
-              <tr>
-                <th style="width: 25%;">Evaluation Period</th>
-                <th style="width: 50%;">Parent / Guardian Signature</th>
-                <th style="width: 25%;">Date Signed</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><b>1st Marking Period</b></td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr>
-                <td><b>2nd Marking Period</b></td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr>
-                <td><b>3rd Marking Period</b></td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr>
-                <td><b>4th Marking Period</b></td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr>
-                <td><b>5th Marking Period</b></td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr>
-                <td><b>6th Marking Period</b></td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div style="margin-top: 36px; text-align: center; font-size: 11.5px; color: #64748b;">
-            Side 1 of 2 &bull; Official Student Cumulative Academic Record Booklet
           </div>
         </div>
 
-        <!-- ========================================== -->
-        <!-- SIDE 2: INSIDE / BACK SPREAD              -->
-        <!-- ========================================== -->
-        <div class="booklet-side-card">
-          <div class="booklet-side-header">
-            <div class="booklet-side-title">PERFORMANCE RECORD &bull; SEMESTERS 1 &amp; 2</div>
-            <h2 class="booklet-school-name" style="font-size: 18px;">${escapeHtml(schoolName)}</h2>
-            <div style="font-size: 13px; font-weight: 700; color: #0f2d59;">
-              Student: ${escapeHtml(student.name)} &bull; ID: [${escapeHtml(student.id)}] &bull; Class: ${escapeHtml(student.className || student.grade)}
+        <!-- ============ BACK PAGE — PROMOTION & SIGN-OFF ============ -->
+        <div class="reportCardPage rcBackPage">
+          <div class="rcPageLabel">Back — Promotion &amp; Sign-Off</div>
+          <div class="rcBackGrid">
+
+            <div class="rcPromoBox">
+              <h3>Promotion Statement</h3>
+              <p class="rcPromoLine">This certifies that <span class="fillIn">${escapeHtml(studentName)}</span></p>
+              <p class="rcPromoLine">Has satisfactorily completed the work of Grade <span class="fillIn">${escapeHtml(className)}</span> and is:</p>
+              <div class="rcPromoOption">A. Promoted to Grade _____________________</div>
+              <div class="rcPromoOption">B. Condition in _____________________</div>
+              <div class="rcPromoOption">C. Required to repeat the grade</div>
+              <div class="rcPromoOption">D. Asked not to return (NTR)</div>
+              <div class="rcSignBlock"><span class="rcSignLine"></span><div class="rcSignLabel">Class Sponsor</div></div>
+              <div class="rcSignBlock"><span class="rcSignLine"></span><div class="rcSignLabel">Principal</div></div>
+              <div class="rcSignBlock"><span class="rcSignLine">Date: ______________________</span></div>
             </div>
-          </div>
 
-          <!-- Academic Table -->
-          <div class="table-responsive" style="border: 1px solid #0f2d59; border-radius: 4px; overflow: hidden;">
-            <table class="rc-table" style="font-size: 12px;">
-              <thead>
-                <tr>
-                  <th class="subject-col" style="min-width: 170px; text-align: left;">SUBJECT</th>
-                  <th>1st P</th>
-                  <th>2nd P</th>
-                  <th>3rd P</th>
-                  <th>Exam 1</th>
-                  <th style="background-color: #0b3c8a;">Sem 1</th>
-                  <th>4th P</th>
-                  <th>5th P</th>
-                  <th>6th P</th>
-                  <th>Exam 2</th>
-                  <th style="background-color: #0b3c8a;">Sem 2</th>
-                  <th style="background-color: #0d47a1;">Yearly</th>
-                  <th>Grade</th>
-                  <th>Remark</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${groupedData.map(group => `
-                  <tr class="category-header-row">
-                    <td colspan="14">${escapeHtml(group.categoryName)}</td>
-                  </tr>
-                  ${group.rows.map(row => renderBookletRow(row, isNursery)).join('')}
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Booklet Footer: Promotion, Summary, Legend, and Signatures -->
-          <div class="booklet-footer-summary">
-            
-            <div class="promotion-block">
-              <div style="margin-bottom: 8px;">
-                <strong>Attendance Summary:</strong> Total Days: <b>180</b> &nbsp;|&nbsp; Days Present: <b>176</b> &nbsp;|&nbsp; Days Absent: <b>4</b>
+            <div class="rcHeaderBox">
+              <div class="rcSchoolHead">
+                <img src="${logoSrc}" alt="Logo" onerror="this.style.display='none'">
+                <div>
+                  <div class="rcSchoolName">${escapeHtml(schoolName)}</div>
+                  <div class="rcSchoolSub">${escapeHtml(schoolMotto)}</div>
+                </div>
               </div>
-              <div style="margin-bottom: 8px;">
-                <strong>Overall Yearly Average:</strong> 
-                <b style="font-size: 16px; margin-left: 4px;" class="${getScoreColorClass(summary.overallAverage, isNursery)}">
-                  ${summary.overallAverage || '—'}
-                </b>
-                &nbsp;|&nbsp; <strong>Grade:</strong> <span class="${getScoreColorClass(summary.overallGrade, isNursery)}">${summary.overallGrade || '—'}</span>
-              </div>
-              <div style="margin-top: 14px; padding: 10px; border: 1px solid #0f2d59; border-radius: 4px; background: #fdfdfe;">
-                <div style="font-weight: 800; color: #0f2d59; margin-bottom: 4px;">PROMOTION DECISION:</div>
-                <div>&bull; Promoted to Grade / Class: <b>${summary.overallGrade === 'F' ? '—' : (summary.promotedTo || getNextClass(student.className || student.grade))}</b></div>
-                <div>&bull; Retained in Grade / Class: <b>${summary.overallGrade === 'F' ? (student.className || student.grade) : '—'}</b></div>
-              </div>
+              <div class="rcCardTitleBar">Student Report Card</div>
+              <p class="rcStudentMetaLine">Student's Name: <b>${escapeHtml(studentName)}</b></p>
+              <p class="rcStudentMetaLine">Grade: <b>${escapeHtml(className)}</b> &nbsp; School Year: <b>${escapeHtml(academicYear)}</b></p>
+              <p class="rcStudentMetaLine">Student ID: <b>${escapeHtml(studentId)}</b></p>
+              <p class="rcSignoffNote">Parents or Guardian must sign each period as evidence they have seen the periodic report.</p>
+              <table class="rcSignoffTable">
+                <thead><tr><th>Period</th><th>Class Teacher</th><th>Parent/Guardian</th></tr></thead>
+                <tbody>
+                  <tr><td>I</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+                  <tr><td>II</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+                  <tr><td>III</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+                  <tr><td>IV</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+                  <tr><td>V</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+                  <tr><td>VI</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+                </tbody>
+              </table>
+              <p class="rcFootnote">Note: When a student's mark is below 70 in any subject, the Parent or Guardian should give special attention to see that the student does well in all required work; otherwise the student will probably fail.</p>
             </div>
 
-            <!-- Grading Scale Legend -->
-            <div class="grading-legend-box">
-              <h4>${isNursery ? 'Nursery Scale' : 'Standard Grading Scale'}</h4>
-              ${isNursery ? `
-                <div style="color: #15803d; font-weight: 700;">A &bull; 85–100% (Excellent)</div>
-                <div style="color: #2563eb; font-weight: 700;">B/C &bull; 70–84% (Good / Satisfactory)</div>
-                <div style="color: #dc2626; font-weight: 700;">D/F &bull; Below 70% (Poor / Retained)</div>
-              ` : `
-                <div style="color: #15803d; font-weight: 700;">91–100% &bull; A (Deep Green: Honored)</div>
-                <div style="color: #2563eb; font-weight: 700;">70–90% &bull; B/C (Blue: Satisfactory)</div>
-                <div style="color: #dc2626; font-weight: 700;">&lt; 70% &bull; D/F (Red: Retained)</div>
-              `}
-            </div>
-
-          </div>
-
-          <!-- Signatures -->
-          <div class="booklet-signature-row">
-            <div class="booklet-sign-item">
-              Homeroom Teacher
-            </div>
-            <div class="booklet-sign-item" style="border-top: none; text-align: center;">
-              <div style="font-size: 11px; color: #64748b;">[ OFFICIAL SCHOOL STAMP ]</div>
-            </div>
-            <div class="booklet-sign-item">
-              Principal / Registrar
-            </div>
-          </div>
-
-          <div style="margin-top: 24px; text-align: center; font-size: 11.5px; color: #64748b;">
-            Side 2 of 2 &bull; End of Cumulative Academic Record
           </div>
         </div>
 
@@ -347,40 +245,6 @@ const ReportCard = (function () {
     `;
 
     container.innerHTML = html;
-  }
-
-  function renderBookletRow(row, isNursery) {
-    return `
-      <tr>
-        <td class="subject-col" style="text-align: left; font-weight: 600;">${escapeHtml(row.subject)}</td>
-        <td>${formatScore(row.p1, isNursery)}</td>
-        <td>${formatScore(row.p2, isNursery)}</td>
-        <td>${formatScore(row.p3, isNursery)}</td>
-        <td>${formatScore(row.exam1, isNursery)}</td>
-        <td style="font-weight: 700; background: #f8fafc;">${formatScore(row.sem1Avg, isNursery)}</td>
-        <td>${formatScore(row.p4, isNursery)}</td>
-        <td>${formatScore(row.p5, isNursery)}</td>
-        <td>${formatScore(row.p6, isNursery)}</td>
-        <td>${formatScore(row.exam2, isNursery)}</td>
-        <td style="font-weight: 700; background: #f8fafc;">${formatScore(row.sem2Avg, isNursery)}</td>
-        <td style="font-weight: 800; background: #eff6ff;">${formatScore(row.yearlyAvg, isNursery)}</td>
-        <td style="font-weight: 700;">${formatScore(row.gradeLetter, isNursery)}</td>
-        <td style="font-size: 10.5px; color: #475569;">${escapeHtml(row.remark || '—')}</td>
-      </tr>
-    `;
-  }
-
-  function getNextClass(currentClass) {
-    if (!currentClass) return 'Next Grade Level';
-    const c = String(currentClass).trim();
-    if (c.toLowerCase().includes('nursery')) return 'Kindergarten';
-    if (c.toLowerCase().includes('k-2') || c.toLowerCase().includes('kg-2')) return 'Grade 1';
-    const m = c.match(/Grade\s*(\d+)/i);
-    if (m) {
-      const nextGrade = parseInt(m[1], 10) + 1;
-      return nextGrade <= 12 ? `Grade ${nextGrade}` : 'Graduated (Senior High Diploma)';
-    }
-    return 'Promoted to Next Level';
   }
 
   function escapeHtml(str) {

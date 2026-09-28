@@ -25,6 +25,9 @@ window.AdminPanel = (function () {
   let currentTab = 'summary';
   let cachedStudents = [];
   let cachedTeachers = [];
+  let cachedAdmins = [];
+  let cachedPayroll = [];
+  let cachedCustomStaff = JSON.parse(localStorage.getItem('sorina_custom_staff') || '[]');
   let cachedSubjects = [];
   let isSidebarCollapsed = false;
   let selectedStudentIdsForPrint = new Set();
@@ -360,32 +363,51 @@ window.AdminPanel = (function () {
           ` : ''}
         </div>
 
-        <!-- Filter Row -->
-        <div style="display: flex; gap: 10px; margin: 14px 0; flex-wrap: wrap;">
-          <input type="text" id="studentSearchInput" class="input-field" placeholder="Search by student name or ID..." style="max-width: 250px;">
-          <select id="studentClassFilter" class="select-field" style="max-width: 160px;">
-            <option value="">All Classes</option>
-            <option value="Nursery A">Nursery A</option>
-            <option value="Nursery B">Nursery B</option>
-            <option value="Kindergarten">Kindergarten</option>
-            <option value="Grade 1">Grade 1</option>
-            <option value="Grade 2">Grade 2</option>
-            <option value="Grade 3">Grade 3</option>
-            <option value="Grade 4">Grade 4</option>
-            <option value="Grade 5">Grade 5</option>
-            <option value="Grade 6">Grade 6</option>
-            <option value="Grade 7">Grade 7</option>
-            <option value="Grade 8">Grade 8</option>
-            <option value="Grade 9">Grade 9</option>
-            <option value="Grade 10">Grade 10</option>
-            <option value="Grade 11">Grade 11</option>
-            <option value="Grade 12">Grade 12</option>
-          </select>
-          <select id="studentCategoryFilter" class="select-field" style="max-width: 140px;">
-            <option value="">All Categories</option>
-            <option value="new">New Enrollee</option>
-            <option value="old">Returning Student</option>
-          </select>
+        <!-- Filter & Receipt Action Row -->
+        <div style="display: flex; gap: 10px; margin: 14px 0; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <input type="text" id="studentSearchInput" class="input-field" placeholder="Search by student name or ID..." style="max-width: 220px;">
+            <select id="studentClassFilter" class="select-field" style="max-width: 140px;">
+              <option value="">All Classes</option>
+              <option value="Nursery A">Nursery A</option>
+              <option value="Nursery B">Nursery B</option>
+              <option value="Kindergarten">Kindergarten</option>
+              <option value="Grade 1">Grade 1</option>
+              <option value="Grade 2">Grade 2</option>
+              <option value="Grade 3">Grade 3</option>
+              <option value="Grade 4">Grade 4</option>
+              <option value="Grade 5">Grade 5</option>
+              <option value="Grade 6">Grade 6</option>
+              <option value="Grade 7">Grade 7</option>
+              <option value="Grade 8">Grade 8</option>
+              <option value="Grade 9">Grade 9</option>
+              <option value="Grade 10">Grade 10</option>
+              <option value="Grade 11">Grade 11</option>
+              <option value="Grade 12">Grade 12</option>
+            </select>
+            <select id="studentCategoryFilter" class="select-field" style="max-width: 140px;">
+              <option value="">All Categories</option>
+              <option value="new">New Enrollee</option>
+              <option value="old">Returning Student</option>
+            </select>
+          </div>
+
+          <!-- Bulk Receipt Printing Controls -->
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <label style="font-size: 13px; font-weight: 600; color: var(--color-primary); display: flex; align-items: center; gap: 6px;">
+              Receipts:
+              <select id="receiptCategorySelect" class="select-field" style="max-width: 160px; font-weight: normal;" onchange="window.AdminPanel.onReceiptCategoryChange()">
+                <option value="all">All Students</option>
+                <option value="class">By Class</option>
+                <option value="overdue">Overdue (Balance Due)</option>
+                <option value="cleared">Tuition Cleared</option>
+              </select>
+            </label>
+            <select id="receiptClassSelect" class="select-field hidden" style="max-width: 140px;"></select>
+            <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.printReceiptsByCategory()" style="display: flex; align-items: center; gap: 6px;">
+              🧾 Print Receipts (3/page)
+            </button>
+          </div>
         </div>
 
         <!-- Student Roster Table -->
@@ -393,6 +415,7 @@ window.AdminPanel = (function () {
           <table class="data-table" id="studentDirectoryTable">
             <thead>
               <tr>
+                <th style="width: 28px;"></th>
                 <th style="width: 38px;"><input type="checkbox" id="selectAllStudentsCheckbox"></th>
                 <th>Student ID</th>
                 <th>Full Name</th>
@@ -439,14 +462,17 @@ window.AdminPanel = (function () {
     if (!tbody) return;
 
     if (list.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 25px; color: var(--color-text-muted);">No matching students found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 25px; color: var(--color-text-muted);">No matching students found.</td></tr>';
       return;
     }
 
     tbody.innerHTML = list.map(s => {
       const isLocked = s.gradeLocked === true;
       return `
-        <tr>
+        <tr id="student-row-${escapeHtml(s.id)}">
+          <td>
+            <button type="button" class="expand-btn" data-id="${escapeHtml(s.id)}" onclick="window.AdminPanel.toggleStudentExpandRow('${escapeHtml(s.id)}', this)" title="Expand academic and finance details">+</button>
+          </td>
           <td><input type="checkbox" class="student-checkbox" data-id="${escapeHtml(s.id)}" ${selectedStudentIdsForPrint.has(s.id) ? 'checked' : ''}></td>
           <td><b>[${escapeHtml(s.id)}]</b></td>
           <td>${escapeHtml(s.name)}</td>
@@ -461,6 +487,9 @@ window.AdminPanel = (function () {
           <td><span class="badge ${s.status === 'Active' ? 'badge-success' : 'badge-danger'}">${escapeHtml(s.status || 'Active')}</span></td>
           <td>
             <div style="display: flex; gap: 4px;">
+              <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.printSingleReceipt('${escapeHtml(s.id)}')" title="Print Payment Receipt">
+                🧾
+              </button>
               <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.viewStudentReport('${escapeHtml(s.id)}')" title="View Report Card">
                 <img src="assets/icons/file-text.png" style="width: 13px; height: 13px;" alt="">
               </button>
@@ -470,6 +499,13 @@ window.AdminPanel = (function () {
               <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.openEditStudentModal('${escapeHtml(s.id)}')" title="Edit Profile">
                 <img src="assets/icons/pencil.png" style="width: 13px; height: 13px;" alt="">
               </button>
+            </div>
+          </td>
+        </tr>
+        <tr id="expand-row-${escapeHtml(s.id)}" class="student-expand-row hidden">
+          <td colspan="10">
+            <div id="expand-content-${escapeHtml(s.id)}" class="student-expand-container">
+              <div style="text-align: center; padding: 12px; color: var(--color-text-muted); font-size: 13px;">Loading student grades and financial summary...</div>
             </div>
           </td>
         </tr>
@@ -499,6 +535,290 @@ window.AdminPanel = (function () {
     });
 
     renderStudentRows(filtered);
+  }
+
+  // =========================================================================
+  // STUDENT EXPAND ROW (ACADEMIC GRADES & FINANCIAL SUMMARY)
+  // =========================================================================
+  async function toggleStudentExpandRow(studentId, btn) {
+    const expandRow = document.getElementById(`expand-row-${studentId}`);
+    const content = document.getElementById(`expand-content-${studentId}`);
+    if (!expandRow || !content) return;
+
+    if (!expandRow.classList.contains('hidden')) {
+      expandRow.classList.add('hidden');
+      if (btn) btn.textContent = '+';
+      return;
+    }
+
+    expandRow.classList.remove('hidden');
+    if (btn) btn.textContent = '−';
+
+    const isSuper = currentUser.role === 'superadmin';
+    const perms = currentUser.permissions || {};
+    const canScores = isSuper || perms['scores:view'];
+    const canFinance = isSuper || perms['finance:view'];
+
+    if (!canScores && !canFinance) {
+      content.innerHTML = `
+        <div style="padding: 10px; color: var(--color-text-muted); font-size: 13px;">
+          You do not have assigned administrative permissions to view grades or finances for this student.
+        </div>
+      `;
+      return;
+    }
+
+    content.innerHTML = '<div style="text-align: center; padding: 14px; color: var(--color-text-muted); font-size: 13px;">Loading student grades and financial summary...</div>';
+
+    try {
+      const [rcRes, finRes] = await Promise.all([
+        canScores ? API.callBackend('getReportCard', { studentId: studentId }) : Promise.resolve(null),
+        canFinance ? API.callBackend('getStudentFinance', { studentId: studentId }) : Promise.resolve(null)
+      ]);
+
+      const s = cachedStudents.find(x => x.id === studentId) || { id: studentId, name: 'Student' };
+      const rc = (rcRes && rcRes.success && rcRes.reportCard) ? rcRes.reportCard : null;
+      const fin = (finRes && finRes.success && finRes.finance) ? finRes.finance : (s.finance || {});
+      const studentWithFin = Object.assign({}, s, { finance: fin });
+
+      const currency = fin.currency || 'USD';
+      const totBilled = toNum(fin.tuitionTotal) + toNum(fin.registrationFee) + toNum(fin.requirementsFee) + toNum(fin.peSuitFee) + toNum(fin.portalFee) + toNum(fin.entranceFee);
+      const totPaid = toNum(fin.totalPaid);
+      const balance = studentBalance(studentWithFin);
+
+      const rows = (rc && Array.isArray(rc.rows) && rc.rows.length > 0) ? rc.rows : [];
+      const summary = (rc && rc.summary) ? rc.summary : {};
+
+      content.innerHTML = `
+        <div class="expand-split-grid">
+          <!-- Academic Grades Column -->
+          <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
+              <h4 style="margin: 0; color: var(--color-primary); font-size: 14px;">Academic Grades Summary</h4>
+              <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.viewStudentReport('${escapeHtml(studentId)}')" style="font-size: 11.5px; padding: 3px 8px;">
+                Full Report Card &rarr;
+              </button>
+            </div>
+            ${canScores ? (rows.length > 0 ? `
+              <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px;">
+                <thead>
+                  <tr style="background: #f1f5f9; text-align: left;">
+                    <th style="padding: 4px 6px; border: 1px solid #cbd5e1;">Subject</th>
+                    <th style="padding: 4px 6px; border: 1px solid #cbd5e1; text-align: center;">Sem 1</th>
+                    <th style="padding: 4px 6px; border: 1px solid #cbd5e1; text-align: center;">Sem 2</th>
+                    <th style="padding: 4px 6px; border: 1px solid #cbd5e1; text-align: center;">Yearly</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows.slice(0, 8).map(r => `
+                    <tr>
+                      <td style="padding: 4px 6px; border: 1px solid #e2e8f0; font-weight: 500;">${escapeHtml(r.subject)}</td>
+                      <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: center;">${r.sem1Avg || '—'}</td>
+                      <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: center;">${r.sem2Avg || '—'}</td>
+                      <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700;">${r.yearlyAvg || '—'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              <div style="font-size: 11.5px; display: flex; justify-content: space-between; color: var(--color-text-muted); padding-top: 4px;">
+                <div><b>Yearly Avg:</b> <span style="font-weight: 700; color: var(--color-primary);">${summary.overallAverage || '—'}</span></div>
+                <div><b>Rank:</b> ${summary.rankSem2 || summary.rankSem1 || '—'}</div>
+                <div><b>Status:</b> ${summary.promotionDecision || 'Active'}</div>
+              </div>
+            ` : '<div style="font-size: 12px; color: #64748b; padding: 10px 0;">No grade records submitted yet for this student.</div>') : '<div style="font-size: 12px; color: #64748b;">No scores view permission.</div>'}
+          </div>
+
+          <!-- Financial Status Column -->
+          <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
+              <h4 style="margin: 0; color: var(--color-primary); font-size: 14px;">Financial Status &amp; Balance</h4>
+              <button type="button" class="btn btn-primary btn-sm" onclick="window.AdminPanel.printSingleReceipt('${escapeHtml(studentId)}')" style="font-size: 11.5px; padding: 3px 8px;">
+                🧾 Print Receipt
+              </button>
+            </div>
+            ${canFinance ? `
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; text-align: center;">
+                <div style="background: #f8fafc; padding: 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
+                  <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Total Billed</div>
+                  <div style="font-size: 13px; font-weight: 700;">${formatMoney(totBilled, currency)}</div>
+                </div>
+                <div style="background: #f8fafc; padding: 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
+                  <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Total Paid</div>
+                  <div style="font-size: 13px; font-weight: 700; color: var(--color-success);">${formatMoney(totPaid, currency)}</div>
+                </div>
+                <div style="background: #f8fafc; padding: 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
+                  <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Balance Due</div>
+                  <div style="font-size: 13px; font-weight: 700; color: ${balance > 0 ? 'var(--color-danger)' : 'var(--color-success)'};">${formatMoney(balance, currency)}</div>
+                </div>
+              </div>
+
+              <!-- Checklist of fee items -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 11.5px;">
+                <div>Registration: ${fin.registrationPaid ? '<span class="badge badge-success" style="padding:1px 5px; font-size:10px;">Paid</span>' : '<span class="badge badge-warning" style="padding:1px 5px; font-size:10px;">Unpaid</span>'}</div>
+                <div>PE Suit: ${fin.peSuitFeePaid ? '<span class="badge badge-success" style="padding:1px 5px; font-size:10px;">Paid</span>' : '<span class="badge badge-light" style="padding:1px 5px; font-size:10px;">Unpaid</span>'}</div>
+                <div>Requirements: ${fin.requirementsFeePaid ? '<span class="badge badge-success" style="padding:1px 5px; font-size:10px;">Paid</span>' : '<span class="badge badge-light" style="padding:1px 5px; font-size:10px;">Unpaid</span>'}</div>
+                <div>Portal Fee: ${fin.portalFeePaid ? '<span class="badge badge-success" style="padding:1px 5px; font-size:10px;">Paid</span>' : '<span class="badge badge-light" style="padding:1px 5px; font-size:10px;">Unpaid</span>'}</div>
+              </div>
+            ` : '<div style="font-size: 12px; color: #64748b;">No finance view permission.</div>'}
+          </div>
+        </div>
+      `;
+    } catch (err) {
+      content.innerHTML = '<div class="alert alert-danger" style="margin: 0;">Error loading student details. Please try again.</div>';
+    }
+  }
+
+  // =========================================================================
+  // PAYMENT RECEIPTS & BULK PRINTING (3 PER LANDSCAPE A4 PAGE)
+  // =========================================================================
+  function buildReceiptRow(label, amount, currency, dateStr) {
+    if (!amount || Number(amount) <= 0) return '';
+    return `
+      <div class="receiptRow">
+        <div class="receiptRowCheck">✓</div>
+        <div class="receiptRowLabel">${escapeHtml(label)}</div>
+        <div class="receiptRowDate"><small>Payment Date</small>${escapeHtml(dateStr) || '—'}</div>
+        <div class="receiptRowAmount">${formatMoney(amount, currency)}</div>
+      </div>`;
+  }
+
+  function buildReceiptCardHtml(s) {
+    const f = s.finance || {};
+    const currency = f.currency || 'USD';
+    const installments = f.installments || [0, 0, 0, 0];
+    const fallbackDate = f.updatedAt || new Date().toLocaleDateString();
+    const rows = [];
+
+    if (f.entranceFeePaid) rows.push(buildReceiptRow('Entrance Fee', f.entranceFee, currency, fallbackDate));
+    if (f.registrationPaid) rows.push(buildReceiptRow('Registration Fee', f.registrationFee, currency, f.registrationDate || fallbackDate));
+    if (f.requirementsFeePaid) rows.push(buildReceiptRow('Requirements Fee', f.requirementsFee, currency, fallbackDate));
+    if (f.peSuitFeePaid) rows.push(buildReceiptRow('PE Suit Fee', f.peSuitFee, currency, fallbackDate));
+    if (f.portalFeePaid) rows.push(buildReceiptRow('Portal Fee', f.portalFee, currency, fallbackDate));
+    ['1st', '2nd', '3rd', '4th'].forEach((ord, i) => {
+      rows.push(buildReceiptRow(`${ord} Tuition Installment`, installments[i], currency, fallbackDate));
+    });
+    rows.push(buildReceiptRow('Other Payments', f.otherPayments, currency, fallbackDate));
+
+    const rowsHtml = rows.join('') || `<p class="muted" style="padding:10px 0; color:#64748b; font-size:12px;">No payments recorded yet.</p>`;
+
+    const totalPaid =
+      (f.entranceFeePaid ? toNum(f.entranceFee) : 0) +
+      (f.registrationPaid ? toNum(f.registrationFee) : 0) +
+      (f.requirementsFeePaid ? toNum(f.requirementsFee) : 0) +
+      (f.peSuitFeePaid ? toNum(f.peSuitFee) : 0) +
+      (f.portalFeePaid ? toNum(f.portalFee) : 0) +
+      installments.reduce((a, b) => a + toNum(b), 0) +
+      toNum(f.otherPayments);
+
+    const totalBalance = studentBalance(s);
+    return `
+      <div class="receiptCard">
+        <div class="receiptTopBrand">
+          <img class="receiptTopLogo" src="assets/images/school-logo.png" alt="Logo" onerror="this.style.display='none'">
+          <div class="receiptTopSchoolName">Sorina Daycare &amp; Primary School System</div>
+          <div class="receiptTopMotto">Excellence in Knowledge, Character &amp; Integrity</div>
+        </div>
+        <div class="receiptHeaderRule"></div>
+        <div class="receiptStudentPhotoRow">
+          <div class="receiptStudentPhotoBox">${s.photo ? `<img src="${escapeHtml(s.photo)}" alt="Photo">` : '👤'}</div>
+        </div>
+        <div class="receiptTitle">PAYMENT RECEIPT</div>
+        <div class="receiptMetaRow">
+          <div><small>Paid For</small><b>${escapeHtml(s.name)} (${escapeHtml(s.id)})</b></div>
+          <div><small>Date</small><b>${new Date().toLocaleDateString()}</b></div>
+        </div>
+        <div class="receiptRowsWrap">${rowsHtml}</div>
+        <div class="receiptTotalsBar">
+          <div><small>Total Paid</small><b>${formatMoney(totalPaid, currency)}</b></div>
+          <div class="receiptBalanceBlock"><small>Total Balance</small><b class="${totalBalance > 0 ? 'score-red' : 'score-green'}">${formatMoney(totalBalance, currency)}</b></div>
+        </div>
+        <div class="receiptFooterNote">Payments are record-only; no payment is processed online on this website.</div>
+      </div>`;
+  }
+
+  function studentBalance(s) {
+    const f = s.finance || {};
+    const installments = f.installments || [0, 0, 0, 0];
+    const tuitionPaid = installments.reduce((a, b) => a + toNum(b), 0);
+    const tuitionBalance = Math.max(0, toNum(f.tuitionTotal) - tuitionPaid);
+    const regBalance = f.registrationPaid ? 0 : toNum(f.registrationFee);
+    const reqBalance = f.requirementsFeePaid ? 0 : toNum(f.requirementsFee);
+    const peBalance = f.peSuitFeePaid ? 0 : toNum(f.peSuitFee);
+    const portalBalance = f.portalFeePaid ? 0 : toNum(f.portalFee);
+    const entranceBalance = f.entranceFeePaid ? 0 : toNum(f.entranceFee);
+    return tuitionBalance + regBalance + reqBalance + peBalance + portalBalance + entranceBalance;
+  }
+
+  function toNum(v) { const n = Number(v); return isNaN(n) ? 0 : n; }
+  function formatMoney(n, currency) {
+    const num = toNum(n);
+    return (currency || 'USD') + ' ' + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function receiptCategoryEligibleStudents() {
+    return cachedStudents.filter(s => s.status !== 'Dropped');
+  }
+
+  function populateReceiptClassSelect() {
+    const sel = document.getElementById('receiptClassSelect');
+    if (!sel) return;
+    const classesPresent = Array.from(new Set(receiptCategoryEligibleStudents().map(s => s.className || s.grade).filter(Boolean)));
+    sel.innerHTML = classesPresent.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('') || '<option value="">No classes found</option>';
+  }
+
+  function onReceiptCategoryChange() {
+    const cat = document.getElementById('receiptCategorySelect').value;
+    const classSel = document.getElementById('receiptClassSelect');
+    if (!classSel) return;
+    if (cat === 'class') {
+      populateReceiptClassSelect();
+      classSel.classList.remove('hidden');
+    } else {
+      classSel.classList.add('hidden');
+    }
+  }
+
+  function printReceiptsByCategory() {
+    const cat = document.getElementById('receiptCategorySelect').value;
+    const pool = receiptCategoryEligibleStudents();
+    let selected = [];
+
+    if (cat === 'all') {
+      selected = pool;
+    } else if (cat === 'class') {
+      const cls = document.getElementById('receiptClassSelect').value;
+      if (!cls) { alert('No class selected.'); return; }
+      selected = pool.filter(s => String(s.className || s.grade).toLowerCase() === cls.toLowerCase());
+    } else if (cat === 'overdue') {
+      selected = pool.filter(s => studentBalance(s) > 0);
+    } else if (cat === 'cleared') {
+      selected = pool.filter(s => toNum((s.finance || {}).tuitionTotal) > 0 && studentBalance(s) <= 0);
+    }
+
+    if (!selected.length) {
+      alert('No students match this category.');
+      return;
+    }
+    printReceiptCards(selected);
+  }
+
+  function printReceiptCards(students) {
+    const list = (students || []).filter(Boolean);
+    if (!list.length) { alert('No students to print receipts for.'); return; }
+    const cardsHtml = list.map(s => buildReceiptCardHtml(s)).join('');
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map(el => el.outerHTML).join('');
+    const printWin = window.open('', '_blank');
+    printWin.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Payment Receipts - Sorina Daycare & Primary School System</title>${styles}
+      <style>@page { size: A4 landscape; margin: 6mm; } body{background:#fff;margin:0;padding:4mm;}</style></head><body><div class="receiptPrintGrid">${cardsHtml}</div></body></html>`);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => { printWin.print(); }, 400);
+  }
+
+  function printSingleReceipt(studentId) {
+    const s = cachedStudents.find(x => x.id === studentId);
+    if (!s) { alert('Student record not found.'); return; }
+    printReceiptCards([s]);
   }
 
   // --- Register New Student Modal (Systematic ID: SPSS001...) ---
@@ -1066,31 +1386,108 @@ window.AdminPanel = (function () {
   // =========================================================================
   // 5. STAFF PAYROLL TAB
   // =========================================================================
+  const PAYROLL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const PAYROLL_YEARS = [2024, 2025, 2026, 2027, 2028, 2029, 2030];
+
+  async function ensureStaffLoadedForPayroll() {
+    if (!cachedTeachers || cachedTeachers.length === 0) {
+      const tRes = await API.callBackend('getTeachers', {});
+      if (tRes && tRes.success && Array.isArray(tRes.teachers)) {
+        cachedTeachers = tRes.teachers;
+      }
+    }
+    if (!cachedAdmins || cachedAdmins.length === 0) {
+      const aRes = await API.callBackend('listAdmins', {});
+      if (aRes && aRes.success && Array.isArray(aRes.admins)) {
+        cachedAdmins = aRes.admins;
+      }
+    }
+  }
+
+  function getAllStaffList() {
+    const list = [];
+    (cachedTeachers || []).forEach(t => {
+      list.push({ id: t.id, name: t.name, role: t.title || 'Teacher', category: 'Teacher' });
+    });
+    (cachedAdmins || []).forEach(a => {
+      list.push({ id: a.username, name: a.name || a.username, role: a.title || a.roleTier || 'Administrator', category: 'Administrator' });
+    });
+    (cachedCustomStaff || []).forEach(c => {
+      list.push({ id: c.id, name: c.name, role: c.role || 'Staff', category: 'General Staff' });
+    });
+    return list;
+  }
+
   async function renderPayrollTab(container) {
+    await ensureStaffLoadedForPayroll();
     const res = await API.callBackend('getPayroll', {}, 'Loading payroll...');
-    const payroll = (res && res.success && Array.isArray(res.payroll)) ? res.payroll : [];
+    cachedPayroll = (res && res.success && Array.isArray(res.payroll)) ? res.payroll : [];
+
+    const now = new Date();
+    const currentMonthName = PAYROLL_MONTHS[now.getMonth()];
+    const currentYearNum = now.getFullYear();
 
     container.innerHTML = `
       <div class="content-card">
-        <div class="card-header-row">
+        <div class="card-header-row" style="flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
           <div>
             <h3 class="card-title">Staff Monthly Payroll Management</h3>
             <div style="font-size: 13px; color: var(--color-text-muted);">
-              Compute staff base salaries, deductions, taxes, and track disbursement status.
+              Manage compensation for teachers, administrators, and general staff with custom deductions, tax and disbursement records.
             </div>
           </div>
-          <button type="button" class="btn btn-primary" id="openAddPayrollBtn" style="display: flex; align-items: center; gap: 6px;">
-            <img src="assets/icons/file-plus.png" style="width: 15px; height: 15px; filter: brightness(0) invert(1);" alt="">
-            Record Staff Salary Entry
-          </button>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-light" id="openDownloadPayrollBtn" style="display: flex; align-items: center; gap: 6px;">
+              <img src="assets/icons/download (2).png" style="width: 15px; height: 15px;" alt="">
+              Download Payroll Report
+            </button>
+            <button type="button" class="btn btn-secondary" id="openAddCustomStaffBtn" style="display: flex; align-items: center; gap: 6px;">
+              <img src="assets/icons/user-plus.png" style="width: 15px; height: 15px;" alt="">
+              + Add Staff Member
+            </button>
+            <button type="button" class="btn btn-primary" id="openAddPayrollBtn" style="display: flex; align-items: center; gap: 6px;">
+              <img src="assets/icons/file-plus.png" style="width: 15px; height: 15px; filter: brightness(0) invert(1);" alt="">
+              Record Salary Entry
+            </button>
+          </div>
         </div>
 
-        <div class="table-responsive" style="margin-top: 14px;">
-          <table class="data-table">
+        <!-- Filter Bar -->
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; background: #f8fafc; padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; border: 1px solid var(--color-border);">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 12.5px; font-weight: 600; color: var(--color-text-muted);">Filter Month:</span>
+            <select id="payrollMonthFilter" class="select-field" style="width: 140px; padding: 5px 8px; font-size: 13px;">
+              <option value="">All Months</option>
+              ${PAYROLL_MONTHS.map(m => `<option value="${m}">${m}</option>`).join('')}
+            </select>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 12.5px; font-weight: 600; color: var(--color-text-muted);">Year:</span>
+            <select id="payrollYearFilter" class="select-field" style="width: 100px; padding: 5px 8px; font-size: 13px;">
+              <option value="">All Years</option>
+              ${PAYROLL_YEARS.map(y => `<option value="${y}" ${y === currentYearNum ? 'selected' : ''}>${y}</option>`).join('')}
+            </select>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 12.5px; font-weight: 600; color: var(--color-text-muted);">Status:</span>
+            <select id="payrollStatusFilter" class="select-field" style="width: 120px; padding: 5px 8px; font-size: 13px;">
+              <option value="">All Statuses</option>
+              <option value="paid">Paid</option>
+              <option value="unpaid">Unpaid</option>
+            </select>
+          </div>
+
+          <button type="button" class="btn btn-light btn-sm" id="resetPayrollFilterBtn" style="margin-left: auto;">Reset Filters</button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" id="payrollDataTable">
             <thead>
               <tr>
                 <th>Staff Member</th>
-                <th>Role</th>
+                <th>Role / Dept</th>
                 <th>Month / Year</th>
                 <th>Base Salary</th>
                 <th>Deductions</th>
@@ -1098,63 +1495,204 @@ window.AdminPanel = (function () {
                 <th>Net Salary</th>
                 <th>Disbursement</th>
                 <th>Pay Slip / Voucher</th>
+                <th>Actions</th>
               </tr>
             </thead>
-            <tbody>
-              ${payroll.length === 0 ? `
-                <tr><td colspan="9" style="text-align: center; padding: 25px; color: var(--color-text-muted);">No payroll records entered for this period.</td></tr>
-              ` : payroll.map(p => `
-                <tr>
-                  <td><b>${escapeHtml(p.staffName || p.staffId)}</b></td>
-                  <td>${escapeHtml(p.role || 'Staff')}</td>
-                  <td>${escapeHtml(p.monthYear)}</td>
-                  <td>$${(p.baseSalary || 0).toLocaleString()}</td>
-                  <td>$${(p.deductions || 0).toLocaleString()}</td>
-                  <td>$${(p.tax || 0).toLocaleString()}</td>
-                  <td><b style="color: var(--color-primary); font-size: 14px;">$${(p.netSalary || 0).toLocaleString()}</b></td>
-                  <td>
-                    ${p.paid ? `
-                      <span class="badge badge-success">Paid (${escapeHtml(p.paymentDate || '')})</span>
-                    ` : `
-                      <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.markPayrollPaid('${escapeHtml(p.staffId)}', '${escapeHtml(p.monthYear)}')">
-                        Mark as Paid
-                      </button>
-                    `}
-                  </td>
-                  <td>
-                    ${p.documentUrl ? `
-                      <a href="${p.documentUrl}" target="_blank" class="btn btn-light btn-sm">View Voucher</a>
-                    ` : '<span style="color:#94a3b8;">No File</span>'}
-                  </td>
-                </tr>
-              `).join('')}
+            <tbody id="payrollTableBody">
+              <!-- Rendered via renderFilteredPayrollTable -->
             </tbody>
           </table>
         </div>
       </div>
     `;
 
+    renderFilteredPayrollTable();
+
     document.getElementById('openAddPayrollBtn').onclick = () => openAddPayrollModal();
+    document.getElementById('openAddCustomStaffBtn').onclick = () => openAddCustomStaffModal();
+    document.getElementById('openDownloadPayrollBtn').onclick = () => downloadPayrollReport();
+    document.getElementById('payrollMonthFilter').onchange = () => renderFilteredPayrollTable();
+    document.getElementById('payrollYearFilter').onchange = () => renderFilteredPayrollTable();
+    document.getElementById('payrollStatusFilter').onchange = () => renderFilteredPayrollTable();
+    document.getElementById('resetPayrollFilterBtn').onclick = () => {
+      document.getElementById('payrollMonthFilter').value = '';
+      document.getElementById('payrollYearFilter').value = '';
+      document.getElementById('payrollStatusFilter').value = '';
+      renderFilteredPayrollTable();
+    };
+  }
+
+  function getFilteredPayrollRecords() {
+    const monthFilter = document.getElementById('payrollMonthFilter') ? document.getElementById('payrollMonthFilter').value : '';
+    const yearFilter = document.getElementById('payrollYearFilter') ? document.getElementById('payrollYearFilter').value : '';
+    const statusFilter = document.getElementById('payrollStatusFilter') ? document.getElementById('payrollStatusFilter').value : '';
+
+    return cachedPayroll.filter(p => {
+      const my = String(p.monthYear || '');
+      if (monthFilter && !my.toLowerCase().includes(monthFilter.toLowerCase())) return false;
+      if (yearFilter && !my.includes(yearFilter)) return false;
+      if (statusFilter === 'paid' && !p.paid) return false;
+      if (statusFilter === 'unpaid' && p.paid) return false;
+      return true;
+    });
+  }
+
+  function renderFilteredPayrollTable() {
+    const tbody = document.getElementById('payrollTableBody');
+    if (!tbody) return;
+
+    const filtered = getFilteredPayrollRecords();
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 25px; color: var(--color-text-muted);">No payroll records match the selected filters.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(p => `
+      <tr>
+        <td>
+          <b>${escapeHtml(p.staffName || p.staffId)}</b>
+          <div style="font-size: 11px; color: var(--color-text-muted);">${escapeHtml(p.staffId)}</div>
+        </td>
+        <td>${escapeHtml(p.role || 'Staff')}</td>
+        <td><b>${escapeHtml(p.monthYear)}</b></td>
+        <td>$${(Number(p.baseSalary) || 0).toLocaleString()}</td>
+        <td style="color: #b91c1c;">-$${(Number(p.deductions) || 0).toLocaleString()}</td>
+        <td style="color: #64748b;">$${(Number(p.tax) || 0).toLocaleString()}</td>
+        <td><b style="color: var(--color-primary); font-size: 14px;">$${(Number(p.netSalary) || 0).toLocaleString()}</b></td>
+        <td>
+          ${p.paid ? `
+            <span class="badge badge-success">Paid (${escapeHtml(p.paymentDate || '')})</span>
+          ` : `
+            <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.markPayrollPaid('${escapeHtml(p.staffId)}', '${escapeHtml(p.monthYear)}')">
+              Mark as Paid
+            </button>
+          `}
+        </td>
+        <td>
+          ${p.documentUrl ? `
+            <a href="${p.documentUrl}" target="_blank" class="btn btn-light btn-sm">View Voucher</a>
+          ` : '<span style="color:#94a3b8; font-size:12px;">No File</span>'}
+        </td>
+        <td>
+          <button type="button" class="btn btn-light btn-sm" style="display: inline-flex; align-items: center; gap: 4px;" onclick="window.AdminPanel.openEditPayrollModal('${escapeHtml(p.staffId)}', '${escapeHtml(p.monthYear)}')">
+            <img src="assets/icons/edit.png" style="width: 12px; height: 12px;" alt=""> Edit
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function openAddCustomStaffModal() {
+    App.showModal({
+      title: 'Register Staff Member',
+      content: `
+        <div style="font-size: 13.5px;">
+          <p style="color: var(--color-text-muted); margin-bottom: 14px;">
+            Add administrative, instructional, or non-teaching support personnel to the school staff registry.
+          </p>
+          <div class="form-group">
+            <label class="form-label" for="csName">Staff Full Name *</label>
+            <input type="text" id="csName" class="input-field" placeholder="e.g. Samuel K. Gboto" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="csId">Staff ID Code (Optional)</label>
+            <input type="text" id="csId" class="input-field" placeholder="e.g. STF-001" value="STF-${Date.now().toString().slice(-4)}">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="csRole">Role / Designation *</label>
+            <select id="csRole" class="select-field">
+              <option value="Administrator">Administrator</option>
+              <option value="Teacher">Teacher / Instructor</option>
+              <option value="Registrar">Registrar</option>
+              <option value="Bursar / Accountant">Bursar / Accountant</option>
+              <option value="Security Officer">Security Officer</option>
+              <option value="Driver / Transportation">Driver / Transportation</option>
+              <option value="Custodian / Cleaner">Custodian / Cleaner</option>
+              <option value="Cook / Cafeteria Staff">Cook / Cafeteria Staff</option>
+              <option value="Maintenance / Handyman">Maintenance / Handyman</option>
+              <option value="School Nurse">School Nurse</option>
+              <option value="Librarian">Librarian</option>
+              <option value="Other Staff">Other Staff</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="csPhone">Phone Number (Optional)</label>
+            <input type="text" id="csPhone" class="input-field" placeholder="+231-770-000000">
+          </div>
+        </div>
+      `,
+      confirmText: 'Save Staff Member',
+      onConfirm: () => {
+        const name = document.getElementById('csName').value.trim();
+        const id = document.getElementById('csId').value.trim() || `STF-${Date.now().toString().slice(-4)}`;
+        const role = document.getElementById('csRole').value;
+        const phone = document.getElementById('csPhone').value.trim();
+
+        if (!name) {
+          API.toastNotification('Please enter the staff member full name.', true);
+          return;
+        }
+
+        cachedCustomStaff.push({ id, name, role, phone });
+        localStorage.setItem('sorina_custom_staff', JSON.stringify(cachedCustomStaff));
+        API.toastSuccess();
+        loadTab('payroll');
+      }
+    });
   }
 
   function openAddPayrollModal() {
+    const staffList = getAllStaffList();
+    const now = new Date();
+    const currentMonth = PAYROLL_MONTHS[now.getMonth()];
+    const currentYear = now.getFullYear();
+
+    const teachersList = staffList.filter(s => s.category === 'Teacher');
+    const adminsList = staffList.filter(s => s.category === 'Administrator');
+    const generalList = staffList.filter(s => s.category === 'General Staff');
+
     App.showModal({
-      title: 'Process Staff Payroll Record',
+      title: 'Process Staff Payroll Entry',
       content: `
         <div style="font-size: 13.5px;">
           <div class="form-group">
             <label class="form-label" for="prStaff">Select Staff Member *</label>
             <select id="prStaff" class="select-field">
-              ${cachedTeachers.map(t => `<option value="${escapeHtml(t.id)}" data-name="${escapeHtml(t.name)}" data-role="${escapeHtml(t.title || 'Teacher')}">${escapeHtml(t.name)} [${escapeHtml(t.id)}]</option>`).join('')}
+              ${teachersList.length ? `
+                <optgroup label="Teachers &amp; Faculty">
+                  ${teachersList.map(s => `<option value="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name)}" data-role="${escapeHtml(s.role)}">${escapeHtml(s.name)} [${escapeHtml(s.id)}]</option>`).join('')}
+                </optgroup>
+              ` : ''}
+              ${adminsList.length ? `
+                <optgroup label="Administrators &amp; Officers">
+                  ${adminsList.map(s => `<option value="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name)}" data-role="${escapeHtml(s.role)}">${escapeHtml(s.name)} [${escapeHtml(s.id)}]</option>`).join('')}
+                </optgroup>
+              ` : ''}
+              ${generalList.length ? `
+                <optgroup label="Support &amp; General Staff">
+                  ${generalList.map(s => `<option value="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name)}" data-role="${escapeHtml(s.role)}">${escapeHtml(s.name)} [${escapeHtml(s.id)}]</option>`).join('')}
+                </optgroup>
+              ` : ''}
             </select>
           </div>
 
-          <div class="form-group">
-            <label class="form-label" for="prMonth">Month &amp; Academic Year *</label>
-            <input type="text" id="prMonth" class="input-field" value="September 2026" required>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="prMonthSelect">Disbursement Month *</label>
+              <select id="prMonthSelect" class="select-field">
+                ${PAYROLL_MONTHS.map(m => `<option value="${m}" ${m === currentMonth ? 'selected' : ''}>${m}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="prYearSelect">Academic Year *</label>
+              <select id="prYearSelect" class="select-field">
+                ${PAYROLL_YEARS.map(y => `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}</option>`).join('')}
+              </select>
+            </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;">
             <div class="form-group">
               <label class="form-label" for="prBase">Base Salary ($) *</label>
               <input type="number" id="prBase" class="input-field" value="200" required>
@@ -1166,6 +1704,10 @@ window.AdminPanel = (function () {
             <div class="form-group">
               <label class="form-label" for="prTax">Income Tax ($)</label>
               <input type="number" id="prTax" class="input-field" value="10">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="prNet">Net Salary ($)</label>
+              <input type="number" id="prNet" class="input-field" value="190" style="font-weight: 700; color: var(--color-primary);">
             </div>
           </div>
 
@@ -1182,14 +1724,17 @@ window.AdminPanel = (function () {
       confirmText: 'Save Payroll Entry',
       onConfirm: async () => {
         const staffSel = document.getElementById('prStaff');
-        const staffId = staffSel.value;
-        const opt = staffSel.selectedOptions[0];
+        const staffId = staffSel ? staffSel.value : '';
+        const opt = staffSel ? staffSel.selectedOptions[0] : null;
         const staffName = opt ? opt.dataset.name : '';
-        const role = opt ? opt.dataset.role : 'Teacher';
-        const monthYear = document.getElementById('prMonth').value.trim();
+        const role = opt ? opt.dataset.role : 'Staff';
+        const month = document.getElementById('prMonthSelect').value;
+        const year = document.getElementById('prYearSelect').value;
+        const monthYear = `${month} ${year}`;
         const base = Number(document.getElementById('prBase').value) || 0;
         const ded = Number(document.getElementById('prDed').value) || 0;
         const tax = Number(document.getElementById('prTax').value) || 0;
+        const net = Number(document.getElementById('prNet').value) || (base - ded - tax);
         const paid = document.getElementById('prPaid').checked;
         const file = document.getElementById('prDoc').files[0];
 
@@ -1207,6 +1752,7 @@ window.AdminPanel = (function () {
             baseSalary: base,
             deductions: ded,
             tax: tax,
+            netSalary: net,
             paid: paid,
             paymentDate: paid ? new Date().toLocaleDateString() : '',
             documentUrl: docUrl
@@ -1221,6 +1767,156 @@ window.AdminPanel = (function () {
         }
       }
     });
+
+    const updateNet = () => {
+      const b = Number(document.getElementById('prBase').value) || 0;
+      const d = Number(document.getElementById('prDed').value) || 0;
+      const t = Number(document.getElementById('prTax').value) || 0;
+      const netElem = document.getElementById('prNet');
+      if (netElem) netElem.value = Math.max(0, b - d - t);
+    };
+
+    setTimeout(() => {
+      const b = document.getElementById('prBase');
+      const d = document.getElementById('prDed');
+      const t = document.getElementById('prTax');
+      if (b) b.addEventListener('input', updateNet);
+      if (d) d.addEventListener('input', updateNet);
+      if (t) t.addEventListener('input', updateNet);
+      updateNet();
+    }, 50);
+  }
+
+  function openEditPayrollModal(staffId, monthYear) {
+    const p = cachedPayroll.find(x => String(x.staffId) === String(staffId) && String(x.monthYear) === String(monthYear));
+    if (!p) {
+      API.toastNotification('Payroll record not found.', true);
+      return;
+    }
+
+    const parts = String(p.monthYear || '').split(' ');
+    const initialMonth = parts[0] || 'September';
+    const initialYear = Number(parts[1]) || 2026;
+
+    App.showModal({
+      title: `Edit Payroll: ${escapeHtml(p.staffName || p.staffId)}`,
+      content: `
+        <div style="font-size: 13.5px;">
+          <div style="background: #f1f5f9; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px;">
+            <div><b>Staff Member:</b> ${escapeHtml(p.staffName || p.staffId)} [${escapeHtml(p.staffId)}]</div>
+            <div><b>Role:</b> ${escapeHtml(p.role || 'Staff')}</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="prEditMonth">Month *</label>
+              <select id="prEditMonth" class="select-field">
+                ${PAYROLL_MONTHS.map(m => `<option value="${m}" ${m.toLowerCase() === initialMonth.toLowerCase() ? 'selected' : ''}>${m}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="prEditYear">Year *</label>
+              <select id="prEditYear" class="select-field">
+                ${PAYROLL_YEARS.map(y => `<option value="${y}" ${y === initialYear ? 'selected' : ''}>${y}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;">
+            <div class="form-group">
+              <label class="form-label" for="prEditBase">Base Salary ($) *</label>
+              <input type="number" id="prEditBase" class="input-field" value="${p.baseSalary || 0}" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="prEditDed">Deductions ($)</label>
+              <input type="number" id="prEditDed" class="input-field" value="${p.deductions || 0}">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="prEditTax">Income Tax ($)</label>
+              <input type="number" id="prEditTax" class="input-field" value="${p.tax || 0}">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="prEditNet">Net Salary ($) *</label>
+              <input type="number" id="prEditNet" class="input-field" value="${p.netSalary || 0}" style="font-weight: 700; color: var(--color-primary);">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center;">
+            <div class="form-group" style="margin-top: 10px;">
+              <label><input type="checkbox" id="prEditPaid" ${p.paid ? 'checked' : ''}> Disbursed / Paid</label>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="prEditDate">Payment Date</label>
+              <input type="text" id="prEditDate" class="input-field" value="${escapeHtml(p.paymentDate || '')}" placeholder="MM/DD/YYYY">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="prEditDoc">Replace Pay Slip / Voucher (Optional)</label>
+            <input type="file" id="prEditDoc" class="input-field" accept=".pdf,image/*">
+            ${p.documentUrl ? `<div style="margin-top: 4px; font-size: 12px;"><a href="${p.documentUrl}" target="_blank">Current Voucher Document</a></div>` : ''}
+          </div>
+        </div>
+      `,
+      confirmText: 'Update Payroll Record',
+      onConfirm: async () => {
+        const month = document.getElementById('prEditMonth').value;
+        const year = document.getElementById('prEditYear').value;
+        const newMonthYear = `${month} ${year}`;
+        const base = Number(document.getElementById('prEditBase').value) || 0;
+        const ded = Number(document.getElementById('prEditDed').value) || 0;
+        const tax = Number(document.getElementById('prEditTax').value) || 0;
+        const net = Number(document.getElementById('prEditNet').value) || (base - ded - tax);
+        const paid = document.getElementById('prEditPaid').checked;
+        const payDate = document.getElementById('prEditDate').value.trim() || (paid ? new Date().toLocaleDateString() : '');
+        const file = document.getElementById('prEditDoc').files[0];
+
+        let docUrl = p.documentUrl || '';
+        if (file) {
+          docUrl = await readFileAsDataUrl(file);
+        }
+
+        const res = await API.callBackend('savePayrollRecord', {
+          payroll: {
+            staffId: p.staffId,
+            staffName: p.staffName,
+            role: p.role,
+            monthYear: newMonthYear,
+            baseSalary: base,
+            deductions: ded,
+            tax: tax,
+            netSalary: net,
+            paid: paid,
+            paymentDate: payDate,
+            documentUrl: docUrl
+          }
+        }, 'Updating payroll record...');
+
+        if (res && res.success) {
+          API.toastSuccess();
+          loadTab('payroll');
+        } else {
+          API.toastNotification(res.message || 'Error updating payroll.', true);
+        }
+      }
+    });
+
+    const updateEditNet = () => {
+      const b = Number(document.getElementById('prEditBase').value) || 0;
+      const d = Number(document.getElementById('prEditDed').value) || 0;
+      const t = Number(document.getElementById('prEditTax').value) || 0;
+      const netElem = document.getElementById('prEditNet');
+      if (netElem) netElem.value = Math.max(0, b - d - t);
+    };
+
+    setTimeout(() => {
+      const b = document.getElementById('prEditBase');
+      const d = document.getElementById('prEditDed');
+      const t = document.getElementById('prEditTax');
+      if (b) b.addEventListener('input', updateEditNet);
+      if (d) d.addEventListener('input', updateEditNet);
+      if (t) t.addEventListener('input', updateEditNet);
+    }, 50);
   }
 
   async function markPayrollPaid(staffId, monthYear) {
@@ -1237,6 +1933,78 @@ window.AdminPanel = (function () {
       API.toastSuccess();
       loadTab('payroll');
     }
+  }
+
+  function downloadPayrollReport() {
+    App.showModal({
+      title: 'Export Staff Payroll Records',
+      content: `
+        <div style="font-size: 13.5px;">
+          <p style="color: var(--color-text-muted); margin-bottom: 14px;">
+            Export official payroll reports for auditing, banking salary disbursement, or financial archives.
+          </p>
+          <div class="form-group">
+            <label class="form-label" for="prExportScope">Select Timeframe / Category</label>
+            <select id="prExportScope" class="select-field">
+              <option value="filtered">Current Filtered View</option>
+              <option value="all">All Historical Records</option>
+              ${PAYROLL_MONTHS.map(m => `<option value="month_${m}">All Records for ${m}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      `,
+      confirmText: 'Download CSV Report',
+      onConfirm: () => {
+        const scope = document.getElementById('prExportScope').value;
+        let records = [];
+
+        if (scope === 'filtered') {
+          records = getFilteredPayrollRecords();
+        } else if (scope === 'all') {
+          records = cachedPayroll;
+        } else if (scope.startsWith('month_')) {
+          const targetMonth = scope.replace('month_', '').toLowerCase();
+          records = cachedPayroll.filter(p => String(p.monthYear || '').toLowerCase().includes(targetMonth));
+        }
+
+        if (records.length === 0) {
+          API.toastNotification('No payroll records found for the selected timeframe.', true);
+          return;
+        }
+
+        const headers = ['Staff ID', 'Staff Name', 'Role', 'Month & Year', 'Base Salary ($)', 'Deductions ($)', 'Tax ($)', 'Net Salary ($)', 'Payment Status', 'Payment Date'];
+        const csvRows = [headers.join(',')];
+
+        records.forEach(r => {
+          const row = [
+            `"${escapeCsv(r.staffId || '')}"`,
+            `"${escapeCsv(r.staffName || '')}"`,
+            `"${escapeCsv(r.role || '')}"`,
+            `"${escapeCsv(r.monthYear || '')}"`,
+            Number(r.baseSalary || 0),
+            Number(r.deductions || 0),
+            Number(r.tax || 0),
+            Number(r.netSalary || 0),
+            `"${r.paid ? 'Paid' : 'Unpaid'}"`,
+            `"${escapeCsv(r.paymentDate || '')}"`
+          ];
+          csvRows.push(row.join(','));
+        });
+
+        const csvBlob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(csvBlob);
+        link.download = `Sorina_Staff_Payroll_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        API.toastSuccess();
+      }
+    });
+  }
+
+  function escapeCsv(val) {
+    return String(val || '').replace(/"/g, '""');
   }
 
   // =========================================================================
@@ -1715,7 +2483,7 @@ window.AdminPanel = (function () {
           
           <div class="form-group">
             <label class="form-label" for="setSchoolName">School Name</label>
-            <input type="text" id="setSchoolName" class="input-field" value="${escapeHtml(s.schoolName || 'IE School Management System')}">
+            <input type="text" id="setSchoolName" class="input-field" value="${escapeHtml(s.schoolName || 'Sorina Daycare & Primary School System')}">
           </div>
 
           <div class="form-group">
@@ -1769,6 +2537,17 @@ window.AdminPanel = (function () {
               Install Console to Device
             </button>
           </div>
+
+          <div class="content-card" style="margin-top: 20px;">
+            <h3 class="card-title" style="margin-bottom: 12px;">Account Session</h3>
+            <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 14px;">
+              Sign out of your administrator console session on this device.
+            </p>
+            <button type="button" class="btn btn-danger" id="adminSettingsLogoutBtn" style="display: flex; align-items: center; gap: 8px;">
+              <img src="assets/icons/log-out.png" style="width: 16px; height: 16px; filter: brightness(0) invert(1);" alt="">
+              Sign Out
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -1806,44 +2585,360 @@ window.AdminPanel = (function () {
       if (btn) btn.click();
       else API.toastNotification('App install ready via browser menu (Add to Home Screen).');
     };
+
+    const signOutBtn = document.getElementById('adminSettingsLogoutBtn');
+    if (signOutBtn) {
+      signOutBtn.onclick = () => {
+        if (window.Auth) window.Auth.logout();
+      };
+    }
   }
 
   // =========================================================================
-  // 11. ADMINS TAB (SUPER ADMIN ONLY)
+  // 11. ADMINS TAB (SUPER ADMIN RBAC MANAGEMENT)
   // =========================================================================
+  const PERMISSION_DEFINITIONS = [
+    { key: 'students:view', label: 'Students (View)', desc: 'View student directory, profiles and attendance' },
+    { key: 'students:edit', label: 'Students (Manage)', desc: 'Enroll new/old students, modify profiles, drop/undrop' },
+    { key: 'teachers:view', label: 'Faculty (View)', desc: 'Browse teacher roster and assigned courses' },
+    { key: 'teachers:edit', label: 'Faculty (Manage)', desc: 'Register teachers and configure class/subject assignments' },
+    { key: 'finance:view', label: 'Finance (View)', desc: 'Inspect fee schedules, collections and student balances' },
+    { key: 'finance:edit', label: 'Finance (Manage)', desc: 'Record tuition fee receipts and manage staff payroll' },
+    { key: 'scores:view', label: 'Grades (View)', desc: 'Access student grade sheets and report cards' },
+    { key: 'scores:edit', label: 'Grades (Manage)', desc: 'Lock/unlock grading periods and edit student scores' },
+    { key: 'messaging', label: 'Announcements', desc: 'Broadcast notices to students, parents, and faculty' },
+    { key: 'lesson_plans', label: 'Lesson Plans', desc: 'Inspect and evaluate teacher lesson plans' },
+    { key: 'export:data', label: 'Export Records', desc: 'Download CSV roster, financial and payroll archives' },
+    { key: 'settings:edit', label: 'School Settings', desc: 'Update school branding, contacts and academic calendar' },
+    { key: 'audit:view', label: 'Audit Logs', desc: 'Review security audit trails and system activity logs' }
+  ];
+
   async function renderAdminsTab(container) {
     const res = await API.callBackend('listAdmins', {}, 'Loading admins...');
     const admins = (res && res.success && Array.isArray(res.admins)) ? res.admins : [];
+    cachedAdmins = admins;
 
     container.innerHTML = `
       <div class="content-card">
-        <h3 class="card-title">Authorized System Administrators</h3>
-        <div class="table-responsive" style="margin-top: 14px;">
+        <div class="card-header-row" style="flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+          <div>
+            <h3 class="card-title">Authorized System Administrators</h3>
+            <div style="font-size: 13px; color: var(--color-text-muted);">
+              Super Administrator Console: Provision administrative accounts and assign granular role-based features and permissions.
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary" id="openAddAdminBtn" style="display: flex; align-items: center; gap: 6px;">
+            <img src="assets/icons/user-plus.png" style="width: 15px; height: 15px; filter: brightness(0) invert(1);" alt="">
+            Register New Administrator
+          </button>
+        </div>
+
+        <div class="table-responsive">
           <table class="data-table">
             <thead>
               <tr>
-                <th>Username</th>
-                <th>Full Name</th>
+                <th>Administrator</th>
+                <th>Title / Role</th>
                 <th>Email</th>
-                <th>Role</th>
                 <th>Last Login</th>
+                <th>Assigned Features &amp; Permissions</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              ${admins.map(a => `
-                <tr>
-                  <td><b>${escapeHtml(a.username)}</b></td>
-                  <td>${escapeHtml(a.name)}</td>
-                  <td>${escapeHtml(a.email)}</td>
-                  <td><span class="badge ${a.isSuperAdmin ? 'badge-success' : 'badge-info'}">${escapeHtml(a.roleTier)}</span></td>
-                  <td>${escapeHtml(a.lastLogin || 'Never')}</td>
-                </tr>
-              `).join('')}
+              ${admins.length === 0 ? `
+                <tr><td colspan="6" style="text-align: center; padding: 25px; color: var(--color-text-muted);">No administrator accounts found.</td></tr>
+              ` : admins.map(a => {
+                const perms = a.permissions || {};
+                const activePermKeys = Object.keys(perms).filter(k => perms[k] === true);
+
+                return `
+                  <tr>
+                    <td>
+                      <b>${escapeHtml(a.name || a.username)}</b>
+                      <div style="font-size: 11px; color: var(--color-text-muted); font-family: monospace;">@${escapeHtml(a.username)}</div>
+                    </td>
+                    <td>
+                      <span class="badge ${a.isSuperAdmin ? 'badge-success' : 'badge-info'}">${escapeHtml(a.title || a.roleTier)}</span>
+                    </td>
+                    <td>${escapeHtml(a.email)}</td>
+                    <td>${escapeHtml(a.lastLogin || 'Never')}</td>
+                    <td style="max-width: 320px;">
+                      ${a.isSuperAdmin ? `
+                        <span class="badge badge-success" style="font-size: 11px;">Full System Control (Super Admin)</span>
+                      ` : activePermKeys.length === 0 ? `
+                        <span style="color: var(--color-text-muted); font-size: 12px; font-style: italic;">No specific features assigned</span>
+                      ` : `
+                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                          ${activePermKeys.map(k => {
+                            const def = PERMISSION_DEFINITIONS.find(p => p.key === k);
+                            const lbl = def ? def.label : k;
+                            return `<span style="font-size: 10.5px; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 500;">${escapeHtml(lbl)}</span>`;
+                          }).join('')}
+                        </div>
+                      `}
+                    </td>
+                    <td>
+                      ${a.isSuperAdmin ? `
+                        <span style="color: var(--color-text-muted); font-size: 12px;">Protected Account</span>
+                      ` : `
+                        <div style="display: flex; gap: 6px;">
+                          <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.openEditAdminPermissionsModal('${escapeHtml(a.username)}')">
+                            Permissions
+                          </button>
+                          <button type="button" class="btn btn-danger btn-sm" onclick="window.AdminPanel.removeAdmin('${escapeHtml(a.username)}')">
+                            Remove
+                          </button>
+                        </div>
+                      `}
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
         </div>
       </div>
     `;
+
+    document.getElementById('openAddAdminBtn').onclick = () => openAddAdminModal();
+  }
+
+  function openAddAdminModal() {
+    App.showModal({
+      title: 'Provision Administrator Account',
+      content: `
+        <div style="font-size: 13.5px; max-height: 70vh; overflow-y: auto; padding-right: 6px;">
+          <p style="color: var(--color-text-muted); margin-bottom: 14px;">
+            Create an administrator user account and check the specific system features and permissions they are authorized to access.
+          </p>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="newAdmUsername">Username *</label>
+              <input type="text" id="newAdmUsername" class="input-field" placeholder="e.g. registrar.sorina" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="newAdmName">Full Name *</label>
+              <input type="text" id="newAdmName" class="input-field" placeholder="e.g. Sarah J. Freeman" required>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="newAdmEmail">Email Address *</label>
+              <input type="email" id="newAdmEmail" class="input-field" placeholder="e.g. sfreeman@sorina.edu" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="newAdmPass">Initial Password *</label>
+              <input type="password" id="newAdmPass" class="input-field" placeholder="Min 6 characters" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="newAdmTitle">Official Title / Designation *</label>
+            <input type="text" id="newAdmTitle" class="input-field" placeholder="e.g. School Registrar, Bursar, Vice Principal" value="School Registrar">
+          </div>
+
+          <div style="margin-top: 18px; border-top: 1px solid var(--color-border); pt-3;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <label class="form-label" style="font-weight: 700; margin: 0;">Authorized Features &amp; Permissions</label>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn btn-light btn-sm" id="admSelectAllPermsBtn" style="padding: 2px 8px; font-size: 11.5px;">Select All</button>
+                <button type="button" class="btn btn-light btn-sm" id="admClearAllPermsBtn" style="padding: 2px 8px; font-size: 11.5px;">Clear</button>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--color-border);">
+              ${PERMISSION_DEFINITIONS.map(p => `
+                <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; padding: 4px; font-size: 12.5px;">
+                  <input type="checkbox" class="adm-perm-check" data-key="${p.key}" style="margin-top: 2px;">
+                  <div>
+                    <div style="font-weight: 600; color: var(--color-text-main);">${escapeHtml(p.label)}</div>
+                    <div style="font-size: 11px; color: var(--color-text-muted); line-height: 1.2;">${escapeHtml(p.desc)}</div>
+                  </div>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `,
+      confirmText: 'Create Administrator',
+      onConfirm: async () => {
+        const username = document.getElementById('newAdmUsername').value.trim();
+        const name = document.getElementById('newAdmName').value.trim();
+        const email = document.getElementById('newAdmEmail').value.trim();
+        const password = document.getElementById('newAdmPass').value;
+        const title = document.getElementById('newAdmTitle').value.trim() || 'Administrator';
+
+        if (!username || !name || !email || !password) {
+          API.toastNotification('Please fill in all required fields.', true);
+          return;
+        }
+
+        if (password.length < 6) {
+          API.toastNotification('Password must be at least 6 characters.', true);
+          return;
+        }
+
+        const permissions = {};
+        document.querySelectorAll('.adm-perm-check').forEach(chk => {
+          permissions[chk.dataset.key] = chk.checked;
+        });
+
+        const res = await API.callBackend('createAdmin', {
+          username: username,
+          name: name,
+          email: email,
+          password: password,
+          title: title,
+          permissions: permissions
+        }, 'Creating administrator...');
+
+        if (res && res.success) {
+          API.toastSuccess();
+          loadTab('admins');
+        } else {
+          API.toastNotification(res.message || 'Error creating administrator.', true);
+        }
+      }
+    });
+
+    setTimeout(() => {
+      const selectAllBtn = document.getElementById('admSelectAllPermsBtn');
+      const clearAllBtn = document.getElementById('admClearAllPermsBtn');
+      if (selectAllBtn) {
+        selectAllBtn.onclick = () => {
+          document.querySelectorAll('.adm-perm-check').forEach(c => c.checked = true);
+        };
+      }
+      if (clearAllBtn) {
+        clearAllBtn.onclick = () => {
+          document.querySelectorAll('.adm-perm-check').forEach(c => c.checked = false);
+        };
+      }
+    }, 50);
+  }
+
+  function openEditAdminPermissionsModal(username) {
+    const a = cachedAdmins.find(x => x.username === username);
+    if (!a) {
+      API.toastNotification('Administrator account not found.', true);
+      return;
+    }
+
+    const currentPerms = a.permissions || {};
+
+    App.showModal({
+      title: `Permissions: ${escapeHtml(a.name || a.username)}`,
+      content: `
+        <div style="font-size: 13.5px; max-height: 70vh; overflow-y: auto; padding-right: 6px;">
+          <div style="background: #f1f5f9; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px;">
+            <div><b>Administrator:</b> ${escapeHtml(a.name || a.username)} (@${escapeHtml(a.username)})</div>
+            <div><b>Email:</b> ${escapeHtml(a.email)}</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="editAdmTitle">Title / Role Designation</label>
+              <input type="text" id="editAdmTitle" class="input-field" value="${escapeHtml(a.title || a.roleTier)}">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editAdmNewPass">Reset Password (Optional)</label>
+              <input type="password" id="editAdmNewPass" class="input-field" placeholder="Leave blank to keep unchanged">
+            </div>
+          </div>
+
+          <div style="margin-top: 14px; border-top: 1px solid var(--color-border); padding-top: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <label class="form-label" style="font-weight: 700; margin: 0;">Assigned Features &amp; Permissions</label>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn btn-light btn-sm" id="admEditSelectAllBtn" style="padding: 2px 8px; font-size: 11.5px;">Select All</button>
+                <button type="button" class="btn btn-light btn-sm" id="admEditClearAllBtn" style="padding: 2px 8px; font-size: 11.5px;">Clear</button>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--color-border);">
+              ${PERMISSION_DEFINITIONS.map(p => `
+                <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; padding: 4px; font-size: 12.5px;">
+                  <input type="checkbox" class="adm-edit-perm-check" data-key="${p.key}" ${currentPerms[p.key] === true ? 'checked' : ''} style="margin-top: 2px;">
+                  <div>
+                    <div style="font-weight: 600; color: var(--color-text-main);">${escapeHtml(p.label)}</div>
+                    <div style="font-size: 11px; color: var(--color-text-muted); line-height: 1.2;">${escapeHtml(p.desc)}</div>
+                  </div>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `,
+      confirmText: 'Save Permissions',
+      onConfirm: async () => {
+        const title = document.getElementById('editAdmTitle').value.trim();
+        const newPass = document.getElementById('editAdmNewPass').value.trim();
+
+        const permissions = {};
+        document.querySelectorAll('.adm-edit-perm-check').forEach(chk => {
+          permissions[chk.dataset.key] = chk.checked;
+        });
+
+        const payload = {
+          username: a.username,
+          title: title,
+          permissions: permissions
+        };
+        if (newPass) {
+          payload.newPassword = newPass;
+        }
+
+        const res = await API.callBackend('updateAdminPermissions', payload, 'Updating administrator permissions...');
+
+        if (res && res.success) {
+          API.toastSuccess();
+          loadTab('admins');
+        } else {
+          API.toastNotification(res.message || 'Error updating administrator.', true);
+        }
+      }
+    });
+
+    setTimeout(() => {
+      const selectAllBtn = document.getElementById('admEditSelectAllBtn');
+      const clearAllBtn = document.getElementById('admEditClearAllBtn');
+      if (selectAllBtn) {
+        selectAllBtn.onclick = () => {
+          document.querySelectorAll('.adm-edit-perm-check').forEach(c => c.checked = true);
+        };
+      }
+      if (clearAllBtn) {
+        clearAllBtn.onclick = () => {
+          document.querySelectorAll('.adm-edit-perm-check').forEach(c => c.checked = false);
+        };
+      }
+    }, 50);
+  }
+
+  function removeAdmin(username) {
+    App.showModal({
+      title: 'Remove Administrator Access',
+      content: `
+        <div style="font-size: 13.5px;">
+          <p>Are you sure you want to revoke administrative credentials and access for <b>@${escapeHtml(username)}</b>?</p>
+          <p style="color: #b91c1c; font-size: 12.5px;">This action will immediately disable their login to the admin console.</p>
+        </div>
+      `,
+      confirmText: 'Revoke Access',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        const res = await API.callBackend('removeAdmin', { username: username }, 'Removing administrator...');
+        if (res && res.success) {
+          API.toastSuccess();
+          loadTab('admins');
+        } else {
+          API.toastNotification(res.message || 'Error removing administrator.', true);
+        }
+      }
+    });
   }
 
   // =========================================================================
@@ -1984,6 +3079,16 @@ window.AdminPanel = (function () {
     openEditSubjectModal: openEditSubjectModal,
     deleteSubject: deleteSubject,
     togglePeriodPerm: togglePeriodPerm,
-    exportCsv: exportCsv
+    exportCsv: exportCsv,
+    toggleStudentExpandRow: toggleStudentExpandRow,
+    printReceiptsByCategory: printReceiptsByCategory,
+    onReceiptCategoryChange: onReceiptCategoryChange,
+    printSingleReceipt: printSingleReceipt,
+    openAddAdminModal: openAddAdminModal,
+    openEditAdminPermissionsModal: openEditAdminPermissionsModal,
+    removeAdmin: removeAdmin,
+    openAddCustomStaffModal: openAddCustomStaffModal,
+    openEditPayrollModal: openEditPayrollModal,
+    downloadPayrollReport: downloadPayrollReport
   };
 })();
