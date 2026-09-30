@@ -4349,6 +4349,8 @@ window.AdminPanel = (function () {
         };
       }
     }, 50);
+  }
+
   function removeAdmin(username) {
     App.showModal({
       title: 'Remove Administrator Access',
