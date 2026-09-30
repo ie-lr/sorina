@@ -86,7 +86,7 @@ window.TeacherPanel = (function () {
               <span class="sidebar-item-label">Settings</span>
             </a>
 
-            <a class="sidebar-item" id="teacherLogoutBtn">
+            <a class="sidebar-item" id="teacherLogoutBtn" data-action="logout" role="button" tabindex="0" style="cursor: pointer;">
               <img src="assets/icons/log-out.png" class="sidebar-icon" alt="">
               <span class="sidebar-item-label">Sign Out</span>
             </a>
@@ -781,7 +781,7 @@ window.TeacherPanel = (function () {
           <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 14px;">
             Sign out of your teacher portal session on this device.
           </p>
-          <button type="button" class="btn btn-danger" id="teacherSettingsSignOutBtn" style="display: flex; align-items: center; gap: 8px;">
+          <button type="button" class="btn btn-danger" id="teacherSettingsSignOutBtn" data-action="logout" style="display: flex; align-items: center; gap: 8px;">
             <img src="assets/icons/log-out.png" style="width: 16px; height: 16px; filter: brightness(0) invert(1);" alt="">
             Sign Out
           </button>

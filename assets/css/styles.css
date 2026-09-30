@@ -126,33 +126,57 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 
 /* Mobile Header Responsive Rule: prevent jammed content and scattering */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .site-header {
-    padding: 8px 12px;
+    padding: 8px 12px !important;
+    gap: 8px !important;
+    min-height: 48px !important;
   }
   .brand-wrap {
-    gap: 8px;
-    max-width: calc(100% - 60px);
+    gap: 8px !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: calc(100% - 100px) !important;
+    overflow: hidden !important;
   }
   .brand-logo {
-    width: 32px;
-    height: 32px;
+    width: 32px !important;
+    height: 32px !important;
+    flex-shrink: 0 !important;
+  }
+  .brand-text {
+    min-width: 0 !important;
+    overflow: hidden !important;
   }
   .brand-text h1 {
-    font-size: 13.5px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    margin: 0 !important;
   }
   #headerMotto, .brand-text .motto {
     display: none !important;
+  }
+  .header-actions {
+    flex-shrink: 0 !important;
+    gap: 4px !important;
   }
   .header-actions #signOutBtn {
     display: none !important;
   }
   .header-actions .user-badge {
-    font-size: 11px;
-    padding: 3px 8px;
+    font-size: 11px !important;
+    padding: 3px 8px !important;
+    max-width: 120px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    gap: 4px !important;
+  }
+  .header-actions .user-badge span {
+    display: none !important;
   }
 }
 

@@ -288,7 +288,7 @@ const API = (function () {
             resolve({
               success: true,
               settings: {
-                schoolName: 'IE School Management System',
+                schoolName: 'Sorina Daycare & Primary School System',
                 schoolMotto: 'Excellence in Knowledge, Character & Integrity',
                 logoUrl: 'assets/images/school-logo.png',
                 campusPhotoUrl: 'assets/images/campus.jpeg',
@@ -324,12 +324,17 @@ const API = (function () {
                   userType: 'admin',
                   email: email || 'admin@ieschools.edu',
                   permissions: {
-                    'students:view': true, 'students:edit': true,
-                    'teachers:view': true, 'teachers:edit': true,
-                    'finance:view': true, 'finance:edit': true,
+                    'summary:view': true,
+                    'students:view': true, 'students:edit': true, 'students:delete': true,
+                    'teachers:view': true, 'teachers:edit': true, 'teachers:delete': true,
+                    'finance:view': true, 'finance:edit': true, 'finance:delete': true,
+                    'payroll:view': true, 'payroll:edit': true, 'payroll:delete': true,
+                    'printing:view': true, 'printing:send': true,
+                    'subjects:view': true, 'subjects:edit': true, 'subjects:delete': true,
                     'scores:view': true, 'scores:edit': true,
-                    'messaging': true, 'lesson_plans': true,
-                    'export:data': true, 'settings:edit': true,
+                    'messaging': true, 'messaging:view': true, 'messaging:send': true,
+                    'lesson_plans': true, 'lesson_plans:view': true, 'lesson_plans:review': true,
+                    'export:view': true, 'export:data': true, 'settings:edit': true,
                     'backups': true, 'manage_admins': true,
                     'audit:view': true
                   }
@@ -508,6 +513,38 @@ const API = (function () {
             });
             break;
           }
+
+          case 'getClassFees':
+            resolve({
+              success: true,
+              classFees: [
+                { className: 'Daycare', studentCategory: 'new', entranceFee: 20, registrationFee: 30, tuitionTotal: 150, requirementsFee: 25, peSuitFee: 20, portalFee: 15 },
+                { className: 'Daycare', studentCategory: 'old', entranceFee: 0, registrationFee: 25, tuitionTotal: 140, requirementsFee: 25, peSuitFee: 20, portalFee: 15 },
+                { className: 'Nursery', studentCategory: 'new', entranceFee: 20, registrationFee: 30, tuitionTotal: 160, requirementsFee: 25, peSuitFee: 20, portalFee: 15 },
+                { className: 'Nursery', studentCategory: 'old', entranceFee: 0, registrationFee: 25, tuitionTotal: 150, requirementsFee: 25, peSuitFee: 20, portalFee: 15 },
+                { className: 'ABC', studentCategory: 'new', entranceFee: 20, registrationFee: 35, tuitionTotal: 180, requirementsFee: 30, peSuitFee: 20, portalFee: 15 },
+                { className: 'ABC', studentCategory: 'old', entranceFee: 0, registrationFee: 30, tuitionTotal: 170, requirementsFee: 30, peSuitFee: 20, portalFee: 15 },
+                { className: 'K1', studentCategory: 'new', entranceFee: 20, registrationFee: 35, tuitionTotal: 190, requirementsFee: 30, peSuitFee: 20, portalFee: 15 },
+                { className: 'K1', studentCategory: 'old', entranceFee: 0, registrationFee: 30, tuitionTotal: 180, requirementsFee: 30, peSuitFee: 20, portalFee: 15 },
+                { className: 'K2', studentCategory: 'new', entranceFee: 20, registrationFee: 35, tuitionTotal: 200, requirementsFee: 30, peSuitFee: 20, portalFee: 15 },
+                { className: 'K2', studentCategory: 'old', entranceFee: 0, registrationFee: 30, tuitionTotal: 190, requirementsFee: 30, peSuitFee: 20, portalFee: 15 },
+                { className: 'Grade 1', studentCategory: 'new', entranceFee: 25, registrationFee: 40, tuitionTotal: 220, requirementsFee: 35, peSuitFee: 25, portalFee: 20 },
+                { className: 'Grade 1', studentCategory: 'old', entranceFee: 0, registrationFee: 35, tuitionTotal: 200, requirementsFee: 35, peSuitFee: 25, portalFee: 20 }
+              ]
+            });
+            break;
+
+          case 'saveClassFee':
+            resolve({ success: true, message: 'Class fee schedule saved successfully.' });
+            break;
+
+          case 'recordPayment':
+            resolve({ success: true, message: 'Student payment recorded successfully.' });
+            break;
+
+          case 'deleteStudent':
+            resolve({ success: true, message: 'Student record deleted successfully.' });
+            break;
 
           default:
             resolve({ success: true, message: '{Success}' });

@@ -32,9 +32,121 @@ window.AdminPanel = (function () {
   let isSidebarCollapsed = false;
   let selectedStudentIdsForPrint = new Set();
 
+  const GRADE_LEVELS = [
+    'Daycare',
+    'Nursery',
+    'ABC',
+    'K1',
+    'K2',
+    'Grade 1',
+    'Grade 2',
+    'Grade 3',
+    'Grade 4',
+    'Grade 5',
+    'Grade 6'
+  ];
+
+  let cachedClassFees = [];
+  const DEFAULT_CLASS_FEES = {
+    'Daycare': {
+      new: { entranceFee: 20, registrationFee: 30, tuitionTotal: 150, requirementsFee: 25, peSuitFee: 20, portalFee: 15 },
+      old: { entranceFee: 0, registrationFee: 25, tuitionTotal: 140, requirementsFee: 25, peSuitFee: 20, portalFee: 15 }
+    },
+    'Nursery': {
+      new: { entranceFee: 20, registrationFee: 30, tuitionTotal: 160, requirementsFee: 25, peSuitFee: 20, portalFee: 15 },
+      old: { entranceFee: 0, registrationFee: 25, tuitionTotal: 150, requirementsFee: 25, peSuitFee: 20, portalFee: 15 }
+    },
+    'ABC': {
+      new: { entranceFee: 20, registrationFee: 35, tuitionTotal: 180, requirementsFee: 30, peSuitFee: 20, portalFee: 15 },
+      old: { entranceFee: 0, registrationFee: 30, tuitionTotal: 170, requirementsFee: 30, peSuitFee: 20, portalFee: 15 }
+    },
+    'K1': {
+      new: { entranceFee: 20, registrationFee: 35, tuitionTotal: 190, requirementsFee: 30, peSuitFee: 20, portalFee: 15 },
+      old: { entranceFee: 0, registrationFee: 30, tuitionTotal: 180, requirementsFee: 30, peSuitFee: 20, portalFee: 15 }
+    },
+    'K2': {
+      new: { entranceFee: 20, registrationFee: 35, tuitionTotal: 200, requirementsFee: 30, peSuitFee: 20, portalFee: 15 },
+      old: { entranceFee: 0, registrationFee: 30, tuitionTotal: 190, requirementsFee: 30, peSuitFee: 20, portalFee: 15 }
+    },
+    'Grade 1': {
+      new: { entranceFee: 25, registrationFee: 40, tuitionTotal: 220, requirementsFee: 35, peSuitFee: 25, portalFee: 20 },
+      old: { entranceFee: 0, registrationFee: 35, tuitionTotal: 200, requirementsFee: 35, peSuitFee: 25, portalFee: 20 }
+    },
+    'Grade 2': {
+      new: { entranceFee: 25, registrationFee: 40, tuitionTotal: 220, requirementsFee: 35, peSuitFee: 25, portalFee: 20 },
+      old: { entranceFee: 0, registrationFee: 35, tuitionTotal: 200, requirementsFee: 35, peSuitFee: 25, portalFee: 20 }
+    },
+    'Grade 3': {
+      new: { entranceFee: 25, registrationFee: 40, tuitionTotal: 230, requirementsFee: 35, peSuitFee: 25, portalFee: 20 },
+      old: { entranceFee: 0, registrationFee: 35, tuitionTotal: 210, requirementsFee: 35, peSuitFee: 25, portalFee: 20 }
+    },
+    'Grade 4': {
+      new: { entranceFee: 25, registrationFee: 40, tuitionTotal: 240, requirementsFee: 35, peSuitFee: 25, portalFee: 20 },
+      old: { entranceFee: 0, registrationFee: 35, tuitionTotal: 220, requirementsFee: 35, peSuitFee: 25, portalFee: 20 }
+    },
+    'Grade 5': {
+      new: { entranceFee: 25, registrationFee: 40, tuitionTotal: 250, requirementsFee: 35, peSuitFee: 25, portalFee: 20 },
+      old: { entranceFee: 0, registrationFee: 35, tuitionTotal: 230, requirementsFee: 35, peSuitFee: 25, portalFee: 20 }
+    },
+    'Grade 6': {
+      new: { entranceFee: 25, registrationFee: 40, tuitionTotal: 260, requirementsFee: 35, peSuitFee: 25, portalFee: 20 },
+      old: { entranceFee: 0, registrationFee: 35, tuitionTotal: 240, requirementsFee: 35, peSuitFee: 25, portalFee: 20 }
+    }
+  };
+
+  function getClassFeeSchedule(className, category) {
+    category = String(category || 'new').toLowerCase();
+    const found = cachedClassFees.find(f =>
+      String(f.className).toLowerCase() === String(className).toLowerCase() &&
+      String(f.studentCategory || 'new').toLowerCase() === category
+    );
+    if (found) return found;
+    const defForClass = DEFAULT_CLASS_FEES[className] || DEFAULT_CLASS_FEES['Grade 1'];
+    return (defForClass && defForClass[category]) || {
+      entranceFee: category === 'new' ? 25 : 0,
+      registrationFee: category === 'new' ? 40 : 35,
+      tuitionTotal: 200,
+      requirementsFee: 35,
+      peSuitFee: 25,
+      portalFee: 20
+    };
+  }
+
+  function formatGradeCell(val) {
+    if (val === null || val === undefined || val === '' || val === '—' || val === '-') return '—';
+    const num = Number(val);
+    if (isNaN(num)) {
+      const s = String(val).trim().toUpperCase();
+      if (s === 'A' || s === 'A+') return `<span class="score-deep-green">${escapeHtml(s)}</span>`;
+      if (s === 'B' || s === 'C') return `<span class="score-blue">${escapeHtml(s)}</span>`;
+      if (s === 'D' || s === 'F') return `<span class="score-red">${escapeHtml(s)}</span>`;
+      return escapeHtml(s);
+    }
+    if (num >= 91) return `<span class="score-deep-green">${num}</span>`;
+    if (num >= 70) return `<span class="score-blue">${num}</span>`;
+    return `<span class="score-red">${num}</span>`;
+  }
+
+  let selectedAcademicYear = '2026-2027';
+
   function mount(container, user) {
     currentUser = user;
-    currentTab = 'summary';
+    const isSuper = user.role === 'superadmin';
+    const perms = user.permissions || {};
+
+    if (isSuper || perms['summary:view'] === true) currentTab = 'summary';
+    else if (perms['students:view'] || perms['students:edit'] || perms['students:delete']) currentTab = 'students';
+    else if (perms['teachers:view'] || perms['teachers:edit'] || perms['teachers:delete']) currentTab = 'teachers';
+    else if (perms['finance:view'] || perms['finance:edit'] || perms['finance:delete']) currentTab = 'finance';
+    else if (perms['payroll:view'] || perms['payroll:edit'] || perms['payroll:delete']) currentTab = 'payroll';
+    else if (perms['printing:view'] || perms['printing:send']) currentTab = 'printing';
+    else if (perms['subjects:view'] || perms['subjects:edit'] || perms['subjects:delete']) currentTab = 'subjects';
+    else if (perms['scores:view'] || perms['scores:edit']) currentTab = 'grading';
+    else if (perms['settings:edit']) currentTab = 'settings';
+    else if (perms['audit:view']) currentTab = 'audit';
+    else if (perms['export:view'] || perms['export:data']) currentTab = 'export';
+    else currentTab = 'settings';
+
     renderPortalLayout(container);
     loadTab(currentTab);
   }
@@ -43,13 +155,17 @@ window.AdminPanel = (function () {
     const isSuperAdmin = currentUser.role === 'superadmin';
     const perms = currentUser.permissions || {};
 
-    const canStudents = isSuperAdmin || perms['students:view'];
-    const canTeachers = isSuperAdmin || perms['teachers:view'];
-    const canFinance = isSuperAdmin || perms['finance:view'];
-    const canScores = isSuperAdmin || perms['scores:view'];
+    const canSummary = isSuperAdmin || perms['summary:view'] === true;
+    const canStudents = isSuperAdmin || perms['students:view'] || perms['students:edit'] || perms['students:delete'];
+    const canTeachers = isSuperAdmin || perms['teachers:view'] || perms['teachers:edit'] || perms['teachers:delete'];
+    const canFinance = isSuperAdmin || perms['finance:view'] || perms['finance:edit'] || perms['finance:delete'];
+    const canPayroll = isSuperAdmin || perms['payroll:view'] || perms['payroll:edit'] || perms['payroll:delete'];
+    const canPrinting = isSuperAdmin || perms['printing:view'] || perms['printing:send'];
+    const canSubjects = isSuperAdmin || perms['subjects:view'] || perms['subjects:edit'] || perms['subjects:delete'];
+    const canScores = isSuperAdmin || perms['scores:view'] || perms['scores:edit'];
     const canSettings = isSuperAdmin || perms['settings:edit'];
     const canAudit = isSuperAdmin || perms['audit:view'];
-    const canExport = isSuperAdmin || perms['export:data'];
+    const canExport = isSuperAdmin || perms['export:view'] || perms['export:data'];
 
     container.innerHTML = `
       <div class="portal-layout">
@@ -62,13 +178,26 @@ window.AdminPanel = (function () {
             </button>
           </div>
 
+          <!-- Academic Year Selector -->
+          <div class="sidebar-year-box" style="padding: 10px 14px; background: rgba(255,255,255,0.08); border-radius: 6px; margin: 10px 12px 14px;">
+            <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; margin-bottom: 4px; color: #ffffff; font-weight: 600;">Academic Year</div>
+            <select id="adminGlobalYearSelect" class="select-field" style="width: 100%; background: #ffffff; color: var(--color-primary); font-weight: 700; font-size: 12.5px; padding: 5px 8px; border-radius: 4px; cursor: pointer;">
+              <option value="2026-2027" ${selectedAcademicYear === '2026-2027' ? 'selected' : ''}>2026–2027</option>
+              <option value="2025-2026" ${selectedAcademicYear === '2025-2026' ? 'selected' : ''}>2025–2026</option>
+              <option value="2024-2025" ${selectedAcademicYear === '2024-2025' ? 'selected' : ''}>2024–2025</option>
+              <option value="2027-2028" ${selectedAcademicYear === '2027-2028' ? 'selected' : ''}>2027–2028</option>
+            </select>
+          </div>
+
           <nav class="sidebar-nav">
             <div class="nav-section-title">Core Operations</div>
 
-            <a class="sidebar-item ${currentTab === 'summary' ? 'active' : ''}" data-tab="summary">
-              <img src="assets/icons/tally-4.png" class="sidebar-icon" alt="">
-              <span class="sidebar-item-label">Executive Summary</span>
-            </a>
+            ${canSummary ? `
+              <a class="sidebar-item ${currentTab === 'summary' ? 'active' : ''}" data-tab="summary">
+                <img src="assets/icons/tally-4.png" class="sidebar-icon" alt="">
+                <span class="sidebar-item-label">Executive Summary</span>
+              </a>
+            ` : ''}
 
             ${canStudents ? `
               <a class="sidebar-item ${currentTab === 'students' ? 'active' : ''}" data-tab="students">
@@ -89,7 +218,9 @@ window.AdminPanel = (function () {
                 <img src="assets/icons/landmark.png" class="sidebar-icon" alt="">
                 <span class="sidebar-item-label">Tuition &amp; Fees</span>
               </a>
+            ` : ''}
 
+            ${canPayroll ? `
               <a class="sidebar-item ${currentTab === 'payroll' ? 'active' : ''}" data-tab="payroll">
                 <img src="assets/icons/landmark.png" class="sidebar-icon" alt="">
                 <span class="sidebar-item-label">Staff Payroll</span>
@@ -98,15 +229,19 @@ window.AdminPanel = (function () {
 
             <div class="nav-section-title">Academics &amp; Services</div>
 
-            <a class="sidebar-item ${currentTab === 'printing' ? 'active' : ''}" data-tab="printing">
-              <img src="assets/icons/file-text.png" class="sidebar-icon" alt="">
-              <span class="sidebar-item-label">Printing Services</span>
-            </a>
+            ${canPrinting ? `
+              <a class="sidebar-item ${currentTab === 'printing' ? 'active' : ''}" data-tab="printing">
+                <img src="assets/icons/file-text.png" class="sidebar-icon" alt="">
+                <span class="sidebar-item-label">Printing Services</span>
+              </a>
+            ` : ''}
 
-            <a class="sidebar-item ${currentTab === 'subjects' ? 'active' : ''}" data-tab="subjects">
-              <img src="assets/icons/folders.png" class="sidebar-icon" alt="">
-              <span class="sidebar-item-label">Subjects Catalog</span>
-            </a>
+            ${canSubjects ? `
+              <a class="sidebar-item ${currentTab === 'subjects' ? 'active' : ''}" data-tab="subjects">
+                <img src="assets/icons/folders.png" class="sidebar-icon" alt="">
+                <span class="sidebar-item-label">Subjects Catalog</span>
+              </a>
+            ` : ''}
 
             ${canScores ? `
               <a class="sidebar-item ${currentTab === 'grading' ? 'active' : ''}" data-tab="grading">
@@ -117,12 +252,12 @@ window.AdminPanel = (function () {
 
             <div class="nav-section-title">Administration</div>
 
-            <a class="sidebar-item ${currentTab === 'developer' ? 'active' : ''}" data-tab="developer">
-              <img src="assets/icons/mail-open.png" class="sidebar-icon" alt="">
-              <span class="sidebar-item-label">IE Developer Desk</span>
-            </a>
-
             ${isSuperAdmin ? `
+              <a class="sidebar-item ${currentTab === 'developer' ? 'active' : ''}" data-tab="developer">
+                <img src="assets/icons/mail-open.png" class="sidebar-icon" alt="">
+                <span class="sidebar-item-label">IE Developer Desk</span>
+              </a>
+
               <a class="sidebar-item ${currentTab === 'admins' ? 'active' : ''}" data-tab="admins">
                 <img src="assets/icons/user-key.png" class="sidebar-icon" alt="">
                 <span class="sidebar-item-label">System Admins</span>
@@ -150,7 +285,7 @@ window.AdminPanel = (function () {
               </a>
             ` : ''}
 
-            <a class="sidebar-item" id="adminLogoutBtn">
+            <a class="sidebar-item" id="adminLogoutBtn" role="button" tabindex="0" style="cursor: pointer;">
               <img src="assets/icons/log-out.png" class="sidebar-icon" alt="">
               <span class="sidebar-item-label">Sign Out</span>
             </a>
@@ -172,6 +307,16 @@ window.AdminPanel = (function () {
       });
     }
 
+    // Academic Year Select handler
+    const yearSelect = document.getElementById('adminGlobalYearSelect');
+    if (yearSelect) {
+      yearSelect.addEventListener('change', (e) => {
+        selectedAcademicYear = e.target.value;
+        App.showToast(`Switched active academic year to ${selectedAcademicYear}`, 'info');
+        loadTab(currentTab);
+      });
+    }
+
     // Nav Item Click Handlers
     container.querySelectorAll('.sidebar-item[data-tab]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -186,7 +331,11 @@ window.AdminPanel = (function () {
     const logoutBtn = document.getElementById('adminLogoutBtn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
-        if (window.Auth) window.Auth.logout();
+        if (window.Auth && typeof window.Auth.logout === 'function') {
+          window.Auth.logout();
+        } else if (typeof window.logout === 'function') {
+          window.logout();
+        }
       });
     }
   }
@@ -195,6 +344,39 @@ window.AdminPanel = (function () {
     const container = document.getElementById('adminContentBody');
     if (!container) return;
     container.innerHTML = '<div style="padding: 30px; text-align: center; color: var(--color-text-muted);">Loading section...</div>';
+
+    const isSuper = currentUser.role === 'superadmin';
+    const perms = currentUser.permissions || {};
+
+    const permittedTabs = {
+      summary: isSuper || perms['summary:view'] === true,
+      students: isSuper || perms['students:view'] || perms['students:edit'] || perms['students:delete'],
+      teachers: isSuper || perms['teachers:view'] || perms['teachers:edit'] || perms['teachers:delete'],
+      finance: isSuper || perms['finance:view'] || perms['finance:edit'] || perms['finance:delete'],
+      payroll: isSuper || perms['payroll:view'] || perms['payroll:edit'] || perms['payroll:delete'],
+      printing: isSuper || perms['printing:view'] || perms['printing:send'],
+      subjects: isSuper || perms['subjects:view'] || perms['subjects:edit'] || perms['subjects:delete'],
+      grading: isSuper || perms['scores:view'] || perms['scores:edit'],
+      developer: isSuper,
+      admins: isSuper,
+      settings: isSuper || perms['settings:edit'],
+      audit: isSuper || perms['audit:view'],
+      export: isSuper || perms['export:view'] || perms['export:data']
+    };
+
+    if (!permittedTabs[tab]) {
+      container.innerHTML = `
+        <div class="content-card" style="text-align: center; padding: 50px 20px;">
+          <div style="font-size: 40px; margin-bottom: 12px;">🔒</div>
+          <h3 style="color: var(--color-danger); margin-bottom: 8px;">Access Restricted</h3>
+          <p style="color: var(--color-text-muted); max-width: 480px; margin: 0 auto 16px;">
+            You do not have assigned permissions to access the <b>${escapeHtml(tab)}</b> module. Please contact the Super Administrator if you require access.
+          </p>
+          <button type="button" class="btn btn-primary" onclick="window.AdminPanel.switchTab('summary')">Return to Summary</button>
+        </div>
+      `;
+      return;
+    }
 
     switch (tab) {
       case 'summary':
@@ -240,10 +422,78 @@ window.AdminPanel = (function () {
   }
 
   // =========================================================================
-  // 1. EXECUTIVE SUMMARY TAB
+  // 1. EXECUTIVE SUMMARY TAB (WITH ENROLLMENT PIE CHART)
   // =========================================================================
+  function generatePieChartSvg(data, total) {
+    if (!total || total === 0 || Object.keys(data).length === 0) {
+      return `<div style="text-align: center; padding: 30px; color: var(--color-text-muted);">No student enrollment records filed for ${escapeHtml(selectedAcademicYear)}.</div>`;
+    }
+    const colors = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#ea580c', '#6366f1', '#14b8a6', '#f43f5e', '#84cc16'];
+    const cx = 130;
+    const cy = 130;
+    const r = 95;
+    let cumulativeAngle = -Math.PI / 2;
+    const entries = Object.entries(data);
+
+    let paths = '';
+    entries.forEach(([cls, count], idx) => {
+      const fraction = count / total;
+      const angle = fraction * 2 * Math.PI;
+      const endAngle = cumulativeAngle + angle;
+
+      const x1 = cx + r * Math.cos(cumulativeAngle);
+      const y1 = cy + r * Math.sin(cumulativeAngle);
+      const x2 = cx + r * Math.cos(endAngle);
+      const y2 = cy + r * Math.sin(endAngle);
+
+      const largeArcFlag = angle > Math.PI ? 1 : 0;
+      const color = colors[idx % colors.length];
+
+      if (entries.length === 1 || fraction >= 0.999) {
+        paths += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"><title>${escapeHtml(cls)}: ${count} (${Math.round(fraction * 100)}%)</title></circle>`;
+      } else {
+        const d = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+        paths += `<path d="${d}" fill="${color}" stroke="#ffffff" stroke-width="2"><title>${escapeHtml(cls)}: ${count} (${Math.round(fraction * 100)}%)</title></path>`;
+      }
+      cumulativeAngle = endAngle;
+    });
+
+    // Donut hole
+    paths += `<circle cx="${cx}" cy="${cy}" r="48" fill="#ffffff"></circle>`;
+    paths += `<text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="11" font-weight="700" fill="#64748b">TOTAL</text>`;
+    paths += `<text x="${cx}" y="${cy + 16}" text-anchor="middle" font-size="16" font-weight="800" fill="var(--color-primary)">${total}</text>`;
+
+    const legend = entries.map(([cls, count], idx) => {
+      const color = colors[idx % colors.length];
+      const pct = Math.round((count / total) * 100);
+      return `
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; padding: 4px 0; border-bottom: 1px dashed #f1f5f9;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: ${color}; flex-shrink: 0;"></span>
+            <b>${escapeHtml(cls)}</b>
+          </div>
+          <div style="color: var(--color-text-muted);"><b style="color: var(--color-text-main);">${count}</b> (${pct}%)</div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; align-items: center; padding: 12px 0;">
+        <div style="display: flex; justify-content: center;">
+          <svg viewBox="0 0 260 260" width="220" height="220" style="max-width: 100%; height: auto;">
+            ${paths}
+          </svg>
+        </div>
+        <div style="max-height: 240px; overflow-y: auto; padding-right: 8px;">
+          <div style="font-weight: 700; font-size: 13px; color: var(--color-primary); margin-bottom: 8px;">Class Enrollment Distribution Legend</div>
+          ${legend}
+        </div>
+      </div>
+    `;
+  }
+
   async function renderSummaryTab(container) {
-    const res = await API.callBackend('getFinancialSummary', {}, 'Loading summary...');
+    const res = await API.callBackend('getFinancialSummary', { academicYear: selectedAcademicYear }, 'Loading summary...');
     const sum = (res && res.success && res.summary) ? res.summary : {
       totalStudents: 0, totalTeachers: 0, totalBilled: 0,
       totalRevenue: 0, totalExpenses: 0, netBalance: 0, targetRemaining: 0,
@@ -251,9 +501,14 @@ window.AdminPanel = (function () {
     };
 
     container.innerHTML = `
-      <div style="margin-bottom: 20px;">
-        <h2 style="margin: 0 0 6px; color: var(--color-primary); font-size: 22px;">Institutional Executive Summary</h2>
-        <div style="font-size: 13.5px; color: var(--color-text-muted);">Real-time institutional metrics, class enrollment, and cash flow balance.</div>
+      <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h2 style="margin: 0 0 6px; color: var(--color-primary); font-size: 22px;">Institutional Executive Summary</h2>
+          <div style="font-size: 13.5px; color: var(--color-text-muted);">Real-time institutional metrics, class enrollment, and cash flow balance.</div>
+        </div>
+        <div class="badge badge-light" style="font-size: 13px; font-weight: 700; padding: 6px 12px; border: 1px solid #cbd5e1;">
+          Academic Year: <span style="color: var(--color-primary);">${escapeHtml(selectedAcademicYear)}</span>
+        </div>
       </div>
 
       <!-- Financial & Metric Stats -->
@@ -286,10 +541,12 @@ window.AdminPanel = (function () {
         </div>
       </div>
 
-      <!-- Enrollment by Class -->
+      <!-- Enrollment by Class with Pie Chart -->
       <div class="content-card" style="margin-bottom: 24px;">
-        <h3 class="card-title" style="margin-bottom: 14px;">Enrollment Distribution by Class</h3>
-        <div class="table-responsive">
+        <h3 class="card-title" style="margin-bottom: 14px;">Enrollment Distribution by Class (Summary Pie Chart)</h3>
+        ${generatePieChartSvg(sum.enrolledByClass, sum.totalStudents)}
+
+        <div class="table-responsive" style="margin-top: 16px;">
           <table class="data-table">
             <thead>
               <tr>
@@ -300,7 +557,7 @@ window.AdminPanel = (function () {
             </thead>
             <tbody>
               ${Object.keys(sum.enrolledByClass).length === 0 ? `
-                <tr><td colspan="3" style="text-align: center; padding: 20px; color: var(--color-text-muted);">No student records filed yet.</td></tr>
+                <tr><td colspan="3" style="text-align: center; padding: 20px; color: var(--color-text-muted);">No student records filed yet for ${escapeHtml(selectedAcademicYear)}.</td></tr>
               ` : Object.entries(sum.enrolledByClass).map(([cls, count]) => {
                 const pct = sum.totalStudents > 0 ? Math.round((count / sum.totalStudents) * 100) : 0;
                 return `
@@ -334,6 +591,8 @@ window.AdminPanel = (function () {
     selectedStudentIdsForPrint.clear();
 
     const canEdit = currentUser.role === 'superadmin' || (currentUser.permissions && currentUser.permissions['students:edit']);
+    const canDelete = currentUser.role === 'superadmin' || (currentUser.permissions && currentUser.permissions['students:delete']);
+    const canPrint = currentUser.role === 'superadmin' || (currentUser.permissions && (currentUser.permissions['printing:view'] || currentUser.permissions['printing:send']));
 
     container.innerHTML = `
       <div class="content-card">
@@ -369,21 +628,7 @@ window.AdminPanel = (function () {
             <input type="text" id="studentSearchInput" class="input-field" placeholder="Search by student name or ID..." style="max-width: 220px;">
             <select id="studentClassFilter" class="select-field" style="max-width: 140px;">
               <option value="">All Classes</option>
-              <option value="Nursery A">Nursery A</option>
-              <option value="Nursery B">Nursery B</option>
-              <option value="Kindergarten">Kindergarten</option>
-              <option value="Grade 1">Grade 1</option>
-              <option value="Grade 2">Grade 2</option>
-              <option value="Grade 3">Grade 3</option>
-              <option value="Grade 4">Grade 4</option>
-              <option value="Grade 5">Grade 5</option>
-              <option value="Grade 6">Grade 6</option>
-              <option value="Grade 7">Grade 7</option>
-              <option value="Grade 8">Grade 8</option>
-              <option value="Grade 9">Grade 9</option>
-              <option value="Grade 10">Grade 10</option>
-              <option value="Grade 11">Grade 11</option>
-              <option value="Grade 12">Grade 12</option>
+              ${GRADE_LEVELS.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}
             </select>
             <select id="studentCategoryFilter" class="select-field" style="max-width: 140px;">
               <option value="">All Categories</option>
@@ -418,7 +663,7 @@ window.AdminPanel = (function () {
                 <th style="width: 28px;"></th>
                 <th style="width: 38px;"><input type="checkbox" id="selectAllStudentsCheckbox"></th>
                 <th>Student ID</th>
-                <th>Full Name</th>
+                <th>Student</th>
                 <th>Class</th>
                 <th>Category</th>
                 <th>Guardian Phone</th>
@@ -475,14 +720,28 @@ window.AdminPanel = (function () {
           </td>
           <td><input type="checkbox" class="student-checkbox" data-id="${escapeHtml(s.id)}" ${selectedStudentIdsForPrint.has(s.id) ? 'checked' : ''}></td>
           <td><b>[${escapeHtml(s.id)}]</b></td>
-          <td>${escapeHtml(s.name)}</td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="width: 32px; height: 32px; border-radius: 50%; overflow: hidden; background: #e2e8f0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid #cbd5e1;">
+                ${s.photo ? `<img src="${escapeHtml(s.photo)}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.innerHTML='👤'">` : '👤'}
+              </div>
+              <div>
+                <div style="font-weight: 600;">${escapeHtml(s.name)}</div>
+                ${s.assignedSubjects && s.assignedSubjects.length ? `<div style="font-size: 10.5px; color: #64748b;">${s.assignedSubjects.length} Assigned Subjects</div>` : ''}
+              </div>
+            </div>
+          </td>
           <td>${escapeHtml(s.className || s.grade)}</td>
           <td><span class="badge ${s.studentCategory === 'old' ? 'badge-light' : 'badge-info'}">${s.studentCategory === 'old' ? 'Returning' : 'New'}</span></td>
           <td>${escapeHtml(s.phone || '—')}</td>
           <td>
-            <button type="button" class="btn btn-sm ${isLocked ? 'btn-danger' : 'btn-light'}" onclick="window.AdminPanel.toggleGradeLock('${escapeHtml(s.id)}', ${!isLocked})">
-              ${isLocked ? 'Locked' : 'Open'}
-            </button>
+            ${canEdit ? `
+              <button type="button" class="btn btn-sm ${isLocked ? 'btn-danger' : 'btn-light'}" onclick="window.AdminPanel.toggleGradeLock('${escapeHtml(s.id)}', ${!isLocked})">
+                ${isLocked ? 'Locked' : 'Open'}
+              </button>
+            ` : `
+              <span class="badge ${isLocked ? 'badge-danger' : 'badge-light'}">${isLocked ? 'Locked' : 'Open'}</span>
+            `}
           </td>
           <td><span class="badge ${s.status === 'Active' ? 'badge-success' : 'badge-danger'}">${escapeHtml(s.status || 'Active')}</span></td>
           <td>
@@ -496,9 +755,16 @@ window.AdminPanel = (function () {
               <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.previewStudentIdCard('${escapeHtml(s.id)}')" title="Preview ID Card">
                 <img src="assets/icons/circle-user-round.png" style="width: 13px; height: 13px;" alt="">
               </button>
-              <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.openEditStudentModal('${escapeHtml(s.id)}')" title="Edit Profile">
-                <img src="assets/icons/pencil.png" style="width: 13px; height: 13px;" alt="">
-              </button>
+              ${canEdit ? `
+                <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.openEditStudentModal('${escapeHtml(s.id)}')" title="Edit Profile">
+                  <img src="assets/icons/pencil.png" style="width: 13px; height: 13px;" alt="">
+                </button>
+              ` : ''}
+              ${canDelete ? `
+                <button type="button" class="btn btn-danger btn-sm" onclick="window.AdminPanel.deleteStudent('${escapeHtml(s.id)}')" title="Delete Student" style="padding: 2px 6px;">
+                  🗑
+                </button>
+              ` : ''}
             </div>
           </td>
         </tr>
@@ -538,7 +804,7 @@ window.AdminPanel = (function () {
   }
 
   // =========================================================================
-  // STUDENT EXPAND ROW (ACADEMIC GRADES & FINANCIAL SUMMARY)
+  // STUDENT EXPAND ROW (ACADEMIC GRADES & FINANCIAL SUMMARY ROWS)
   // =========================================================================
   async function toggleStudentExpandRow(studentId, btn) {
     const expandRow = document.getElementById(`expand-row-${studentId}`);
@@ -588,78 +854,159 @@ window.AdminPanel = (function () {
 
       const rows = (rc && Array.isArray(rc.rows) && rc.rows.length > 0) ? rc.rows : [];
       const summary = (rc && rc.summary) ? rc.summary : {};
+      const installments = fin.installments || [0, 0, 0, 0];
+      const fallbackDate = fin.updatedAt || new Date().toLocaleDateString();
+
+      // Individual payment breakdown rows
+      const paymentRows = [
+        { label: 'Entrance Fee', billed: toNum(fin.entranceFee), paid: fin.entranceFeePaid ? toNum(fin.entranceFee) : 0, isPaid: Boolean(fin.entranceFeePaid), date: fallbackDate },
+        { label: 'Registration Fee', billed: toNum(fin.registrationFee), paid: fin.registrationPaid ? toNum(fin.registrationFee) : 0, isPaid: Boolean(fin.registrationPaid), date: fin.registrationDate || fallbackDate },
+        { label: 'Requirements Fee', billed: toNum(fin.requirementsFee), paid: fin.requirementsFeePaid ? toNum(fin.requirementsFee) : 0, isPaid: Boolean(fin.requirementsFeePaid), date: fallbackDate },
+        { label: 'PE Suit Fee', billed: toNum(fin.peSuitFee), paid: fin.peSuitFeePaid ? toNum(fin.peSuitFee) : 0, isPaid: Boolean(fin.peSuitFeePaid), date: fallbackDate },
+        { label: 'Portal Fee', billed: toNum(fin.portalFee), paid: fin.portalFeePaid ? toNum(fin.portalFee) : 0, isPaid: Boolean(fin.portalFeePaid), date: fallbackDate },
+        { label: '1st Tuition Installment', billed: toNum(fin.tuitionTotal) > 0 ? Math.round(toNum(fin.tuitionTotal) / 4) : 0, paid: toNum(installments[0]), isPaid: toNum(installments[0]) > 0, date: fallbackDate },
+        { label: '2nd Tuition Installment', billed: toNum(fin.tuitionTotal) > 0 ? Math.round(toNum(fin.tuitionTotal) / 4) : 0, paid: toNum(installments[1]), isPaid: toNum(installments[1]) > 0, date: fallbackDate },
+        { label: '3rd Tuition Installment', billed: toNum(fin.tuitionTotal) > 0 ? Math.round(toNum(fin.tuitionTotal) / 4) : 0, paid: toNum(installments[2]), isPaid: toNum(installments[2]) > 0, date: fallbackDate },
+        { label: '4th Tuition Installment', billed: toNum(fin.tuitionTotal) > 0 ? Math.round(toNum(fin.tuitionTotal) / 4) : 0, paid: toNum(installments[3]), isPaid: toNum(installments[3]) > 0, date: fallbackDate },
+        { label: 'Other Payments', billed: 0, paid: toNum(fin.otherPayments), isPaid: toNum(fin.otherPayments) > 0, date: fallbackDate }
+      ];
 
       content.innerHTML = `
-        <div class="expand-split-grid">
-          <!-- Academic Grades Column -->
-          <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
-              <h4 style="margin: 0; color: var(--color-primary); font-size: 14px;">Academic Grades Summary</h4>
-              <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.viewStudentReport('${escapeHtml(studentId)}')" style="font-size: 11.5px; padding: 3px 8px;">
-                Full Report Card &rarr;
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; margin: 6px 0;">
+          <!-- Header Banner with Student Photo & Core Details -->
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="width: 48px; height: 48px; border-radius: 6px; overflow: hidden; background: #e2e8f0; border: 2px solid var(--color-primary); display: flex; align-items: center; justify-content: center; font-size: 24px;">
+                ${s.photo ? `<img src="${escapeHtml(s.photo)}" style="width:100%;height:100%;object-fit:cover;">` : '👤'}
+              </div>
+              <div>
+                <h4 style="margin: 0; font-size: 15px; color: var(--color-primary);">${escapeHtml(s.name)} [${escapeHtml(s.id)}]</h4>
+                <div style="font-size: 12px; color: var(--color-text-muted);">
+                  Class: <b>${escapeHtml(s.className || s.grade)}</b> &bull; Academic Year: <b>${escapeHtml(s.academicYear || selectedAcademicYear)}</b> &bull; Category: <b>${s.studentCategory === 'old' ? 'Returning Student' : 'New Enrollee'}</b>
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-primary btn-sm" onclick="window.AdminPanel.openEditPaymentModal('${escapeHtml(studentId)}')">
+                💳 Edit / Record Payment
+              </button>
+              <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.printSingleReceipt('${escapeHtml(studentId)}')">
+                🧾 Print Receipt (3/page)
+              </button>
+              <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.viewStudentReport('${escapeHtml(studentId)}')">
+                📄 Full Report Card
               </button>
             </div>
-            ${canScores ? (rows.length > 0 ? `
-              <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px;">
-                <thead>
-                  <tr style="background: #f1f5f9; text-align: left;">
-                    <th style="padding: 4px 6px; border: 1px solid #cbd5e1;">Subject</th>
-                    <th style="padding: 4px 6px; border: 1px solid #cbd5e1; text-align: center;">Sem 1</th>
-                    <th style="padding: 4px 6px; border: 1px solid #cbd5e1; text-align: center;">Sem 2</th>
-                    <th style="padding: 4px 6px; border: 1px solid #cbd5e1; text-align: center;">Yearly</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${rows.slice(0, 8).map(r => `
-                    <tr>
-                      <td style="padding: 4px 6px; border: 1px solid #e2e8f0; font-weight: 500;">${escapeHtml(r.subject)}</td>
-                      <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: center;">${r.sem1Avg || '—'}</td>
-                      <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: center;">${r.sem2Avg || '—'}</td>
-                      <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700;">${r.yearlyAvg || '—'}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-              <div style="font-size: 11.5px; display: flex; justify-content: space-between; color: var(--color-text-muted); padding-top: 4px;">
-                <div><b>Yearly Avg:</b> <span style="font-weight: 700; color: var(--color-primary);">${summary.overallAverage || '—'}</span></div>
-                <div><b>Rank:</b> ${summary.rankSem2 || summary.rankSem1 || '—'}</div>
-                <div><b>Status:</b> ${summary.promotionDecision || 'Active'}</div>
-              </div>
-            ` : '<div style="font-size: 12px; color: #64748b; padding: 10px 0;">No grade records submitted yet for this student.</div>') : '<div style="font-size: 12px; color: #64748b;">No scores view permission.</div>'}
           </div>
 
-          <!-- Financial Status Column -->
-          <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
-              <h4 style="margin: 0; color: var(--color-primary); font-size: 14px;">Financial Status &amp; Balance</h4>
-              <button type="button" class="btn btn-primary btn-sm" onclick="window.AdminPanel.printSingleReceipt('${escapeHtml(studentId)}')" style="font-size: 11.5px; padding: 3px 8px;">
-                🧾 Print Receipt
-              </button>
+          <div class="expand-split-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px;">
+            <!-- Left: Academic Grades Rows Table -->
+            <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px 14px;">
+              <div style="font-weight: 700; color: var(--color-primary); font-size: 13.5px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                <span>Academic Grades Roster</span>
+                <span style="font-size: 11px; font-weight: normal; color: #64748b;">
+                  <span class="score-deep-green">■ 91-100</span> &bull; <span class="score-blue">■ 70-90</span> &bull; <span class="score-red">■ &lt;70</span>
+                </span>
+              </div>
+              ${canScores ? (rows.length > 0 ? `
+                <div style="max-height: 380px; overflow-y: auto;">
+                  <table style="width: 100%; border-collapse: collapse; font-size: 11.5px;">
+                    <thead>
+                      <tr style="background: #f1f5f9; text-align: center;">
+                        <th style="padding: 4px 6px; border: 1px solid #cbd5e1; text-align: left;">Subject</th>
+                        <th style="padding: 4px 5px; border: 1px solid #cbd5e1;" title="1st Period">1st</th>
+                        <th style="padding: 4px 5px; border: 1px solid #cbd5e1;" title="2nd Period">2nd</th>
+                        <th style="padding: 4px 5px; border: 1px solid #cbd5e1;" title="3rd Period">3rd</th>
+                        <th style="padding: 4px 5px; border: 1px solid #cbd5e1;" title="Exam 1">Ex1</th>
+                        <th style="padding: 4px 5px; border: 1px solid #cbd5e1; font-weight: 700;">Sem1</th>
+                        <th style="padding: 4px 5px; border: 1px solid #cbd5e1;" title="4th Period">4th</th>
+                        <th style="padding: 4px 5px; border: 1px solid #cbd5e1;" title="5th Period">5th</th>
+                        <th style="padding: 4px 5px; border: 1px solid #cbd5e1;" title="6th Period">6th</th>
+                        <th style="padding: 4px 5px; border: 1px solid #cbd5e1;" title="Exam 2">Ex2</th>
+                        <th style="padding: 4px 5px; border: 1px solid #cbd5e1; font-weight: 700;">Sem2</th>
+                        <th style="padding: 4px 5px; border: 1px solid #cbd5e1; font-weight: 800; background: #e2e8f0;">Yr.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${rows.map(r => `
+                        <tr>
+                          <td style="padding: 4px 6px; border: 1px solid #e2e8f0; font-weight: 600;">${escapeHtml(r.subject)}</td>
+                          <td style="padding: 4px 5px; border: 1px solid #e2e8f0; text-align: center;">${formatGradeCell(r.p1)}</td>
+                          <td style="padding: 4px 5px; border: 1px solid #e2e8f0; text-align: center;">${formatGradeCell(r.p2)}</td>
+                          <td style="padding: 4px 5px; border: 1px solid #e2e8f0; text-align: center;">${formatGradeCell(r.p3)}</td>
+                          <td style="padding: 4px 5px; border: 1px solid #e2e8f0; text-align: center;">${formatGradeCell(r.exam1)}</td>
+                          <td style="padding: 4px 5px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700;">${formatGradeCell(r.sem1Avg)}</td>
+                          <td style="padding: 4px 5px; border: 1px solid #e2e8f0; text-align: center;">${formatGradeCell(r.p4)}</td>
+                          <td style="padding: 4px 5px; border: 1px solid #e2e8f0; text-align: center;">${formatGradeCell(r.p5)}</td>
+                          <td style="padding: 4px 5px; border: 1px solid #e2e8f0; text-align: center;">${formatGradeCell(r.p6)}</td>
+                          <td style="padding: 4px 5px; border: 1px solid #e2e8f0; text-align: center;">${formatGradeCell(r.exam2)}</td>
+                          <td style="padding: 4px 5px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700;">${formatGradeCell(r.sem2Avg)}</td>
+                          <td style="padding: 4px 5px; border: 1px solid #cbd5e1; text-align: center; font-weight: 800; background: #f8fafc;">${formatGradeCell(r.yearlyAvg)}</td>
+                        </tr>
+                      `).join('')}
+                      <tr style="background: #f1f5f9; font-weight: 700;">
+                        <td style="padding: 4px 6px; border: 1px solid #cbd5e1;">General Summary</td>
+                        <td colspan="4" style="text-align: right; padding: 4px 6px; border: 1px solid #cbd5e1; font-size: 11px;">Sem 1 Avg: <b>${formatGradeCell(summary.sem1Avg || summary.overallAverage)}</b></td>
+                        <td style="padding: 4px 5px; border: 1px solid #cbd5e1; text-align: center;">${formatGradeCell(summary.sem1Avg)}</td>
+                        <td colspan="4" style="text-align: right; padding: 4px 6px; border: 1px solid #cbd5e1; font-size: 11px;">Rank: <b>${summary.rankSem2 || summary.rankSem1 || '—'}</b></td>
+                        <td style="padding: 4px 5px; border: 1px solid #cbd5e1; text-align: center;">${formatGradeCell(summary.sem2Avg)}</td>
+                        <td style="padding: 4px 5px; border: 1px solid #cbd5e1; text-align: center; font-weight: 800; background: #e2e8f0;">${formatGradeCell(summary.overallAverage)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              ` : '<div style="font-size: 12.5px; color: #64748b; padding: 14px 0; text-align: center;">No academic grades recorded for this student yet.</div>') : '<div style="font-size: 12.5px; color: #64748b;">No scores view permissions assigned.</div>'}
             </div>
-            ${canFinance ? `
-              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; text-align: center;">
-                <div style="background: #f8fafc; padding: 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
-                  <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Total Billed</div>
-                  <div style="font-size: 13px; font-weight: 700;">${formatMoney(totBilled, currency)}</div>
-                </div>
-                <div style="background: #f8fafc; padding: 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
-                  <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Total Paid</div>
-                  <div style="font-size: 13px; font-weight: 700; color: var(--color-success);">${formatMoney(totPaid, currency)}</div>
-                </div>
-                <div style="background: #f8fafc; padding: 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
-                  <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Balance Due</div>
-                  <div style="font-size: 13px; font-weight: 700; color: ${balance > 0 ? 'var(--color-danger)' : 'var(--color-success)'};">${formatMoney(balance, currency)}</div>
-                </div>
-              </div>
 
-              <!-- Checklist of fee items -->
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 11.5px;">
-                <div>Registration: ${fin.registrationPaid ? '<span class="badge badge-success" style="padding:1px 5px; font-size:10px;">Paid</span>' : '<span class="badge badge-warning" style="padding:1px 5px; font-size:10px;">Unpaid</span>'}</div>
-                <div>PE Suit: ${fin.peSuitFeePaid ? '<span class="badge badge-success" style="padding:1px 5px; font-size:10px;">Paid</span>' : '<span class="badge badge-light" style="padding:1px 5px; font-size:10px;">Unpaid</span>'}</div>
-                <div>Requirements: ${fin.requirementsFeePaid ? '<span class="badge badge-success" style="padding:1px 5px; font-size:10px;">Paid</span>' : '<span class="badge badge-light" style="padding:1px 5px; font-size:10px;">Unpaid</span>'}</div>
-                <div>Portal Fee: ${fin.portalFeePaid ? '<span class="badge badge-success" style="padding:1px 5px; font-size:10px;">Paid</span>' : '<span class="badge badge-light" style="padding:1px 5px; font-size:10px;">Unpaid</span>'}</div>
+            <!-- Right: Fee & Payment Schedule Rows Table -->
+            <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px 14px;">
+              <div style="font-weight: 700; color: var(--color-primary); font-size: 13.5px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                <span>Tuition &amp; Fee Payments Ledger</span>
+                <span class="badge ${balance > 0 ? 'badge-danger' : 'badge-success'}" style="font-size: 11px;">
+                  ${balance > 0 ? 'Balance Due: ' + formatMoney(balance, currency) : 'Tuition Cleared ✓'}
+                </span>
               </div>
-            ` : '<div style="font-size: 12px; color: #64748b;">No finance view permission.</div>'}
+              ${canFinance ? `
+                <div style="max-height: 380px; overflow-y: auto;">
+                  <table style="width: 100%; border-collapse: collapse; font-size: 11.5px;">
+                    <thead>
+                      <tr style="background: #f1f5f9; text-align: left;">
+                        <th style="padding: 4px 6px; border: 1px solid #cbd5e1;">Fee Category</th>
+                        <th style="padding: 4px 6px; border: 1px solid #cbd5e1; text-align: right;">Billed</th>
+                        <th style="padding: 4px 6px; border: 1px solid #cbd5e1; text-align: right;">Paid</th>
+                        <th style="padding: 4px 6px; border: 1px solid #cbd5e1; text-align: right;">Balance</th>
+                        <th style="padding: 4px 6px; border: 1px solid #cbd5e1; text-align: center;">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${paymentRows.map(p => {
+                        const bal = Math.max(0, p.billed - p.paid);
+                        return `
+                          <tr>
+                            <td style="padding: 4px 6px; border: 1px solid #e2e8f0; font-weight: 500;">${escapeHtml(p.label)}</td>
+                            <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: right;">${p.billed > 0 ? formatMoney(p.billed, currency) : '—'}</td>
+                            <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: right; color: ${p.paid > 0 ? 'var(--color-success)' : 'inherit'}; font-weight: ${p.paid > 0 ? '700' : 'normal'};">${formatMoney(p.paid, currency)}</td>
+                            <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: right; color: ${bal > 0 ? 'var(--color-danger)' : '#64748b'}; font-weight: ${bal > 0 ? '700' : 'normal'};">${p.billed > 0 ? formatMoney(bal, currency) : '—'}</td>
+                            <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: center;">
+                              ${p.isPaid ? '<span class="badge badge-success" style="padding: 1px 6px; font-size: 10px;">Paid</span>' : (p.billed > 0 ? '<span class="badge badge-warning" style="padding: 1px 6px; font-size: 10px;">Pending</span>' : '<span style="color:#94a3b8;">—</span>')}
+                            </td>
+                          </tr>
+                        `;
+                      }).join('')}
+                      <tr style="background: #f8fafc; font-weight: 800; border-top: 2px solid #cbd5e1;">
+                        <td style="padding: 6px; border: 1px solid #cbd5e1;">Total Financial Position</td>
+                        <td style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">${formatMoney(totBilled, currency)}</td>
+                        <td style="padding: 6px; border: 1px solid #cbd5e1; text-align: right; color: var(--color-success);">${formatMoney(totPaid, currency)}</td>
+                        <td style="padding: 6px; border: 1px solid #cbd5e1; text-align: right; color: ${balance > 0 ? 'var(--color-danger)' : 'var(--color-success)'};">${formatMoney(balance, currency)}</td>
+                        <td style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">
+                          ${balance <= 0 && totBilled > 0 ? '<span class="badge badge-success" style="padding: 2px 6px; font-size: 10px;">Cleared</span>' : '<span class="badge badge-danger" style="padding: 2px 6px; font-size: 10px;">Due</span>'}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              ` : '<div style="font-size: 12.5px; color: #64748b;">No finance view permissions assigned.</div>'}
+            </div>
           </div>
         </div>
       `;
@@ -821,69 +1168,124 @@ window.AdminPanel = (function () {
     printReceiptCards([s]);
   }
 
-  // --- Register New Student Modal (Systematic ID: SPSS001...) ---
+  const CURRICULUM_SUBJECTS = [
+    'English / Reading',
+    'Phonics',
+    'Spelling & Vocabulary',
+    'Handwriting',
+    'Composition / Grammar',
+    'General Mathematics',
+    'Mental Math',
+    'General Science',
+    'Health Education',
+    'Social Studies',
+    'Religious & Moral Education',
+    'Creative Arts / Music',
+    'Physical Education'
+  ];
+
+  // --- Register New Student Modal (Systematic ID: SPSS001, Photo, Subjects, Class Fee Schedule) ---
   async function openRegisterNewStudentModal() {
-    // Fetch next systematic ID from backend
     const idRes = await API.callBackend('getNextStudentId', {}, 'Fetching next ID...');
     const nextId = (idRes && idRes.success) ? idRes.nextId : 'SPSS001';
+    let uploadedPhotoBase64 = '';
+
+    const initialClass = GRADE_LEVELS[2] || 'ABC';
+    const initialFee = getClassFeeSchedule(initialClass, 'new');
 
     App.showModal({
       title: 'Register New Student (New Enrollee)',
       content: `
-        <div style="font-size: 13.5px;">
+        <div style="font-size: 13.5px; max-height: 75vh; overflow-y: auto; padding-right: 6px;">
+          <!-- Student Photo Upload & Preview -->
+          <div style="text-align: center; margin-bottom: 14px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1;">
+            <label class="form-label" style="display: block; font-weight: 700; margin-bottom: 6px;">Student Photo</label>
+            <div id="nsPhotoPreviewBox" style="width: 76px; height: 90px; border: 2px dashed #94a3b8; border-radius: 6px; margin: 0 auto 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #ffffff;">
+              <span style="font-size: 32px; color: #94a3b8;">👤</span>
+            </div>
+            <input type="file" id="nsPhotoInput" accept="image/*" class="input-field" style="max-width: 250px; margin: 0 auto; font-size: 12px; padding: 4px;">
+            <div class="form-hint" style="margin-top: 4px;">Upload passport-style student photograph. Used globally in ID cards, receipts, and reports.</div>
+          </div>
+
+          <!-- Identification & Personal Details -->
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
               <label class="form-label" for="nsId">Systematic Student ID *</label>
               <input type="text" id="nsId" class="input-field" value="${escapeHtml(nextId)}" required style="font-weight: 700; color: var(--color-primary);">
-              <div class="form-hint">Automatically assigned systematic numbering [SPSS001].</div>
+              <div class="form-hint">Systematic format [SPSS001].</div>
             </div>
             <div class="form-group">
-              <label class="form-label" for="nsName">Full Name *</label>
+              <label class="form-label" for="nsName">Student Full Name *</label>
               <input type="text" id="nsName" class="input-field" placeholder="e.g. Samuel K. Brown" required>
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
             <div class="form-group">
               <label class="form-label" for="nsClass">Enrolling Class *</label>
               <select id="nsClass" class="select-field">
-                <option value="Nursery A">Nursery A</option>
-                <option value="Nursery B">Nursery B</option>
-                <option value="Kindergarten">Kindergarten</option>
-                <option value="Grade 1" selected>Grade 1</option>
-                <option value="Grade 2">Grade 2</option>
-                <option value="Grade 3">Grade 3</option>
-                <option value="Grade 4">Grade 4</option>
-                <option value="Grade 5">Grade 5</option>
-                <option value="Grade 6">Grade 6</option>
-                <option value="Grade 7">Grade 7</option>
-                <option value="Grade 8">Grade 8</option>
-                <option value="Grade 9">Grade 9</option>
-                <option value="Grade 10">Grade 10</option>
-                <option value="Grade 11">Grade 11</option>
-                <option value="Grade 12">Grade 12</option>
+                ${GRADE_LEVELS.map(g => `<option value="${escapeHtml(g)}" ${g === initialClass ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label" for="nsPass">Initial Password *</label>
-              <input type="password" id="nsPass" class="input-field" value="student123" required>
+              <label class="form-label" for="nsGender">Gender</label>
+              <select id="nsGender" class="select-field">
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
             </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
               <label class="form-label" for="nsDob">Date of Birth</label>
               <input type="date" id="nsDob" class="input-field">
             </div>
+          </div>
+
+          <!-- Auto-Tied Class Fee Schedule Box -->
+          <div style="background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 12px; margin: 12px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-weight: 700; color: var(--color-primary); font-size: 13px;">Class Fee Schedule (Auto-Tied)</span>
+              <span class="badge badge-info" style="font-size: 11px;">New Enrollee Package</span>
+            </div>
+            <div id="nsFeeSummaryBox" style="font-size: 12px; color: #334155; line-height: 1.5;">
+              <div>Tuition: <b>$${initialFee.tuitionTotal || 0}</b> | Registration: <b>$${initialFee.registrationFee || 0}</b> | Entrance: <b>$${initialFee.entranceFee || 0}</b></div>
+              <div>Requirements: <b>$${initialFee.requirementsFee || 0}</b> | PE Suit: <b>$${initialFee.peSuitFee || 0}</b> | Portal: <b>$${initialFee.portalFee || 0}</b></div>
+              <div style="margin-top: 4px; font-weight: 800; color: var(--color-primary);">
+                Total Annual Obligation: $${toNum(initialFee.tuitionTotal) + toNum(initialFee.registrationFee) + toNum(initialFee.entranceFee) + toNum(initialFee.requirementsFee) + toNum(initialFee.peSuitFee) + toNum(initialFee.portalFee)}
+              </div>
+            </div>
+          </div>
+
+          <!-- Assigned Curriculum Subjects -->
+          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin: 12px 0; background: #ffffff;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <label class="form-label" style="font-weight: 700; margin: 0;">Assigned Curriculum Subjects</label>
+              <button type="button" class="btn btn-light btn-sm" id="nsToggleAllSubjectsBtn" style="padding: 2px 8px; font-size: 11px;">Select All</button>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; font-size: 12px;">
+              ${CURRICULUM_SUBJECTS.map((sub, i) => `
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="checkbox" class="ns-subject-check" value="${escapeHtml(sub)}" checked>
+                  <span>${escapeHtml(sub)}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Guardian & Access Credentials -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
               <label class="form-label" for="nsGuardian">Parent / Guardian Name</label>
               <input type="text" id="nsGuardian" class="input-field" placeholder="e.g. Mary Brown">
             </div>
+            <div class="form-group">
+              <label class="form-label" for="nsPhone">Parent Contact Phone</label>
+              <input type="text" id="nsPhone" class="input-field" placeholder="+231-...">
+            </div>
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="nsPhone">Parent Contact Phone</label>
-            <input type="text" id="nsPhone" class="input-field" placeholder="+231-...">
+            <label class="form-label" for="nsPass">Initial Student Password *</label>
+            <input type="password" id="nsPass" class="input-field" value="student123" required>
           </div>
         </div>
       `,
@@ -892,15 +1294,30 @@ window.AdminPanel = (function () {
         const id = document.getElementById('nsId').value.trim();
         const name = document.getElementById('nsName').value.trim();
         const cls = document.getElementById('nsClass').value;
-        const pass = document.getElementById('nsPass').value.trim();
+        const gender = document.getElementById('nsGender').value;
         const dob = document.getElementById('nsDob').value;
         const guardian = document.getElementById('nsGuardian').value.trim();
         const phone = document.getElementById('nsPhone').value.trim();
+        const pass = document.getElementById('nsPass').value.trim();
 
         if (!name || !pass) {
           API.toastNotification('Student name and password are required.', true);
           return;
         }
+
+        const assignedSubjects = [];
+        document.querySelectorAll('.ns-subject-check:checked').forEach(cb => {
+          assignedSubjects.push(cb.value);
+        });
+
+        const feeSchedule = getClassFeeSchedule(cls, 'new');
+        const totTuition = toNum(feeSchedule.tuitionTotal);
+        const regFee = toNum(feeSchedule.registrationFee);
+        const entFee = toNum(feeSchedule.entranceFee);
+        const reqFee = toNum(feeSchedule.requirementsFee);
+        const peFee = toNum(feeSchedule.peSuitFee);
+        const portFee = toNum(feeSchedule.portalFee);
+        const totalBillable = totTuition + regFee + entFee + reqFee + peFee + portFee;
 
         const res = await API.callBackend('addStudent', {
           student: {
@@ -908,12 +1325,33 @@ window.AdminPanel = (function () {
             name: name,
             className: cls,
             grade: cls,
-            academicYear: '2026-2027',
+            academicYear: selectedAcademicYear,
             studentCategory: 'new',
-            password: pass,
+            gender: gender,
             dob: dob,
+            photo: uploadedPhotoBase64 || '',
             guardian: guardian,
-            phone: phone
+            phone: phone,
+            password: pass,
+            assignedSubjects: assignedSubjects,
+            finance: {
+              tuitionTotal: totTuition,
+              registrationFee: regFee,
+              registrationPaid: false,
+              entranceFee: entFee,
+              entranceFeePaid: false,
+              requirementsFee: reqFee,
+              requirementsFeePaid: false,
+              peSuitFee: peFee,
+              peSuitFeePaid: false,
+              portalFee: portFee,
+              portalFeePaid: false,
+              installments: [0, 0, 0, 0],
+              otherPayments: 0,
+              totalPaid: 0,
+              balance: totalBillable,
+              currency: 'USD'
+            }
           }
         }, 'Registering student...');
 
@@ -925,33 +1363,68 @@ window.AdminPanel = (function () {
         }
       }
     });
+
+    // Wire up image reader and fee schedule update
+    setTimeout(() => {
+      const photoInput = document.getElementById('nsPhotoInput');
+      if (photoInput) {
+        photoInput.onchange = (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+              uploadedPhotoBase64 = evt.target.result;
+              const box = document.getElementById('nsPhotoPreviewBox');
+              if (box) box.innerHTML = `<img src="${uploadedPhotoBase64}" style="width:100%;height:100%;object-fit:cover;">`;
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+      }
+
+      const classSel = document.getElementById('nsClass');
+      if (classSel) {
+        classSel.onchange = () => {
+          const c = classSel.value;
+          const fee = getClassFeeSchedule(c, 'new');
+          const feeBox = document.getElementById('nsFeeSummaryBox');
+          if (feeBox) {
+            const tot = toNum(fee.tuitionTotal) + toNum(fee.registrationFee) + toNum(fee.entranceFee) + toNum(fee.requirementsFee) + toNum(fee.peSuitFee) + toNum(fee.portalFee);
+            feeBox.innerHTML = `
+              <div>Tuition: <b>$${fee.tuitionTotal || 0}</b> | Registration: <b>$${fee.registrationFee || 0}</b> | Entrance: <b>$${fee.entranceFee || 0}</b></div>
+              <div>Requirements: <b>$${fee.requirementsFee || 0}</b> | PE Suit: <b>$${fee.peSuitFee || 0}</b> | Portal: <b>$${fee.portalFee || 0}</b></div>
+              <div style="margin-top: 4px; font-weight: 800; color: var(--color-primary);">Total Annual Obligation: $${tot}</div>
+            `;
+          }
+        };
+      }
+
+      const toggleSubjectsBtn = document.getElementById('nsToggleAllSubjectsBtn');
+      if (toggleSubjectsBtn) {
+        toggleSubjectsBtn.onclick = () => {
+          const cbs = document.querySelectorAll('.ns-subject-check');
+          const allChecked = Array.from(cbs).every(c => c.checked);
+          cbs.forEach(c => c.checked = !allChecked);
+          toggleSubjectsBtn.textContent = allChecked ? 'Select All' : 'Deselect All';
+        };
+      }
+    }, 50);
   }
 
   // --- Register Old Student Modal (Previous Class Filter & Auto-fill while preserving ID) ---
   async function openRegisterOldStudentModal() {
+    let oldStudentPhoto = '';
+
     App.showModal({
       title: 'Register Returning / Old Student (Advance to New Class)',
       content: `
-        <div style="font-size: 13.5px;">
+        <div style="font-size: 13.5px; max-height: 75vh; overflow-y: auto; padding-right: 6px;">
           <!-- Step 1: Filter by Previous Class -->
           <div style="background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #cbd5e1; margin-bottom: 14px;">
             <label class="form-label" for="prevClassFilter">1. Select Student's Previous Class / Grade Level:</label>
             <select id="prevClassFilter" class="select-field">
               <option value="">-- Choose Previous Class --</option>
-              <option value="Nursery A">Nursery A</option>
-              <option value="Nursery B">Nursery B</option>
-              <option value="Kindergarten">Kindergarten</option>
-              <option value="Grade 1">Grade 1</option>
-              <option value="Grade 2">Grade 2</option>
-              <option value="Grade 3">Grade 3</option>
-              <option value="Grade 4">Grade 4</option>
-              <option value="Grade 5">Grade 5</option>
-              <option value="Grade 6">Grade 6</option>
-              <option value="Grade 7">Grade 7</option>
-              <option value="Grade 8">Grade 8</option>
-              <option value="Grade 9">Grade 9</option>
-              <option value="Grade 10">Grade 10</option>
-              <option value="Grade 11">Grade 11</option>
+              ${GRADE_LEVELS.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}
             </select>
 
             <div style="margin-top: 10px;">
@@ -962,40 +1435,65 @@ window.AdminPanel = (function () {
             </div>
           </div>
 
-          <!-- Step 2: Auto-filled Details (Preserves original ID) -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div class="form-group">
-              <label class="form-label">Original Student ID (Preserved)</label>
-              <input type="text" id="osId" class="input-field" readonly style="font-weight: 700; background: #e2e8f0; color: var(--color-primary);">
+          <!-- Step 2: Auto-filled Details (Preserves original ID & Photo) -->
+          <div style="display: flex; gap: 14px; align-items: center; background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 12px;">
+            <div id="osPhotoBox" style="width: 54px; height: 64px; border: 2px solid var(--color-primary); border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #eef2ff; font-size: 24px; flex-shrink: 0;">
+              👤
             </div>
-            <div class="form-group">
-              <label class="form-label">Student Name</label>
-              <input type="text" id="osName" class="input-field" readonly style="background: #e2e8f0;">
+            <div style="flex: 1;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>
+                  <label class="form-label" style="font-size: 11px;">Original Student ID (Preserved)</label>
+                  <input type="text" id="osId" class="input-field" readonly style="font-weight: 700; background: #e2e8f0; color: var(--color-primary); font-size: 12.5px;">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size: 11px;">Student Full Name</label>
+                  <input type="text" id="osName" class="input-field" readonly style="background: #e2e8f0; font-weight: 600; font-size: 12.5px;">
+                </div>
+              </div>
             </div>
           </div>
 
+          <!-- Step 3: Advancing Class & Auto-Tied Old Student Fee Schedule -->
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
               <label class="form-label" for="osNewClass">New Advancing Class *</label>
               <select id="osNewClass" class="select-field">
-                <option value="Kindergarten">Kindergarten</option>
-                <option value="Grade 1">Grade 1</option>
-                <option value="Grade 2">Grade 2</option>
-                <option value="Grade 3">Grade 3</option>
-                <option value="Grade 4">Grade 4</option>
-                <option value="Grade 5">Grade 5</option>
-                <option value="Grade 6">Grade 6</option>
-                <option value="Grade 7">Grade 7</option>
-                <option value="Grade 8">Grade 8</option>
-                <option value="Grade 9">Grade 9</option>
-                <option value="Grade 10">Grade 10</option>
-                <option value="Grade 11">Grade 11</option>
-                <option value="Grade 12">Grade 12</option>
+                ${GRADE_LEVELS.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}
               </select>
             </div>
             <div class="form-group">
               <label class="form-label" for="osGuardian">Guardian Contact</label>
               <input type="text" id="osGuardian" class="input-field" placeholder="Guardian name">
+            </div>
+          </div>
+
+          <!-- Auto-Tied Returning Fee Schedule Box -->
+          <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px; margin: 12px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-weight: 700; color: #065f46; font-size: 13px;">Returning Student Fee Schedule (Auto-Tied)</span>
+              <span class="badge badge-success" style="font-size: 11px;">Returning Rate</span>
+            </div>
+            <div id="osFeeSummaryBox" style="font-size: 12px; color: #064e3b; line-height: 1.5;">
+              <div>Tuition: <b>$200</b> | Registration: <b>$35</b> | Requirements: <b>$35</b></div>
+              <div>PE Suit: <b>$25</b> | Portal: <b>$20</b> | Entrance: <b>$0 (Waived)</b></div>
+              <div style="margin-top: 4px; font-weight: 800;">Total Annual Obligation: $315</div>
+            </div>
+          </div>
+
+          <!-- Assigned Curriculum Subjects -->
+          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin: 12px 0; background: #ffffff;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <label class="form-label" style="font-weight: 700; margin: 0;">Assigned Curriculum Subjects</label>
+              <button type="button" class="btn btn-light btn-sm" id="osToggleAllSubjectsBtn" style="padding: 2px 8px; font-size: 11px;">Select All</button>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; font-size: 12px;">
+              ${CURRICULUM_SUBJECTS.map((sub, i) => `
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="checkbox" class="os-subject-check" value="${escapeHtml(sub)}" checked>
+                  <span>${escapeHtml(sub)}</span>
+                </label>
+              `).join('')}
             </div>
           </div>
 
@@ -1008,25 +1506,56 @@ window.AdminPanel = (function () {
       confirmText: 'Advance &amp; Enroll Student',
       onConfirm: async () => {
         const studentId = document.getElementById('osId').value.trim();
-        const name = document.getElementById('osName').value.trim();
         const newClass = document.getElementById('osNewClass').value;
         const guardian = document.getElementById('osGuardian').value.trim();
         const phone = document.getElementById('osPhone').value.trim();
 
         if (!studentId) {
-          API.toastNotification('Please select a student to advance.', true);
+          API.toastNotification('Please select a returning student to advance.', true);
           return;
         }
+
+        const assignedSubjects = [];
+        document.querySelectorAll('.os-subject-check:checked').forEach(cb => {
+          assignedSubjects.push(cb.value);
+        });
+
+        const feeSchedule = getClassFeeSchedule(newClass, 'old');
+        const totTuition = toNum(feeSchedule.tuitionTotal);
+        const regFee = toNum(feeSchedule.registrationFee);
+        const reqFee = toNum(feeSchedule.requirementsFee);
+        const peFee = toNum(feeSchedule.peSuitFee);
+        const portFee = toNum(feeSchedule.portalFee);
+        const totalBillable = totTuition + regFee + reqFee + peFee + portFee;
 
         const res = await API.callBackend('updateStudent', {
           student: {
             id: studentId,
             className: newClass,
             grade: newClass,
-            academicYear: '2026-2027',
+            academicYear: selectedAcademicYear,
             studentCategory: 'old',
             guardian: guardian,
-            phone: phone
+            phone: phone,
+            assignedSubjects: assignedSubjects,
+            finance: {
+              tuitionTotal: totTuition,
+              registrationFee: regFee,
+              registrationPaid: false,
+              entranceFee: 0,
+              entranceFeePaid: true,
+              requirementsFee: reqFee,
+              requirementsFeePaid: false,
+              peSuitFee: peFee,
+              peSuitFeePaid: false,
+              portalFee: portFee,
+              portalFeePaid: false,
+              installments: [0, 0, 0, 0],
+              otherPayments: 0,
+              totalPaid: 0,
+              balance: totalBillable,
+              currency: 'USD'
+            }
           }
         }, 'Advancing student...');
 
@@ -1042,6 +1571,24 @@ window.AdminPanel = (function () {
     // Wire up dynamic cascading filter
     const prevClassSelect = document.getElementById('prevClassFilter');
     const studentPicker = document.getElementById('oldStudentPicker');
+    const newClassSelect = document.getElementById('osNewClass');
+
+    function updateOsFeeBox(cls) {
+      const fee = getClassFeeSchedule(cls, 'old');
+      const box = document.getElementById('osFeeSummaryBox');
+      if (box) {
+        const tot = toNum(fee.tuitionTotal) + toNum(fee.registrationFee) + toNum(fee.requirementsFee) + toNum(fee.peSuitFee) + toNum(fee.portalFee);
+        box.innerHTML = `
+          <div>Tuition: <b>$${fee.tuitionTotal || 0}</b> | Registration: <b>$${fee.registrationFee || 0}</b> | Requirements: <b>$${fee.requirementsFee || 0}</b></div>
+          <div>PE Suit: <b>$${fee.peSuitFee || 0}</b> | Portal: <b>$${fee.portalFee || 0}</b> | Entrance: <b>$0 (Waived)</b></div>
+          <div style="margin-top: 4px; font-weight: 800;">Total Annual Obligation: $${tot}</div>
+        `;
+      }
+    }
+
+    if (newClassSelect) {
+      newClassSelect.onchange = () => updateOsFeeBox(newClassSelect.value);
+    }
 
     let classStudents = [];
 
@@ -1078,15 +1625,192 @@ window.AdminPanel = (function () {
       document.getElementById('osGuardian').value = student.guardian || '';
       document.getElementById('osPhone').value = student.phone || '';
 
-      // Auto suggest next class
+      const photoBox = document.getElementById('osPhotoBox');
+      if (photoBox) {
+        photoBox.innerHTML = student.photo ? `<img src="${escapeHtml(student.photo)}" style="width:100%;height:100%;object-fit:cover;">` : '👤';
+      }
+
+      // Auto suggest next class from GRADE_LEVELS
       const currentClass = student.className || student.grade || '';
-      const m = currentClass.match(/Grade\s*(\d+)/i);
-      if (m) {
-        const nextGrade = parseInt(m[1], 10) + 1;
-        const nextOption = document.querySelector(`#osNewClass option[value="Grade ${nextGrade}"]`);
-        if (nextOption) nextOption.selected = true;
+      const curIdx = GRADE_LEVELS.indexOf(currentClass);
+      if (curIdx >= 0 && curIdx < GRADE_LEVELS.length - 1) {
+        const nextGrade = GRADE_LEVELS[curIdx + 1];
+        newClassSelect.value = nextGrade;
+        updateOsFeeBox(nextGrade);
       }
     };
+
+    setTimeout(() => {
+      const toggleSubjectsBtn = document.getElementById('osToggleAllSubjectsBtn');
+      if (toggleSubjectsBtn) {
+        toggleSubjectsBtn.onclick = () => {
+          const cbs = document.querySelectorAll('.os-subject-check');
+          const allChecked = Array.from(cbs).every(c => c.checked);
+          cbs.forEach(c => c.checked = !allChecked);
+          toggleSubjectsBtn.textContent = allChecked ? 'Select All' : 'Deselect All';
+        };
+      }
+    }, 50);
+  }
+
+  // --- Edit Student Modal ---
+  function openEditStudentModal(studentId) {
+    const s = cachedStudents.find(x => x.id === studentId);
+    if (!s) {
+      API.toastNotification('Student record not found.', true);
+      return;
+    }
+
+    let updatedPhoto = s.photo || '';
+    const currentSubjects = s.assignedSubjects || CURRICULUM_SUBJECTS;
+
+    App.showModal({
+      title: `Edit Student Profile: ${escapeHtml(s.name)} [${escapeHtml(s.id)}]`,
+      content: `
+        <div style="font-size: 13.5px; max-height: 75vh; overflow-y: auto; padding-right: 6px;">
+          <!-- Photo Edit -->
+          <div style="text-align: center; margin-bottom: 12px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1;">
+            <div id="editStudentPhotoBox" style="width: 76px; height: 90px; border: 2px solid var(--color-primary); border-radius: 6px; margin: 0 auto 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #ffffff;">
+              ${updatedPhoto ? `<img src="${escapeHtml(updatedPhoto)}" style="width:100%;height:100%;object-fit:cover;">` : '👤'}
+            </div>
+            <input type="file" id="editStudentPhotoInput" accept="image/*" class="input-field" style="max-width: 250px; margin: 0 auto; font-size: 12px; padding: 4px;">
+            <div class="form-hint">Change or upload new student photograph.</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="editSName">Full Name *</label>
+              <input type="text" id="editSName" class="input-field" value="${escapeHtml(s.name)}" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editSClass">Enrolled Class *</label>
+              <select id="editSClass" class="select-field">
+                ${GRADE_LEVELS.map(g => `<option value="${escapeHtml(g)}" ${(s.className || s.grade) === g ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="editSCat">Student Category</label>
+              <select id="editSCat" class="select-field">
+                <option value="new" ${s.studentCategory === 'new' ? 'selected' : ''}>New Enrollee</option>
+                <option value="old" ${s.studentCategory === 'old' ? 'selected' : ''}>Returning Student</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editSStatus">Account Status</label>
+              <select id="editSStatus" class="select-field">
+                <option value="Active" ${s.status === 'Active' ? 'selected' : ''}>Active</option>
+                <option value="Suspended" ${s.status === 'Suspended' ? 'selected' : ''}>Suspended</option>
+                <option value="Dropped" ${s.status === 'Dropped' ? 'selected' : ''}>Dropped</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editSDob">Date of Birth</label>
+              <input type="date" id="editSDob" class="input-field" value="${escapeHtml(s.dob || '')}">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="editSGuardian">Parent / Guardian</label>
+              <input type="text" id="editSGuardian" class="input-field" value="${escapeHtml(s.guardian || '')}">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editSPhone">Contact Phone</label>
+              <input type="text" id="editSPhone" class="input-field" value="${escapeHtml(s.phone || '')}">
+            </div>
+          </div>
+
+          <!-- Assigned Subjects -->
+          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin: 12px 0; background: #ffffff;">
+            <label class="form-label" style="font-weight: 700; margin-bottom: 8px; display: block;">Curriculum Subjects Assignment</label>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; font-size: 12px;">
+              ${CURRICULUM_SUBJECTS.map(sub => `
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="checkbox" class="edit-s-subject-check" value="${escapeHtml(sub)}" ${currentSubjects.includes(sub) ? 'checked' : ''}>
+                  <span>${escapeHtml(sub)}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `,
+      confirmText: 'Save Profile Changes',
+      onConfirm: async () => {
+        const name = document.getElementById('editSName').value.trim();
+        const cls = document.getElementById('editSClass').value;
+        const cat = document.getElementById('editSCat').value;
+        const status = document.getElementById('editSStatus').value;
+        const dob = document.getElementById('editSDob').value;
+        const guardian = document.getElementById('editSGuardian').value.trim();
+        const phone = document.getElementById('editSPhone').value.trim();
+
+        if (!name) {
+          API.toastNotification('Student name is required.', true);
+          return;
+        }
+
+        const assignedSubjects = [];
+        document.querySelectorAll('.edit-s-subject-check:checked').forEach(cb => {
+          assignedSubjects.push(cb.value);
+        });
+
+        const res = await API.callBackend('updateStudent', {
+          student: {
+            id: s.id,
+            name: name,
+            className: cls,
+            grade: cls,
+            studentCategory: cat,
+            status: status,
+            dob: dob,
+            photo: updatedPhoto,
+            guardian: guardian,
+            phone: phone,
+            assignedSubjects: assignedSubjects
+          }
+        }, 'Updating student...');
+
+        if (res && res.success) {
+          API.toastSuccess();
+          loadTab('students');
+        } else {
+          API.toastNotification(res.message || 'Error updating student.', true);
+        }
+      }
+    });
+
+    setTimeout(() => {
+      const photoInput = document.getElementById('editStudentPhotoInput');
+      if (photoInput) {
+        photoInput.onchange = (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+              updatedPhoto = evt.target.result;
+              const box = document.getElementById('editStudentPhotoBox');
+              if (box) box.innerHTML = `<img src="${updatedPhoto}" style="width:100%;height:100%;object-fit:cover;">`;
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+      }
+    }, 50);
+  }
+
+  async function deleteStudent(studentId) {
+    if (!confirm(`Are you sure you want to permanently delete student [${studentId}] and all associated records?`)) return;
+    const res = await API.callBackend('deleteStudent', { studentId: studentId }, 'Deleting student record...');
+    if (res && res.success) {
+      API.toastSuccess();
+      cachedStudents = cachedStudents.filter(s => s.id !== studentId);
+      loadTab('students');
+    } else {
+      API.toastNotification(res.message || 'Error deleting student.', true);
+    }
   }
 
   // --- Send Selected Students to IE Printing Queue ---
@@ -1193,13 +1917,14 @@ window.AdminPanel = (function () {
     const nextId = (idRes && idRes.success) ? idRes.nextId : 'SPST001';
 
     App.showModal({
-      title: 'Add New Teacher',
+      title: 'Add Teaching Faculty (Attach Classes & Subjects)',
       content: `
-        <div style="font-size: 13.5px;">
+        <div style="font-size: 13.5px; max-height: 75vh; overflow-y: auto; padding-right: 6px;">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
               <label class="form-label" for="ntId">Systematic Teacher ID *</label>
               <input type="text" id="ntId" class="input-field" value="${escapeHtml(nextId)}" required style="font-weight: 700; color: var(--color-primary);">
+              <div class="form-hint">Systematic format [SPST001].</div>
             </div>
             <div class="form-group">
               <label class="form-label" for="ntName">Full Name *</label>
@@ -1219,8 +1944,37 @@ window.AdminPanel = (function () {
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="ntTitle">Professional Title</label>
+            <label class="form-label" for="ntTitle">Professional Title / Designation</label>
             <input type="text" id="ntTitle" class="input-field" value="Subject Instructor">
+          </div>
+
+          <!-- Attach Classes Checkboxes -->
+          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin: 12px 0; background: #f8fafc;">
+            <label class="form-label" style="font-weight: 700; margin-bottom: 6px; display: block;">Attach Assigned Teaching Classes</label>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; font-size: 12px;">
+              ${GRADE_LEVELS.map(g => `
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="checkbox" class="nt-class-check" value="${escapeHtml(g)}">
+                  <span>${escapeHtml(g)}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Attach Subjects Checkboxes -->
+          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin: 12px 0; background: #f8fafc;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label class="form-label" style="font-weight: 700; margin: 0;">Attach Assigned Teaching Subjects</label>
+              <button type="button" class="btn btn-light btn-sm" id="ntToggleAllSubjectsBtn" style="padding: 2px 8px; font-size: 11px;">Select All</button>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; font-size: 12px;">
+              ${CURRICULUM_SUBJECTS.map(sub => `
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="checkbox" class="nt-subject-check" value="${escapeHtml(sub)}">
+                  <span>${escapeHtml(sub)}</span>
+                </label>
+              `).join('')}
+            </div>
           </div>
         </div>
       `,
@@ -1237,8 +1991,27 @@ window.AdminPanel = (function () {
           return;
         }
 
+        const classes = [];
+        document.querySelectorAll('.nt-class-check:checked').forEach(c => classes.push(c.value));
+
+        const subjects = [];
+        document.querySelectorAll('.nt-subject-check:checked').forEach(s => subjects.push(s.value));
+
+        const assignments = classes.map(cls => ({
+          class: cls,
+          subjects: subjects
+        }));
+
         const res = await API.callBackend('saveTeacher', {
-          teacher: { id, name, phone, password: pass, title, status: 'Active', assignments: [] }
+          teacher: {
+            id: id,
+            name: name,
+            phone: phone,
+            password: pass,
+            title: title,
+            status: 'Active',
+            assignments: assignments
+          }
         }, 'Saving teacher...');
 
         if (res && res.success) {
@@ -1249,60 +2022,222 @@ window.AdminPanel = (function () {
         }
       }
     });
+
+    setTimeout(() => {
+      const toggleSubjectsBtn = document.getElementById('ntToggleAllSubjectsBtn');
+      if (toggleSubjectsBtn) {
+        toggleSubjectsBtn.onclick = () => {
+          const cbs = document.querySelectorAll('.nt-subject-check');
+          const allChecked = Array.from(cbs).every(c => c.checked);
+          cbs.forEach(c => c.checked = !allChecked);
+          toggleSubjectsBtn.textContent = allChecked ? 'Select All' : 'Deselect All';
+        };
+      }
+    }, 50);
+  }
+
+  function openEditTeacherModal(teacherId) {
+    const t = cachedTeachers.find(x => x.id === teacherId);
+    if (!t) return;
+
+    const assignedClasses = (t.assignments || []).map(a => a.class);
+    const assignedSubjects = (t.assignments && t.assignments[0] && t.assignments[0].subjects) || [];
+
+    App.showModal({
+      title: `Edit Teaching Faculty: ${escapeHtml(t.name)} [${escapeHtml(t.id)}]`,
+      content: `
+        <div style="font-size: 13.5px; max-height: 75vh; overflow-y: auto; padding-right: 6px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="etName">Full Name *</label>
+              <input type="text" id="etName" class="input-field" value="${escapeHtml(t.name)}" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="etPhone">Contact Phone</label>
+              <input type="text" id="etPhone" class="input-field" value="${escapeHtml(t.phone || '')}">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="etTitle">Title / Designation</label>
+              <input type="text" id="etTitle" class="input-field" value="${escapeHtml(t.title || 'Teacher')}">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="etStatus">Status</label>
+              <select id="etStatus" class="select-field">
+                <option value="Active" ${t.status === 'Active' ? 'selected' : ''}>Active</option>
+                <option value="Inactive" ${t.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="etPass">Reset Password (Optional)</label>
+            <input type="password" id="etPass" class="input-field" placeholder="Leave blank to keep unchanged">
+          </div>
+
+          <!-- Attach Classes Checkboxes -->
+          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin: 12px 0; background: #f8fafc;">
+            <label class="form-label" style="font-weight: 700; margin-bottom: 6px; display: block;">Assigned Teaching Classes</label>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; font-size: 12px;">
+              ${GRADE_LEVELS.map(g => `
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="checkbox" class="et-class-check" value="${escapeHtml(g)}" ${assignedClasses.includes(g) ? 'checked' : ''}>
+                  <span>${escapeHtml(g)}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Attach Subjects Checkboxes -->
+          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin: 12px 0; background: #f8fafc;">
+            <label class="form-label" style="font-weight: 700; margin-bottom: 6px; display: block;">Assigned Teaching Subjects</label>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; font-size: 12px;">
+              ${CURRICULUM_SUBJECTS.map(sub => `
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="checkbox" class="et-subject-check" value="${escapeHtml(sub)}" ${assignedSubjects.includes(sub) ? 'checked' : ''}>
+                  <span>${escapeHtml(sub)}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `,
+      confirmText: 'Save Teacher Profile',
+      onConfirm: async () => {
+        const name = document.getElementById('etName').value.trim();
+        const phone = document.getElementById('etPhone').value.trim();
+        const title = document.getElementById('etTitle').value.trim();
+        const status = document.getElementById('etStatus').value;
+        const pass = document.getElementById('etPass').value.trim();
+
+        if (!name) {
+          API.toastNotification('Teacher name required.', true);
+          return;
+        }
+
+        const classes = [];
+        document.querySelectorAll('.et-class-check:checked').forEach(c => classes.push(c.value));
+
+        const subjects = [];
+        document.querySelectorAll('.et-subject-check:checked').forEach(s => subjects.push(s.value));
+
+        const assignments = classes.map(cls => ({
+          class: cls,
+          subjects: subjects
+        }));
+
+        const payload = {
+          id: t.id,
+          name: name,
+          phone: phone,
+          title: title,
+          status: status,
+          assignments: assignments
+        };
+        if (pass) payload.password = pass;
+
+        const res = await API.callBackend('saveTeacher', { teacher: payload }, 'Updating teacher...');
+        if (res && res.success) {
+          API.toastSuccess();
+          loadTab('teachers');
+        } else {
+          API.toastNotification(res.message || 'Error updating teacher.', true);
+        }
+      }
+    });
+  }
+
+  async function deleteTeacher(teacherId) {
+    if (!confirm(`Are you sure you want to remove faculty member [${teacherId}]?`)) return;
+    const res = await API.callBackend('deleteTeacher', { teacherId: teacherId }, 'Removing teacher...');
+    if (res && res.success) {
+      API.toastSuccess();
+      loadTab('teachers');
+    } else {
+      API.toastNotification(res.message || 'Error removing teacher.', true);
+    }
   }
 
   // =========================================================================
-  // 4. TUITION & FEES MANAGEMENT
+  // 4. TUITION & FEES MANAGEMENT (CLASS FEE SCHEDULE + STUDENT PAYMENTS)
   // =========================================================================
+  let financeCategoryView = 'new'; // 'new' or 'old'
+
   async function renderFinanceTab(container) {
-    const res = await API.callBackend('getAllStudents', {}, 'Loading finance records...');
-    const students = (res && res.success && Array.isArray(res.students)) ? res.students : [];
+    const [studRes, feesRes] = await Promise.all([
+      API.callBackend('getAllStudents', { academicYear: selectedAcademicYear }, 'Loading finance records...'),
+      API.callBackend('getClassFees', {}, 'Loading class fees...')
+    ]);
+
+    const students = (studRes && studRes.success && Array.isArray(studRes.students)) ? studRes.students : [];
+    if (feesRes && feesRes.success && Array.isArray(feesRes.classFees)) {
+      cachedClassFees = feesRes.classFees;
+    }
 
     container.innerHTML = `
-      <div class="content-card">
-        <div class="card-header-row">
+      <div class="content-card" style="margin-bottom: 20px;">
+        <!-- Card 1: Class Fee Schedule (New vs Old Students) -->
+        <div class="card-header-row" style="flex-wrap: wrap; gap: 12px;">
           <div>
-            <h3 class="card-title">Student Tuition &amp; Fee Payments</h3>
+            <h3 class="card-title">Class Fee Schedule (Tuition &amp; Fees Architecture)</h3>
             <div style="font-size: 13px; color: var(--color-text-muted);">
-              Record installment payments, registration, and monitor student account balances.
+              Set institutional billing rates per grade level. Registering a student automatically binds their year fee schedule.
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <div class="btn-group" style="display: flex; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden;">
+              <button type="button" class="btn btn-sm ${financeCategoryView === 'new' ? 'btn-primary' : 'btn-light'}" id="feeViewNewBtn" style="border-radius: 0;">
+                New Students Rates
+              </button>
+              <button type="button" class="btn btn-sm ${financeCategoryView === 'old' ? 'btn-primary' : 'btn-light'}" id="feeViewOldBtn" style="border-radius: 0;">
+                Returning (Old) Students Rates
+              </button>
             </div>
           </div>
         </div>
 
+        <!-- Class Fee Schedule Table -->
         <div class="table-responsive" style="margin-top: 14px;">
           <table class="data-table">
             <thead>
-              <tr>
-                <th>Student ID</th>
-                <th>Student Name</th>
-                <th>Class</th>
-                <th>Total Billed</th>
-                <th>Registration</th>
-                <th>Installments (1/2/3/4)</th>
-                <th>Total Paid</th>
-                <th>Balance</th>
-                <th>Action</th>
+              <tr style="background: #f1f5f9;">
+                <th>Class / Grade Level</th>
+                <th style="text-align: right;">Entrance</th>
+                <th style="text-align: right;">Registration</th>
+                <th style="text-align: right;">Tuition Total</th>
+                <th style="text-align: right;">Requirements</th>
+                <th style="text-align: right;">PE Suit</th>
+                <th style="text-align: right;">Portal Fee</th>
+                <th style="text-align: right; background: #e2e8f0;">Total Package</th>
+                <th style="text-align: center;">Action</th>
               </tr>
             </thead>
             <tbody>
-              ${students.length === 0 ? `
-                <tr><td colspan="9" style="text-align: center; padding: 25px; color: var(--color-text-muted);">No student finance accounts found.</td></tr>
-              ` : students.map(s => {
-                const f = s.finance || {};
-                const inst = f.installments || [0, 0, 0, 0];
+              ${GRADE_LEVELS.map(cls => {
+                const sched = getClassFeeSchedule(cls, financeCategoryView);
+                const ent = toNum(sched.entranceFee);
+                const reg = toNum(sched.registrationFee);
+                const tui = toNum(sched.tuitionTotal);
+                const req = toNum(sched.requirementsFee);
+                const pe = toNum(sched.peSuitFee);
+                const port = toNum(sched.portalFee);
+                const tot = ent + reg + tui + req + pe + port;
+                const cur = sched.currency || 'USD';
                 return `
                   <tr>
-                    <td><b>[${escapeHtml(s.id)}]</b></td>
-                    <td>${escapeHtml(s.name)}</td>
-                    <td>${escapeHtml(s.className || s.grade)}</td>
-                    <td>$${(f.tuitionTotal || 0).toLocaleString()}</td>
-                    <td>${f.registrationPaid ? '<span class="badge badge-success">Paid</span>' : '<span class="badge badge-warning">Unpaid</span>'}</td>
-                    <td style="font-size: 12px;">$${inst[0]} / $${inst[1]} / $${inst[2]} / $${inst[3]}</td>
-                    <td><b style="color: var(--color-success);">$${(f.totalPaid || 0).toLocaleString()}</b></td>
-                    <td><b class="${(f.balance || 0) > 0 ? 'score-red' : 'score-green'}">$${(f.balance || 0).toLocaleString()}</b></td>
-                    <td>
-                      <button type="button" class="btn btn-primary btn-sm" onclick="window.AdminPanel.openRecordPaymentModal('${escapeHtml(s.id)}')">
-                        Record Payment
+                    <td><b>${escapeHtml(cls)}</b></td>
+                    <td style="text-align: right;">${ent > 0 ? formatMoney(ent, cur) : '<span style="color:#94a3b8;">Waived</span>'}</td>
+                    <td style="text-align: right;">${formatMoney(reg, cur)}</td>
+                    <td style="text-align: right; font-weight: 600;">${formatMoney(tui, cur)}</td>
+                    <td style="text-align: right;">${formatMoney(req, cur)}</td>
+                    <td style="text-align: right;">${formatMoney(pe, cur)}</td>
+                    <td style="text-align: right;">${formatMoney(port, cur)}</td>
+                    <td style="text-align: right; font-weight: 800; color: var(--color-primary); background: #f8fafc;">${formatMoney(tot, cur)}</td>
+                    <td style="text-align: center;">
+                      <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.openClassFeeModal('${escapeHtml(cls)}', '${financeCategoryView}')" title="Configure fee rates">
+                        Edit Schedule
                       </button>
                     </td>
                   </tr>
@@ -1312,76 +2247,466 @@ window.AdminPanel = (function () {
           </table>
         </div>
       </div>
+
+      <!-- Card 2: Student Tuition & Fee Payments Table -->
+      <div class="content-card">
+        <div class="card-header-row" style="flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 class="card-title">Student Tuition &amp; Fee Payments Ledger</h3>
+            <div style="font-size: 13px; color: var(--color-text-muted);">
+              Record installments, registration, and monitor student ledger balances for ${escapeHtml(selectedAcademicYear)}.
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <input type="text" id="finSearchInput" class="input-field" placeholder="Search student or ID..." style="max-width: 190px;">
+            <select id="finClassFilter" class="select-field" style="max-width: 140px;">
+              <option value="">All Classes</option>
+              ${GRADE_LEVELS.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}
+            </select>
+            <select id="finStatusFilter" class="select-field" style="max-width: 130px;">
+              <option value="">All Statuses</option>
+              <option value="overdue">Overdue Balance</option>
+              <option value="cleared">Tuition Cleared</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-responsive" style="margin-top: 14px;">
+          <table class="data-table" id="finStudentTable">
+            <thead>
+              <tr>
+                <th>Student ID</th>
+                <th>Student</th>
+                <th>Class</th>
+                <th>Category</th>
+                <th style="text-align: right;">Total Billed</th>
+                <th style="text-align: center;">Registration</th>
+                <th style="text-align: center;">Installments (1/2/3/4)</th>
+                <th style="text-align: right;">Total Paid</th>
+                <th style="text-align: right;">Balance</th>
+                <th style="text-align: center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="finStudentTableBody"></tbody>
+          </table>
+        </div>
+      </div>
     `;
+
+    // Filter and Render Student Finance Rows
+    function renderFinRows() {
+      const tbody = document.getElementById('finStudentTableBody');
+      if (!tbody) return;
+
+      const q = (document.getElementById('finSearchInput')?.value || '').trim().toLowerCase();
+      const cls = (document.getElementById('finClassFilter')?.value || '').trim().toLowerCase();
+      const stat = (document.getElementById('finStatusFilter')?.value || '').trim().toLowerCase();
+
+      const filtered = students.filter(s => {
+        const curBal = studentBalance(s);
+        const matchQ = !q || s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
+        const matchCls = !cls || String(s.className || s.grade).toLowerCase() === cls;
+        let matchStat = true;
+        if (stat === 'overdue') matchStat = curBal > 0;
+        if (stat === 'cleared') matchStat = curBal <= 0 && toNum((s.finance || {}).tuitionTotal) > 0;
+        return matchQ && matchCls && matchStat;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 25px; color: var(--color-text-muted);">No student finance accounts match your filter.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(s => {
+        const f = s.finance || {};
+        const cur = f.currency || 'USD';
+        const inst = f.installments || [0, 0, 0, 0];
+        const totBilled = toNum(f.tuitionTotal) + toNum(f.registrationFee) + toNum(f.requirementsFee) + toNum(f.peSuitFee) + toNum(f.portalFee) + toNum(f.entranceFee);
+        const totPaid = toNum(f.totalPaid);
+        const bal = studentBalance(s);
+
+        return `
+          <tr>
+            <td><b>[${escapeHtml(s.id)}]</b></td>
+            <td>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="width: 28px; height: 28px; border-radius: 50%; overflow: hidden; background: #e2e8f0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid #cbd5e1;">
+                  ${s.photo ? `<img src="${escapeHtml(s.photo)}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.innerHTML='👤'">` : '👤'}
+                </div>
+                <span style="font-weight: 600;">${escapeHtml(s.name)}</span>
+              </div>
+            </td>
+            <td>${escapeHtml(s.className || s.grade)}</td>
+            <td><span class="badge ${s.studentCategory === 'old' ? 'badge-light' : 'badge-info'}">${s.studentCategory === 'old' ? 'Returning' : 'New'}</span></td>
+            <td style="text-align: right; font-weight: 600;">${formatMoney(totBilled, cur)}</td>
+            <td style="text-align: center;">${f.registrationPaid ? '<span class="badge badge-success" style="padding: 2px 6px; font-size: 10.5px;">Paid</span>' : '<span class="badge badge-warning" style="padding: 2px 6px; font-size: 10.5px;">Unpaid</span>'}</td>
+            <td style="text-align: center; font-size: 11.5px; color: #475569;">
+              $${inst[0]} / $${inst[1]} / $${inst[2]} / $${inst[3]}
+            </td>
+            <td style="text-align: right;"><b style="color: var(--color-success);">${formatMoney(totPaid, cur)}</b></td>
+            <td style="text-align: right;"><b class="${bal > 0 ? 'score-red' : 'score-green'}">${formatMoney(bal, cur)}</b></td>
+            <td style="text-align: center;">
+              <div style="display: flex; gap: 4px; justify-content: center;">
+                <button type="button" class="btn btn-primary btn-sm" onclick="window.AdminPanel.openEditPaymentModal('${escapeHtml(s.id)}')">
+                  Edit Payment
+                </button>
+                <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.printSingleReceipt('${escapeHtml(s.id)}')">
+                  🧾
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    renderFinRows();
+
+    // Event listeners
+    document.getElementById('feeViewNewBtn').onclick = () => {
+      financeCategoryView = 'new';
+      renderFinanceTab(container);
+    };
+    document.getElementById('feeViewOldBtn').onclick = () => {
+      financeCategoryView = 'old';
+      renderFinanceTab(container);
+    };
+
+    document.getElementById('finSearchInput').oninput = renderFinRows;
+    document.getElementById('finClassFilter').onchange = renderFinRows;
+    document.getElementById('finStatusFilter').onchange = renderFinRows;
   }
 
-  function openRecordPaymentModal(studentId) {
-    const student = cachedStudents.find(s => s.id === studentId);
-    if (!student) return;
-    const f = student.finance || {};
-    const inst = f.installments || [0, 0, 0, 0];
+  // --- Modal to Configure Class Fee Schedule ---
+  function openClassFeeModal(className, category) {
+    category = String(category || 'new').toLowerCase();
+    const sched = getClassFeeSchedule(className, category);
 
     App.showModal({
-      title: `Record Fee Payment: ${student.name} [${student.id}]`,
+      title: `Set Class Fee Schedule: ${escapeHtml(className)} (${category === 'new' ? 'New Students' : 'Returning Students'})`,
       content: `
         <div style="font-size: 13.5px;">
-          <div style="background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #cbd5e1; margin-bottom: 14px;">
-            <div>Class: <b>${escapeHtml(student.className || student.grade)}</b></div>
-            <div>Total Tuition Billed: <b>$${f.tuitionTotal || 0}</b> | Current Balance: <b class="${f.balance > 0 ? 'score-red' : 'score-green'}">$${f.balance || 0}</b></div>
-          </div>
-
-          <div class="form-group">
-            <label><input type="checkbox" id="payReg" ${f.registrationPaid ? 'checked' : ''}> Registration Fee Paid ($${f.registrationFee || 0})</label>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div class="form-group">
-              <label class="form-label" for="payInst1">1st Installment Paid ($)</label>
-              <input type="number" id="payInst1" class="input-field" value="${inst[0] || 0}">
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="payInst2">2nd Installment Paid ($)</label>
-              <input type="number" id="payInst2" class="input-field" value="${inst[1] || 0}">
+          <div style="background: #f8fafc; padding: 10px 14px; border-radius: 6px; border: 1px solid #cbd5e1; margin-bottom: 14px;">
+            <div>Class: <b>${escapeHtml(className)}</b> &bull; Category: <b>${category === 'new' ? 'New Enrollee' : 'Returning Student'}</b></div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
+              Configuring fees for this class automatically binds newly registered students to these rates.
             </div>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
-              <label class="form-label" for="payInst3">3rd Installment Paid ($)</label>
-              <input type="number" id="payInst3" class="input-field" value="${inst[2] || 0}">
+              <label class="form-label" for="cfTuition">Tuition Total ($) *</label>
+              <input type="number" id="cfTuition" class="input-field" value="${sched.tuitionTotal || 0}" required>
             </div>
             <div class="form-group">
-              <label class="form-label" for="payInst4">4th Installment Paid ($)</label>
-              <input type="number" id="payInst4" class="input-field" value="${inst[3] || 0}">
+              <label class="form-label" for="cfReg">Registration Fee ($) *</label>
+              <input type="number" id="cfReg" class="input-field" value="${sched.registrationFee || 0}" required>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="cfEntrance">Entrance Fee ($)</label>
+              <input type="number" id="cfEntrance" class="input-field" value="${sched.entranceFee || 0}">
+              <div class="form-hint">Usually $0 for returning students.</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cfReq">Requirements Fee ($)</label>
+              <input type="number" id="cfReq" class="input-field" value="${sched.requirementsFee || 0}">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="cfPe">PE Suit Fee ($)</label>
+              <input type="number" id="cfPe" class="input-field" value="${sched.peSuitFee || 0}">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cfPortal">Portal Fee ($)</label>
+              <input type="number" id="cfPortal" class="input-field" value="${sched.portalFee || 0}">
+            </div>
+          </div>
+        </div>
+      `,
+      confirmText: 'Save Class Fee Schedule',
+      onConfirm: async () => {
+        const tuition = Number(document.getElementById('cfTuition').value) || 0;
+        const reg = Number(document.getElementById('cfReg').value) || 0;
+        const entrance = Number(document.getElementById('cfEntrance').value) || 0;
+        const req = Number(document.getElementById('cfReq').value) || 0;
+        const pe = Number(document.getElementById('cfPe').value) || 0;
+        const portal = Number(document.getElementById('cfPortal').value) || 0;
+
+        const feeData = {
+          className: className,
+          studentCategory: category,
+          currency: 'USD',
+          tuitionTotal: tuition,
+          registrationFee: reg,
+          entranceFee: entrance,
+          requirementsFee: req,
+          peSuitFee: pe,
+          portalFee: portal,
+          inst1Amount: Math.round(tuition / 4),
+          inst2Amount: Math.round(tuition / 4),
+          inst3Amount: Math.round(tuition / 4),
+          inst4Amount: Math.round(tuition / 4)
+        };
+
+        const res = await API.callBackend('saveClassFee', feeData, 'Saving fee schedule...');
+        if (res && res.success) {
+          API.toastSuccess();
+          // Update cachedClassFees locally
+          const idx = cachedClassFees.findIndex(f => f.className === className && f.studentCategory === category);
+          if (idx >= 0) cachedClassFees[idx] = Object.assign({}, cachedClassFees[idx], feeData);
+          else cachedClassFees.push(feeData);
+          loadTab('finance');
+        } else {
+          API.toastNotification(res.message || 'Error saving class fee schedule.', true);
+        }
+      }
+    });
+  }
+
+  // --- Modal to Edit / Record Payment for Student ---
+  function openEditPaymentModal(studentId) {
+    const student = cachedStudents.find(s => s.id === studentId);
+    if (!student) {
+      API.toastNotification('Student record not found.', true);
+      return;
+    }
+
+    const f = student.finance || {};
+    const inst = f.installments || [0, 0, 0, 0];
+    const currency = f.currency || 'USD';
+
+    App.showModal({
+      title: `Edit Fee Payment: ${escapeHtml(student.name)} [${escapeHtml(student.id)}]`,
+      content: `
+        <div style="font-size: 13.5px; max-height: 75vh; overflow-y: auto; padding-right: 6px;">
+          <!-- Student Banner -->
+          <div style="display: flex; gap: 12px; align-items: center; background: #f8fafc; padding: 10px 14px; border-radius: 6px; border: 1px solid #cbd5e1; margin-bottom: 14px;">
+            <div style="width: 44px; height: 44px; border-radius: 6px; overflow: hidden; background: #e2e8f0; border: 1.5px solid var(--color-primary); display: flex; align-items: center; justify-content: center; font-size: 20px;">
+              ${student.photo ? `<img src="${escapeHtml(student.photo)}" style="width:100%;height:100%;object-fit:cover;">` : '👤'}
+            </div>
+            <div>
+              <div style="font-weight: 700; color: var(--color-primary);">${escapeHtml(student.name)} [${escapeHtml(student.id)}]</div>
+              <div style="font-size: 12px; color: #64748b;">
+                Class: <b>${escapeHtml(student.className || student.grade)}</b> &bull; Category: <b>${student.studentCategory === 'old' ? 'Returning Student' : 'New Enrollee'}</b>
+              </div>
+            </div>
+          </div>
+
+          <!-- Miscellaneous Fees Breakdown -->
+          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: #ffffff;">
+            <div style="font-weight: 700; color: var(--color-primary); font-size: 13px; margin-bottom: 8px;">Admission &amp; Activity Fees</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div>
+                <label class="form-label" for="epRegFee">Registration Fee ($)</label>
+                <input type="number" id="epRegFee" class="input-field ep-calc-input" value="${f.registrationFee || 0}">
+                <label style="display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; cursor: pointer;">
+                  <input type="checkbox" id="epRegPaid" class="ep-calc-input" ${f.registrationPaid ? 'checked' : ''}>
+                  <span>Mark as Paid</span>
+                </label>
+              </div>
+
+              <div>
+                <label class="form-label" for="epEntFee">Entrance Fee ($)</label>
+                <input type="number" id="epEntFee" class="input-field ep-calc-input" value="${f.entranceFee || 0}">
+                <label style="display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; cursor: pointer;">
+                  <input type="checkbox" id="epEntPaid" class="ep-calc-input" ${f.entranceFeePaid ? 'checked' : ''}>
+                  <span>Mark as Paid</span>
+                </label>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
+              <div>
+                <label class="form-label" for="epReqFee">Requirements ($)</label>
+                <input type="number" id="epReqFee" class="input-field ep-calc-input" value="${f.requirementsFee || 0}">
+                <label style="display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; cursor: pointer;">
+                  <input type="checkbox" id="epReqPaid" class="ep-calc-input" ${f.requirementsFeePaid ? 'checked' : ''}>
+                  <span>Paid</span>
+                </label>
+              </div>
+
+              <div>
+                <label class="form-label" for="epPeFee">PE Suit ($)</label>
+                <input type="number" id="epPeFee" class="input-field ep-calc-input" value="${f.peSuitFee || 0}">
+                <label style="display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; cursor: pointer;">
+                  <input type="checkbox" id="epPePaid" class="ep-calc-input" ${f.peSuitFeePaid ? 'checked' : ''}>
+                  <span>Paid</span>
+                </label>
+              </div>
+
+              <div>
+                <label class="form-label" for="epPortalFee">Portal Fee ($)</label>
+                <input type="number" id="epPortalFee" class="input-field ep-calc-input" value="${f.portalFee || 0}">
+                <label style="display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; cursor: pointer;">
+                  <input type="checkbox" id="epPortalPaid" class="ep-calc-input" ${f.portalFeePaid ? 'checked' : ''}>
+                  <span>Paid</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tuition Installments -->
+          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: #ffffff;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-weight: 700; color: var(--color-primary); font-size: 13px;">Tuition Installments Payments</span>
+              <div style="font-size: 12px;">Total Tuition Billed: <input type="number" id="epTuitionTotal" class="input-field ep-calc-input" style="width: 90px; display: inline-block; padding: 3px 6px; font-weight: 700;" value="${f.tuitionTotal || 0}"></div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div class="form-group">
+                <label class="form-label" for="epInst1">1st Installment Paid ($)</label>
+                <input type="number" id="epInst1" class="input-field ep-calc-input" value="${inst[0] || 0}">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="epInst2">2nd Installment Paid ($)</label>
+                <input type="number" id="epInst2" class="input-field ep-calc-input" value="${inst[1] || 0}">
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div class="form-group">
+                <label class="form-label" for="epInst3">3rd Installment Paid ($)</label>
+                <input type="number" id="epInst3" class="input-field ep-calc-input" value="${inst[2] || 0}">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="epInst4">4th Installment Paid ($)</label>
+                <input type="number" id="epInst4" class="input-field ep-calc-input" value="${inst[3] || 0}">
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 6px;">
+              <label class="form-label" for="epOther">Other / Sundry Payments ($)</label>
+              <input type="number" id="epOther" class="input-field ep-calc-input" value="${f.otherPayments || 0}">
+            </div>
+          </div>
+
+          <!-- Live Balance Position Preview -->
+          <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
+            <div>
+              <div style="font-size: 10.5px; color: #64748b; text-transform: uppercase;">Total Billed</div>
+              <div style="font-size: 15px; font-weight: 800;" id="epLiveBilled">$0.00</div>
+            </div>
+            <div>
+              <div style="font-size: 10.5px; color: #64748b; text-transform: uppercase;">Total Paid</div>
+              <div style="font-size: 15px; font-weight: 800; color: var(--color-success);" id="epLivePaid">$0.00</div>
+            </div>
+            <div>
+              <div style="font-size: 10.5px; color: #64748b; text-transform: uppercase;">Outstanding Balance</div>
+              <div style="font-size: 15px; font-weight: 800;" id="epLiveBalance">$0.00</div>
             </div>
           </div>
         </div>
       `,
       confirmText: 'Save Payment Record',
       onConfirm: async () => {
-        const regPaid = document.getElementById('payReg').checked;
-        const i1 = Number(document.getElementById('payInst1').value) || 0;
-        const i2 = Number(document.getElementById('payInst2').value) || 0;
-        const i3 = Number(document.getElementById('payInst3').value) || 0;
-        const i4 = Number(document.getElementById('payInst4').value) || 0;
+        const regFee = Number(document.getElementById('epRegFee').value) || 0;
+        const regPaid = document.getElementById('epRegPaid').checked;
+        const entFee = Number(document.getElementById('epEntFee').value) || 0;
+        const entPaid = document.getElementById('epEntPaid').checked;
+        const reqFee = Number(document.getElementById('epReqFee').value) || 0;
+        const reqPaid = document.getElementById('epReqPaid').checked;
+        const peFee = Number(document.getElementById('epPeFee').value) || 0;
+        const pePaid = document.getElementById('epPePaid').checked;
+        const portalFee = Number(document.getElementById('epPortalFee').value) || 0;
+        const portalPaid = document.getElementById('epPortalPaid').checked;
+
+        const tuitionTotal = Number(document.getElementById('epTuitionTotal').value) || 0;
+        const i1 = Number(document.getElementById('epInst1').value) || 0;
+        const i2 = Number(document.getElementById('epInst2').value) || 0;
+        const i3 = Number(document.getElementById('epInst3').value) || 0;
+        const i4 = Number(document.getElementById('epInst4').value) || 0;
+        const other = Number(document.getElementById('epOther').value) || 0;
+
+        const paymentData = {
+          currency: currency,
+          tuitionTotal: tuitionTotal,
+          registrationFee: regFee,
+          registrationPaid: regPaid,
+          registrationDate: regPaid ? (f.registrationDate || new Date().toISOString().split('T')[0]) : '',
+          entranceFee: entFee,
+          entranceFeePaid: entPaid,
+          requirementsFee: reqFee,
+          requirementsFeePaid: reqPaid,
+          peSuitFee: peFee,
+          peSuitFeePaid: pePaid,
+          portalFee: portalFee,
+          portalFeePaid: portalPaid,
+          installments: [i1, i2, i3, i4],
+          otherPayments: other
+        };
 
         const res = await API.callBackend('recordPayment', {
           studentId: studentId,
-          payment: {
-            registrationPaid: regPaid,
-            installments: [i1, i2, i3, i4]
-          }
+          payment: paymentData
         }, 'Recording payment...');
 
         if (res && res.success) {
           API.toastSuccess();
+          // Update cached student finance locally
+          const sObj = cachedStudents.find(x => x.id === studentId);
+          if (sObj) {
+            sObj.finance = Object.assign({}, sObj.finance, paymentData);
+          }
           loadTab('finance');
         } else {
           API.toastNotification(res.message || 'Error recording payment.', true);
         }
       }
     });
+
+    // Wire live calculation
+    setTimeout(() => {
+      function calcLive() {
+        const regFee = Number(document.getElementById('epRegFee')?.value) || 0;
+        const regPaid = document.getElementById('epRegPaid')?.checked;
+        const entFee = Number(document.getElementById('epEntFee')?.value) || 0;
+        const entPaid = document.getElementById('epEntPaid')?.checked;
+        const reqFee = Number(document.getElementById('epReqFee')?.value) || 0;
+        const reqPaid = document.getElementById('epReqPaid')?.checked;
+        const peFee = Number(document.getElementById('epPeFee')?.value) || 0;
+        const pePaid = document.getElementById('epPePaid')?.checked;
+        const portFee = Number(document.getElementById('epPortalFee')?.value) || 0;
+        const portPaid = document.getElementById('epPortalPaid')?.checked;
+
+        const tuition = Number(document.getElementById('epTuitionTotal')?.value) || 0;
+        const i1 = Number(document.getElementById('epInst1')?.value) || 0;
+        const i2 = Number(document.getElementById('epInst2')?.value) || 0;
+        const i3 = Number(document.getElementById('epInst3')?.value) || 0;
+        const i4 = Number(document.getElementById('epInst4')?.value) || 0;
+        const other = Number(document.getElementById('epOther')?.value) || 0;
+
+        const totBilled = tuition + regFee + entFee + reqFee + peFee + portFee;
+        const totPaid = (regPaid ? regFee : 0) + (entPaid ? entFee : 0) + (reqPaid ? reqFee : 0) + (pePaid ? peFee : 0) + (portPaid ? portFee : 0) + i1 + i2 + i3 + i4 + other;
+        const balance = Math.max(0, totBilled - totPaid);
+
+        const bEl = document.getElementById('epLiveBilled');
+        const pEl = document.getElementById('epLivePaid');
+        const balEl = document.getElementById('epLiveBalance');
+
+        if (bEl) bEl.textContent = formatMoney(totBilled, currency);
+        if (pEl) pEl.textContent = formatMoney(totPaid, currency);
+        if (balEl) {
+          balEl.textContent = formatMoney(balance, currency);
+          balEl.style.color = balance > 0 ? 'var(--color-danger)' : 'var(--color-success)';
+        }
+      }
+
+      document.querySelectorAll('.ep-calc-input').forEach(input => {
+        input.addEventListener('input', calcLive);
+        input.addEventListener('change', calcLive);
+      });
+      calcLive();
+    }, 50);
   }
+
+  // Alias for backward compatibility
+  const openRecordPaymentModal = openEditPaymentModal;
 
   // =========================================================================
   // 5. STAFF PAYROLL TAB
@@ -2598,20 +3923,68 @@ window.AdminPanel = (function () {
   // 11. ADMINS TAB (SUPER ADMIN RBAC MANAGEMENT)
   // =========================================================================
   const PERMISSION_DEFINITIONS = [
-    { key: 'students:view', label: 'Students (View)', desc: 'View student directory, profiles and attendance' },
-    { key: 'students:edit', label: 'Students (Manage)', desc: 'Enroll new/old students, modify profiles, drop/undrop' },
-    { key: 'teachers:view', label: 'Faculty (View)', desc: 'Browse teacher roster and assigned courses' },
-    { key: 'teachers:edit', label: 'Faculty (Manage)', desc: 'Register teachers and configure class/subject assignments' },
-    { key: 'finance:view', label: 'Finance (View)', desc: 'Inspect fee schedules, collections and student balances' },
-    { key: 'finance:edit', label: 'Finance (Manage)', desc: 'Record tuition fee receipts and manage staff payroll' },
-    { key: 'scores:view', label: 'Grades (View)', desc: 'Access student grade sheets and report cards' },
-    { key: 'scores:edit', label: 'Grades (Manage)', desc: 'Lock/unlock grading periods and edit student scores' },
-    { key: 'messaging', label: 'Announcements', desc: 'Broadcast notices to students, parents, and faculty' },
-    { key: 'lesson_plans', label: 'Lesson Plans', desc: 'Inspect and evaluate teacher lesson plans' },
-    { key: 'export:data', label: 'Export Records', desc: 'Download CSV roster, financial and payroll archives' },
-    { key: 'settings:edit', label: 'School Settings', desc: 'Update school branding, contacts and academic calendar' },
-    { key: 'audit:view', label: 'Audit Logs', desc: 'Review security audit trails and system activity logs' }
+    // Students Module
+    { key: 'students:view', label: 'Students Directory (View)', desc: 'Browse student roster, profiles, photos & credentials', group: 'Students' },
+    { key: 'students:edit', label: 'Students Directory (Manage/Edit)', desc: 'Enroll new/old students, edit details, lock/unlock grades', group: 'Students' },
+    { key: 'students:delete', label: 'Students Directory (Delete)', desc: 'Permanently remove or archive student records', group: 'Students' },
+
+    // Faculty Module
+    { key: 'teachers:view', label: 'Teaching Staff (View)', desc: 'Browse teacher directory and assigned courses', group: 'Faculty' },
+    { key: 'teachers:edit', label: 'Teaching Staff (Manage/Edit)', desc: 'Register teachers, edit profiles, attach classes & subjects', group: 'Faculty' },
+    { key: 'teachers:delete', label: 'Teaching Staff (Delete)', desc: 'Remove faculty members from active roster', group: 'Faculty' },
+
+    // Finance Module
+    { key: 'finance:view', label: 'Tuition & Fees (View)', desc: 'Inspect fee schedules, collection ledger & student balances', group: 'Finance' },
+    { key: 'finance:edit', label: 'Tuition & Fees (Record/Edit)', desc: 'Record & edit student tuition payments, fee schedule rates', group: 'Finance' },
+    { key: 'finance:delete', label: 'Tuition & Fees (Delete)', desc: 'Delete payment records or fee entries', group: 'Finance' },
+
+    // Payroll Module
+    { key: 'payroll:view', label: 'Staff Payroll (View)', desc: 'Inspect staff compensation and payment vouchers', group: 'Payroll' },
+    { key: 'payroll:edit', label: 'Staff Payroll (Manage/Edit)', desc: 'Process payroll, edit salary amounts, add staff, mark paid', group: 'Payroll' },
+    { key: 'payroll:delete', label: 'Staff Payroll (Delete)', desc: 'Delete payroll records or salary entries', group: 'Payroll' },
+
+    // Curriculum Module
+    { key: 'subjects:view', label: 'Subjects Catalog (View)', desc: 'Browse official school curriculum subjects', group: 'Curriculum' },
+    { key: 'subjects:edit', label: 'Subjects Catalog (Manage/Edit)', desc: 'Add new subjects, edit codes and department names', group: 'Curriculum' },
+    { key: 'subjects:delete', label: 'Subjects Catalog (Delete)', desc: 'Remove subjects from curriculum catalog', group: 'Curriculum' },
+
+    // Academics Module
+    { key: 'scores:view', label: 'Grading Controls (View)', desc: 'View student grade sheets, periodic marks & report cards', group: 'Academics' },
+    { key: 'scores:edit', label: 'Grading Controls (Manage/Edit)', desc: 'Lock/unlock grading periods and override periodic scores', group: 'Academics' },
+
+    // Printing Module
+    { key: 'printing:view', label: 'Printing Services (Preview)', desc: 'Generate & preview student/staff ID cards & tests', group: 'Printing' },
+    { key: 'printing:send', label: 'Printing Services (Submit to IE)', desc: 'Submit ID cards and teacher tests to IE for physical printing', group: 'Printing' },
+
+    // System Operations
+    { key: 'summary:view', label: 'Executive Summary (View)', desc: 'Access administrative KPIs, enrollment charts & revenue metrics', group: 'System' },
+    { key: 'messaging:view', label: 'Announcements (View)', desc: 'View school notices and broadcasts', group: 'Communication' },
+    { key: 'messaging:send', label: 'Announcements (Broadcast)', desc: 'Broadcast notices to students, parents, and faculty', group: 'Communication' },
+    { key: 'lesson_plans:view', label: 'Lesson Plans (Inspect)', desc: 'Review and evaluate submitted teacher lesson plans', group: 'Academics' },
+    { key: 'export:view', label: 'Export Records (Download)', desc: 'Download CSV archives of rosters, ledger & payroll', group: 'System' },
+    { key: 'settings:edit', label: 'School Settings (Manage)', desc: 'Update school branding, contacts, motto & academic year', group: 'System' },
+    { key: 'audit:view', label: 'Security Audit Log (View)', desc: 'Inspect system access logs, authentication & audit trail', group: 'Security' }
   ];
+
+  const ROLE_PRESETS = {
+    'custom': { name: 'Custom Responsibilities', perms: [] },
+    'registrar': {
+      name: 'School Registrar / Admissions Officer',
+      perms: ['students:view', 'students:edit', 'finance:view', 'finance:edit', 'printing:view', 'printing:send', 'subjects:view']
+    },
+    'bursar': {
+      name: 'Bursar / Financial Officer',
+      perms: ['finance:view', 'finance:edit', 'payroll:view', 'payroll:edit', 'summary:view', 'export:view']
+    },
+    'principal': {
+      name: 'Academic Dean / Principal',
+      perms: ['summary:view', 'students:view', 'teachers:view', 'teachers:edit', 'scores:view', 'scores:edit', 'subjects:view', 'subjects:edit', 'messaging:view', 'messaging:send', 'export:view', 'lesson_plans:view']
+    },
+    'auditor': {
+      name: 'Staff Auditor (View Only)',
+      perms: ['summary:view', 'students:view', 'teachers:view', 'finance:view', 'payroll:view', 'audit:view', 'export:view']
+    }
+  };
 
   async function renderAdminsTab(container) {
     const res = await API.callBackend('listAdmins', {}, 'Loading admins...');
@@ -2673,7 +4046,7 @@ window.AdminPanel = (function () {
                           ${activePermKeys.map(k => {
                             const def = PERMISSION_DEFINITIONS.find(p => p.key === k);
                             const lbl = def ? def.label : k;
-                            return `<span style="font-size: 10.5px; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 500;">${escapeHtml(lbl)}</span>`;
+                            return `<span style="font-size: 10px; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 500;">${escapeHtml(lbl)}</span>`;
                           }).join('')}
                         </div>
                       `}
@@ -2710,7 +4083,7 @@ window.AdminPanel = (function () {
       content: `
         <div style="font-size: 13.5px; max-height: 70vh; overflow-y: auto; padding-right: 6px;">
           <p style="color: var(--color-text-muted); margin-bottom: 14px;">
-            Create an administrator user account and check the specific system features and permissions they are authorized to access.
+            Create an administrator user account and assign their granular role and responsibilities (View, Edit, Delete per module).
           </p>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -2735,27 +4108,39 @@ window.AdminPanel = (function () {
             </div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label" for="newAdmTitle">Official Title / Designation *</label>
-            <input type="text" id="newAdmTitle" class="input-field" placeholder="e.g. School Registrar, Bursar, Vice Principal" value="School Registrar">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="newAdmPreset">Role Template / Preset</label>
+              <select id="newAdmPreset" class="select-field">
+                <option value="custom">Custom Configuration</option>
+                <option value="registrar" selected>School Registrar / Admissions Officer</option>
+                <option value="bursar">Bursar / Financial Officer</option>
+                <option value="principal">Academic Dean / Principal</option>
+                <option value="auditor">Staff Auditor (View Only)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="newAdmTitle">Official Title / Designation *</label>
+              <input type="text" id="newAdmTitle" class="input-field" placeholder="e.g. School Registrar, Bursar, Vice Principal" value="School Registrar">
+            </div>
           </div>
 
-          <div style="margin-top: 18px; border-top: 1px solid var(--color-border); pt-3;">
+          <div style="margin-top: 18px; border-top: 1px solid var(--color-border); padding-top: 12px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <label class="form-label" style="font-weight: 700; margin: 0;">Authorized Features &amp; Permissions</label>
+              <label class="form-label" style="font-weight: 700; margin: 0;">Authorized Features &amp; Responsibilities</label>
               <div style="display: flex; gap: 8px;">
                 <button type="button" class="btn btn-light btn-sm" id="admSelectAllPermsBtn" style="padding: 2px 8px; font-size: 11.5px;">Select All</button>
                 <button type="button" class="btn btn-light btn-sm" id="admClearAllPermsBtn" style="padding: 2px 8px; font-size: 11.5px;">Clear</button>
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--color-border);">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--color-border);">
               ${PERMISSION_DEFINITIONS.map(p => `
-                <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; padding: 4px; font-size: 12.5px;">
+                <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; padding: 4px; font-size: 12px;">
                   <input type="checkbox" class="adm-perm-check" data-key="${p.key}" style="margin-top: 2px;">
                   <div>
                     <div style="font-weight: 600; color: var(--color-text-main);">${escapeHtml(p.label)}</div>
-                    <div style="font-size: 11px; color: var(--color-text-muted); line-height: 1.2;">${escapeHtml(p.desc)}</div>
+                    <div style="font-size: 10.5px; color: var(--color-text-muted); line-height: 1.2;">${escapeHtml(p.desc)}</div>
                   </div>
                 </label>
               `).join('')}
@@ -2783,7 +4168,7 @@ window.AdminPanel = (function () {
 
         const permissions = {};
         document.querySelectorAll('.adm-perm-check').forEach(chk => {
-          permissions[chk.dataset.key] = chk.checked;
+          if (chk.checked) permissions[chk.dataset.key] = true;
         });
 
         const res = await API.callBackend('createAdmin', {
@@ -2807,6 +4192,26 @@ window.AdminPanel = (function () {
     setTimeout(() => {
       const selectAllBtn = document.getElementById('admSelectAllPermsBtn');
       const clearAllBtn = document.getElementById('admClearAllPermsBtn');
+      const presetSelect = document.getElementById('newAdmPreset');
+
+      const applyPreset = (key) => {
+        const p = ROLE_PRESETS[key];
+        if (!p) return;
+        const allowed = new Set(p.perms);
+        document.querySelectorAll('.adm-perm-check').forEach(c => {
+          c.checked = allowed.has(c.dataset.key);
+        });
+        if (key !== 'custom') {
+          const tInput = document.getElementById('newAdmTitle');
+          if (tInput) tInput.value = p.name;
+        }
+      };
+
+      if (presetSelect) {
+        presetSelect.onchange = (e) => applyPreset(e.target.value);
+        applyPreset('registrar'); // Default to registrar
+      }
+
       if (selectAllBtn) {
         selectAllBtn.onclick = () => {
           document.querySelectorAll('.adm-perm-check').forEach(c => c.checked = true);
@@ -2840,31 +4245,42 @@ window.AdminPanel = (function () {
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
+              <label class="form-label" for="editAdmPreset">Apply Role Preset</label>
+              <select id="editAdmPreset" class="select-field">
+                <option value="custom">Keep Current Custom</option>
+                <option value="registrar">School Registrar / Admissions Officer</option>
+                <option value="bursar">Bursar / Financial Officer</option>
+                <option value="principal">Academic Dean / Principal</option>
+                <option value="auditor">Staff Auditor (View Only)</option>
+              </select>
+            </div>
+            <div class="form-group">
               <label class="form-label" for="editAdmTitle">Title / Role Designation</label>
               <input type="text" id="editAdmTitle" class="input-field" value="${escapeHtml(a.title || a.roleTier)}">
             </div>
-            <div class="form-group">
-              <label class="form-label" for="editAdmNewPass">Reset Password (Optional)</label>
-              <input type="password" id="editAdmNewPass" class="input-field" placeholder="Leave blank to keep unchanged">
-            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="editAdmNewPass">Reset Password (Optional)</label>
+            <input type="password" id="editAdmNewPass" class="input-field" placeholder="Leave blank to keep unchanged">
           </div>
 
           <div style="margin-top: 14px; border-top: 1px solid var(--color-border); padding-top: 12px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <label class="form-label" style="font-weight: 700; margin: 0;">Assigned Features &amp; Permissions</label>
+              <label class="form-label" style="font-weight: 700; margin: 0;">Assigned Features &amp; Responsibilities</label>
               <div style="display: flex; gap: 8px;">
                 <button type="button" class="btn btn-light btn-sm" id="admEditSelectAllBtn" style="padding: 2px 8px; font-size: 11.5px;">Select All</button>
                 <button type="button" class="btn btn-light btn-sm" id="admEditClearAllBtn" style="padding: 2px 8px; font-size: 11.5px;">Clear</button>
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--color-border);">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--color-border);">
               ${PERMISSION_DEFINITIONS.map(p => `
-                <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; padding: 4px; font-size: 12.5px;">
+                <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; padding: 4px; font-size: 12px;">
                   <input type="checkbox" class="adm-edit-perm-check" data-key="${p.key}" ${currentPerms[p.key] === true ? 'checked' : ''} style="margin-top: 2px;">
                   <div>
                     <div style="font-weight: 600; color: var(--color-text-main);">${escapeHtml(p.label)}</div>
-                    <div style="font-size: 11px; color: var(--color-text-muted); line-height: 1.2;">${escapeHtml(p.desc)}</div>
+                    <div style="font-size: 10.5px; color: var(--color-text-muted); line-height: 1.2;">${escapeHtml(p.desc)}</div>
                   </div>
                 </label>
               `).join('')}
@@ -2879,7 +4295,7 @@ window.AdminPanel = (function () {
 
         const permissions = {};
         document.querySelectorAll('.adm-edit-perm-check').forEach(chk => {
-          permissions[chk.dataset.key] = chk.checked;
+          if (chk.checked) permissions[chk.dataset.key] = true;
         });
 
         const payload = {
@@ -2905,6 +4321,23 @@ window.AdminPanel = (function () {
     setTimeout(() => {
       const selectAllBtn = document.getElementById('admEditSelectAllBtn');
       const clearAllBtn = document.getElementById('admEditClearAllBtn');
+      const presetSelect = document.getElementById('editAdmPreset');
+
+      if (presetSelect) {
+        presetSelect.onchange = (e) => {
+          const key = e.target.value;
+          if (key === 'custom') return;
+          const p = ROLE_PRESETS[key];
+          if (!p) return;
+          const allowed = new Set(p.perms);
+          document.querySelectorAll('.adm-edit-perm-check').forEach(c => {
+            c.checked = allowed.has(c.dataset.key);
+          });
+          const tInput = document.getElementById('editAdmTitle');
+          if (tInput) tInput.value = p.name;
+        };
+      }
+
       if (selectAllBtn) {
         selectAllBtn.onclick = () => {
           document.querySelectorAll('.adm-edit-perm-check').forEach(c => c.checked = true);
@@ -2916,8 +4349,6 @@ window.AdminPanel = (function () {
         };
       }
     }, 50);
-  }
-
   function removeAdmin(username) {
     App.showModal({
       title: 'Remove Administrator Access',
@@ -3089,6 +4520,13 @@ window.AdminPanel = (function () {
     removeAdmin: removeAdmin,
     openAddCustomStaffModal: openAddCustomStaffModal,
     openEditPayrollModal: openEditPayrollModal,
-    downloadPayrollReport: downloadPayrollReport
+    downloadPayrollReport: downloadPayrollReport,
+    openEditPaymentModal: openEditPaymentModal,
+    openRecordPaymentModal: openRecordPaymentModal,
+    openClassFeeModal: openClassFeeModal,
+    openEditStudentModal: openEditStudentModal,
+    deleteStudent: deleteStudent,
+    openEditTeacherModal: openEditTeacherModal,
+    deleteTeacher: deleteTeacher
   };
 })();

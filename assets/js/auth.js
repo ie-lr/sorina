@@ -197,17 +197,33 @@ const Auth = (function () {
       <button type="button" class="btn btn-light btn-sm" id="signOutBtn">Sign Out</button>
     `;
 
-    document.getElementById('signOutBtn').onclick = handleLogout;
+    const btn = document.getElementById('signOutBtn');
+    if (btn) btn.onclick = handleLogout;
   }
+
+  // Delegated global click listener: ensures ALL sidebar and settings logout buttons work immediately
+  document.addEventListener('click', (e) => {
+    const logoutTarget = e.target.closest('#signOutBtn, #adminLogoutBtn, #teacherLogoutBtn, #studentLogoutBtn, #adminSettingsLogoutBtn, #teacherSettingsSignOutBtn, #studentSettingsSignOutBtn, [data-action="logout"]');
+    if (logoutTarget) {
+      e.preventDefault();
+      e.stopPropagation();
+      handleLogout();
+    }
+  });
 
   async function handleLogout() {
     try {
-      await API.callBackend('logout');
+      if (window.API && typeof window.API.callBackend === 'function') {
+        window.API.callBackend('logout').catch(() => {});
+      }
     } catch (e) {}
 
-    sessionStorage.removeItem('sorina_session_token');
-    sessionStorage.removeItem('sorina_user_role');
-    sessionStorage.removeItem('sorina_user_data');
+    try {
+      sessionStorage.clear();
+      localStorage.removeItem('sorina_session_token');
+      localStorage.removeItem('sorina_user_role');
+      localStorage.removeItem('sorina_user_data');
+    } catch (e) {}
 
     const appRoot = document.getElementById('appRoot');
     if (appRoot) appRoot.innerHTML = '';
@@ -219,7 +235,13 @@ const Auth = (function () {
     if (loginScreen) loginScreen.classList.remove('hidden');
 
     hideAlert();
-    App.showToast('You have been signed out.', 'info');
+    if (window.App && typeof window.App.showToast === 'function') {
+      window.App.showToast('You have been signed out.', 'info');
+    }
+
+    setTimeout(() => {
+      window.location.reload();
+    }, 150);
   }
 
   function showForgotPasswordModal() {
@@ -238,6 +260,7 @@ const Auth = (function () {
       onConfirm: async () => {
         const emailInput = document.getElementById('resetEmail');
         if (!emailInput || !emailInput.value.trim()) return;
+
         const res = await API.callBackend('forgotPassword', { email: emailInput.value.trim() });
         App.showToast(res.message || 'Reset instructions sent if email is found.', 'info');
       }
@@ -281,10 +304,15 @@ const Auth = (function () {
       .replace(/"/g, '&quot;');
   }
 
-  return {
+  const exportObj = {
     initLoginForm: initLoginForm,
     checkExistingSession: checkExistingSession,
     handleLogout: handleLogout,
     logout: handleLogout
   };
+
+  window.Auth = exportObj;
+  window.logout = handleLogout;
+
+  return exportObj;
 })();

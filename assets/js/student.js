@@ -73,7 +73,7 @@ window.StudentPanel = (function () {
               <span class="sidebar-item-label">Settings</span>
             </a>
 
-            <a class="sidebar-item" id="studentLogoutBtn">
+            <a class="sidebar-item" id="studentLogoutBtn" data-action="logout" role="button" tabindex="0" style="cursor: pointer;">
               <img src="assets/icons/log-out.png" class="sidebar-icon" alt="">
               <span class="sidebar-item-label">Sign Out</span>
             </a>
@@ -460,6 +460,17 @@ window.StudentPanel = (function () {
           <button type="button" class="btn btn-light" id="studentPwaBtn" style="display: flex; align-items: center; gap: 8px;">
             <img src="assets/icons/download (2).png" style="width: 16px; height: 16px;" alt="">
             Install App to Device
+          </button>
+        </div>
+
+        <div class="content-card" style="margin-top: 20px;">
+          <h3 class="card-title" style="margin-bottom: 12px;">Account Session</h3>
+          <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 14px;">
+            Sign out of your student portal session on this device.
+          </p>
+          <button type="button" class="btn btn-danger" id="studentSettingsSignOutBtn" data-action="logout" style="display: flex; align-items: center; gap: 8px;">
+            <img src="assets/icons/log-out.png" style="width: 16px; height: 16px; filter: brightness(0) invert(1);" alt="">
+            Sign Out
           </button>
         </div>
       </div>

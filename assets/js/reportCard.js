@@ -37,7 +37,7 @@ const ReportCard = (function () {
       if (upper === 'D' || upper === 'F') return `<span class="gradeRed">${escapeHtml(str)}</span>`;
       return escapeHtml(str);
     }
-    if (num >= 90) return `<span class="gradeGreen">${num}</span>`;
+    if (num >= 91) return `<span class="gradeGreen">${num}</span>`;
     if (num >= 70) return `<span class="gradeBlue">${num}</span>`;
     return `<span class="gradeRed">${num}</span>`;
   }
@@ -186,8 +186,8 @@ const ReportCard = (function () {
           <div class="rcGradeKey">
             <b>Method of Grading</b>
             <div class="rcGradeKeyGrid">
-              <span class="gradeGreen">90 &amp; above — Excellent</span>
-              <span class="gradeBlue">70 – 89 — Passing</span>
+              <span class="gradeGreen">91 &amp; above — Excellent</span>
+              <span class="gradeBlue">70 – 90 — Passing</span>
               <span class="gradeRed">Below 70 — Failing</span>
             </div>
           </div>
@@ -220,9 +220,14 @@ const ReportCard = (function () {
                 </div>
               </div>
               <div class="rcCardTitleBar">Student Report Card</div>
-              <p class="rcStudentMetaLine">Student's Name: <b>${escapeHtml(studentName)}</b></p>
-              <p class="rcStudentMetaLine">Grade: <b>${escapeHtml(className)}</b> &nbsp; School Year: <b>${escapeHtml(academicYear)}</b></p>
-              <p class="rcStudentMetaLine">Student ID: <b>${escapeHtml(studentId)}</b></p>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                <div>
+                  <p class="rcStudentMetaLine">Student's Name: <b>${escapeHtml(studentName)}</b></p>
+                  <p class="rcStudentMetaLine">Grade: <b>${escapeHtml(className)}</b> &nbsp; School Year: <b>${escapeHtml(academicYear)}</b></p>
+                  <p class="rcStudentMetaLine">Student ID: <b>${escapeHtml(studentId)}</b></p>
+                </div>
+                ${student.photo ? `<div style="width: 58px; height: 70px; border: 1.5px solid #1c1c1c; border-radius: 4px; overflow: hidden; margin-top: 4px;"><img src="${escapeHtml(student.photo)}" style="width: 100%; height: 100%; object-fit: cover;"></div>` : ''}
+              </div>
               <p class="rcSignoffNote">Parents or Guardian must sign each period as evidence they have seen the periodic report.</p>
               <table class="rcSignoffTable">
                 <thead><tr><th>Period</th><th>Class Teacher</th><th>Parent/Guardian</th></tr></thead>
