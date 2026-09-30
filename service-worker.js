@@ -7,7 +7,7 @@
  * -----------------------------------------------------------------------
  */
 
-const CACHE_NAME = 'ie-school-portal-v2.0';
+const CACHE_NAME = 'ie-school-portal-v2.1';
 const SHELL_ASSETS = [
   './',
   './index.html',
@@ -58,7 +58,21 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Cache-first, fallback to network for static shell assets
+  // Network-first for JavaScript files so updates are immediately loaded
+  if (url.pathname.endsWith('.js') || url.searchParams.has('v')) {
+    event.respondWith(
+      fetch(event.request).then(response => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Cache-first, fallback to network for static shell assets (images, css)
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
