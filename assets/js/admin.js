@@ -32,6 +32,12 @@ window.AdminPanel = (function () {
   let isSidebarCollapsed = false;
   let selectedStudentIdsForPrint = new Set();
 
+  function hasPerm(permKey) {
+    if (!currentUser) return true;
+    if (currentUser.role === 'superadmin') return true;
+    return Boolean(currentUser.permissions && currentUser.permissions[permKey]);
+  }
+
   const GRADE_LEVELS = [
     'Daycare',
     'Nursery',
@@ -590,9 +596,9 @@ window.AdminPanel = (function () {
     cachedStudents = (res && res.success && Array.isArray(res.students)) ? res.students : [];
     selectedStudentIdsForPrint.clear();
 
-    const canEdit = currentUser.role === 'superadmin' || (currentUser.permissions && currentUser.permissions['students:edit']);
-    const canDelete = currentUser.role === 'superadmin' || (currentUser.permissions && currentUser.permissions['students:delete']);
-    const canPrint = currentUser.role === 'superadmin' || (currentUser.permissions && (currentUser.permissions['printing:view'] || currentUser.permissions['printing:send']));
+    const canEdit = hasPerm('students:edit');
+    const canDelete = hasPerm('students:delete');
+    const canPrint = hasPerm('printing:view') || hasPerm('printing:send');
 
     container.innerHTML = `
       <div class="content-card">
@@ -711,10 +717,8 @@ window.AdminPanel = (function () {
     const tbody = document.getElementById('studentDirectoryBody');
     if (!tbody) return;
 
-    const isSuper = currentUser && currentUser.role === 'superadmin';
-    const perms = (currentUser && currentUser.permissions) || {};
-    const canEdit = isSuper || Boolean(perms['students:edit']);
-    const canDelete = isSuper || Boolean(perms['students:delete']);
+    const canEdit = hasPerm('students:edit');
+    const canDelete = hasPerm('students:delete');
 
     if (list.length === 0) {
       tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 25px; color: var(--color-text-muted);">No matching students found.</td></tr>';

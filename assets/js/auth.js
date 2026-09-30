@@ -282,13 +282,13 @@ const Auth = (function () {
 
   function loadScript(src) {
     return new Promise((resolve, reject) => {
-      const existing = document.querySelector(`script[src="${src}"]`);
+      const cleanSrc = src.split('?')[0];
+      const existing = document.querySelector(`script[src*="${cleanSrc}"]`);
       if (existing) {
-        resolve();
-        return;
+        existing.remove();
       }
       const s = document.createElement('script');
-      s.src = src;
+      s.src = src.includes('?') ? src : `${src}?t=${Date.now()}`;
       s.onload = () => resolve();
       s.onerror = (e) => reject(e);
       document.body.appendChild(s);
