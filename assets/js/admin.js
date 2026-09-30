@@ -678,7 +678,12 @@ window.AdminPanel = (function () {
       </div>
     `;
 
-    renderStudentRows(cachedStudents);
+    const yearFiltered = cachedStudents.filter(s => {
+      if (!selectedAcademicYear) return true;
+      if (!s.academicYear) return true;
+      return String(s.academicYear).trim() === String(selectedAcademicYear).trim();
+    });
+    renderStudentRows(yearFiltered);
 
     // Event Listeners
     document.getElementById('studentSearchInput').oninput = filterStudents;
@@ -705,6 +710,11 @@ window.AdminPanel = (function () {
   function renderStudentRows(list) {
     const tbody = document.getElementById('studentDirectoryBody');
     if (!tbody) return;
+
+    const isSuper = currentUser && currentUser.role === 'superadmin';
+    const perms = (currentUser && currentUser.permissions) || {};
+    const canEdit = isSuper || Boolean(perms['students:edit']);
+    const canDelete = isSuper || Boolean(perms['students:delete']);
 
     if (list.length === 0) {
       tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 25px; color: var(--color-text-muted);">No matching students found.</td></tr>';
@@ -789,15 +799,16 @@ window.AdminPanel = (function () {
   }
 
   function filterStudents() {
-    const q = document.getElementById('studentSearchInput').value.trim().toLowerCase();
-    const cls = document.getElementById('studentClassFilter').value.trim().toLowerCase();
-    const cat = document.getElementById('studentCategoryFilter').value.trim().toLowerCase();
+    const q = (document.getElementById('studentSearchInput')?.value || '').trim().toLowerCase();
+    const cls = (document.getElementById('studentClassFilter')?.value || '').trim().toLowerCase();
+    const cat = (document.getElementById('studentCategoryFilter')?.value || '').trim().toLowerCase();
 
     const filtered = cachedStudents.filter(s => {
-      const matchQ = !q || s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
-      const matchCls = !cls || String(s.className || s.grade).toLowerCase() === cls;
+      const matchYear = !selectedAcademicYear || !s.academicYear || String(s.academicYear).trim() === String(selectedAcademicYear).trim();
+      const matchQ = !q || (s.name && s.name.toLowerCase().includes(q)) || (s.id && s.id.toLowerCase().includes(q));
+      const matchCls = !cls || String(s.className || s.grade || '').toLowerCase() === cls;
       const matchCat = !cat || String(s.studentCategory || '').toLowerCase() === cat;
-      return matchQ && matchCls && matchCat;
+      return matchYear && matchQ && matchCls && matchCat;
     });
 
     renderStudentRows(filtered);
@@ -2171,7 +2182,8 @@ window.AdminPanel = (function () {
       API.callBackend('getClassFees', {}, 'Loading class fees...')
     ]);
 
-    const students = (studRes && studRes.success && Array.isArray(studRes.students)) ? studRes.students : [];
+    cachedStudents = (studRes && studRes.success && Array.isArray(studRes.students)) ? studRes.students : [];
+    const students = cachedStudents;
     if (feesRes && feesRes.success && Array.isArray(feesRes.classFees)) {
       cachedClassFees = feesRes.classFees;
     }
@@ -2304,13 +2316,14 @@ window.AdminPanel = (function () {
       const stat = (document.getElementById('finStatusFilter')?.value || '').trim().toLowerCase();
 
       const filtered = students.filter(s => {
+        const matchYear = !selectedAcademicYear || !s.academicYear || String(s.academicYear).trim() === String(selectedAcademicYear).trim();
         const curBal = studentBalance(s);
-        const matchQ = !q || s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
-        const matchCls = !cls || String(s.className || s.grade).toLowerCase() === cls;
+        const matchQ = !q || (s.name && s.name.toLowerCase().includes(q)) || (s.id && s.id.toLowerCase().includes(q));
+        const matchCls = !cls || String(s.className || s.grade || '').toLowerCase() === cls;
         let matchStat = true;
         if (stat === 'overdue') matchStat = curBal > 0;
         if (stat === 'cleared') matchStat = curBal <= 0 && toNum((s.finance || {}).tuitionTotal) > 0;
-        return matchQ && matchCls && matchStat;
+        return matchYear && matchQ && matchCls && matchStat;
       });
 
       if (filtered.length === 0) {
@@ -2470,8 +2483,15 @@ window.AdminPanel = (function () {
   }
 
   // --- Modal to Edit / Record Payment for Student ---
-  function openEditPaymentModal(studentId) {
-    const student = cachedStudents.find(s => s.id === studentId);
+  async function openEditPaymentModal(studentId) {
+    let student = cachedStudents.find(s => s.id === studentId);
+    if (!student) {
+      const res = await API.callBackend('getAllStudents', { academicYear: selectedAcademicYear });
+      if (res && res.success && Array.isArray(res.students)) {
+        cachedStudents = res.students;
+        student = cachedStudents.find(s => s.id === studentId);
+      }
+    }
     if (!student) {
       API.toastNotification('Student record not found.', true);
       return;

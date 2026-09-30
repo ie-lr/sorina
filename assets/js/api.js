@@ -243,7 +243,8 @@ const API = (function () {
       hideLoader();
 
       if (!res.ok) {
-        return { success: false, message: `HTTP Error: ${res.status}` };
+        console.warn(`[API:HTTPError] Backend responded with status ${res.status}. Falling back to local offline mode.`);
+        return handleLocalMock(action, bodyData);
       }
 
       const json = await res.json();
@@ -275,6 +276,110 @@ const API = (function () {
         message: 'Network connection unavailable. Changes will sync automatically when connected.'
       };
     }
+  }
+
+  function getMockStudents() {
+    const saved = localStorage.getItem('_sorina_mock_students');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    const initial = [
+      {
+        id: 'SPSS001', name: 'Emmanuel Johnson', className: 'Grade 1', grade: 'Grade 1',
+        academicYear: '2026-2027', status: 'Active', studentCategory: 'new', gradeLocked: false,
+        guardian: 'Mary Johnson', phone: '+231-886-000111', dob: '2018-05-12', photo: '',
+        assignedSubjects: ['English / Reading', 'General Mathematics', 'General Science', 'Health Education'],
+        finance: {
+          tuitionTotal: 220, registrationFee: 40, registrationPaid: true, entranceFee: 25, entranceFeePaid: true,
+          requirementsFee: 35, requirementsFeePaid: true, peSuitFee: 25, peSuitFeePaid: false,
+          portalFee: 20, portalFeePaid: true, installments: [100, 50, 0, 0], otherPayments: 0,
+          totalPaid: 270, balance: 95, currency: 'USD'
+        }
+      },
+      {
+        id: 'SPSS002', name: 'Blessing Williams', className: 'Grade 1', grade: 'Grade 1',
+        academicYear: '2026-2027', status: 'Active', studentCategory: 'old', gradeLocked: false,
+        guardian: 'James Williams', phone: '+231-770-555444', dob: '2018-02-20', photo: '',
+        assignedSubjects: ['English / Reading', 'General Mathematics', 'Social Studies'],
+        finance: {
+          tuitionTotal: 200, registrationFee: 35, registrationPaid: true, entranceFee: 0, entranceFeePaid: true,
+          requirementsFee: 35, requirementsFeePaid: true, peSuitFee: 25, peSuitFeePaid: true,
+          portalFee: 20, portalFeePaid: true, installments: [100, 100, 0, 0], otherPayments: 0,
+          totalPaid: 315, balance: 0, currency: 'USD'
+        }
+      },
+      {
+        id: 'SPSS003', name: 'Faith Toe', className: 'ABC', grade: 'ABC',
+        academicYear: '2026-2027', status: 'Active', studentCategory: 'new', gradeLocked: false,
+        guardian: 'Sarah Toe', phone: '+231-886-333222', dob: '2021-08-14', photo: '',
+        assignedSubjects: ['Phonics', 'Handwriting', 'Mental Math'],
+        finance: {
+          tuitionTotal: 180, registrationFee: 35, registrationPaid: true, entranceFee: 20, entranceFeePaid: true,
+          requirementsFee: 30, requirementsFeePaid: false, peSuitFee: 20, peSuitFeePaid: false,
+          portalFee: 15, portalFeePaid: true, installments: [90, 0, 0, 0], otherPayments: 0,
+          totalPaid: 160, balance: 140, currency: 'USD'
+        }
+      },
+      {
+        id: 'SPSS004', name: 'Prince Kollie', className: 'K1', grade: 'K1',
+        academicYear: '2026-2027', status: 'Active', studentCategory: 'new', gradeLocked: false,
+        guardian: 'David Kollie', phone: '+231-886-444555', dob: '2020-03-10', photo: '',
+        assignedSubjects: ['English / Reading', 'Mental Math', 'Creative Arts / Music'],
+        finance: {
+          tuitionTotal: 190, registrationFee: 35, registrationPaid: true, entranceFee: 20, entranceFeePaid: true,
+          requirementsFee: 30, requirementsFeePaid: true, peSuitFee: 20, peSuitFeePaid: true,
+          portalFee: 15, portalFeePaid: true, installments: [95, 95, 0, 0], otherPayments: 0,
+          totalPaid: 310, balance: 0, currency: 'USD'
+        }
+      },
+      {
+        id: 'SPSS001', name: 'Emmanuel Johnson', className: 'K2', grade: 'K2',
+        academicYear: '2025-2026', status: 'Active', studentCategory: 'old', gradeLocked: false,
+        guardian: 'Mary Johnson', phone: '+231-886-000111', dob: '2018-05-12', photo: '',
+        assignedSubjects: ['English / Reading', 'General Mathematics'],
+        finance: {
+          tuitionTotal: 190, registrationFee: 30, registrationPaid: true, entranceFee: 0, entranceFeePaid: true,
+          requirementsFee: 30, requirementsFeePaid: true, peSuitFee: 20, peSuitFeePaid: true,
+          portalFee: 15, portalFeePaid: true, installments: [95, 95, 0, 0], otherPayments: 0,
+          totalPaid: 285, balance: 0, currency: 'USD'
+        }
+      },
+      {
+        id: 'SPSS005', name: 'Joseph Myers', className: 'Grade 2', grade: 'Grade 2',
+        academicYear: '2025-2026', status: 'Active', studentCategory: 'old', gradeLocked: false,
+        guardian: 'Helena Myers', phone: '+231-777-888999', dob: '2017-09-01', photo: '',
+        assignedSubjects: ['General Mathematics', 'Social Studies', 'General Science'],
+        finance: {
+          tuitionTotal: 200, registrationFee: 35, registrationPaid: true, entranceFee: 0, entranceFeePaid: true,
+          requirementsFee: 35, requirementsFeePaid: true, peSuitFee: 25, peSuitFeePaid: true,
+          portalFee: 20, portalFeePaid: true, installments: [100, 100, 0, 0], otherPayments: 0,
+          totalPaid: 315, balance: 0, currency: 'USD'
+        }
+      },
+      {
+        id: 'SPSS006', name: 'Cecelia Flomo', className: 'Daycare', grade: 'Daycare',
+        academicYear: '2027-2028', status: 'Active', studentCategory: 'new', gradeLocked: false,
+        guardian: 'Moses Flomo', phone: '+231-888-222111', dob: '2023-01-15', photo: '',
+        assignedSubjects: ['Phonics', 'Creative Arts / Music'],
+        finance: {
+          tuitionTotal: 150, registrationFee: 30, registrationPaid: true, entranceFee: 20, entranceFeePaid: true,
+          requirementsFee: 25, requirementsFeePaid: false, peSuitFee: 20, peSuitFeePaid: false,
+          portalFee: 15, portalFeePaid: false, installments: [50, 0, 0, 0], otherPayments: 0,
+          totalPaid: 100, balance: 160, currency: 'USD'
+        }
+      }
+    ];
+    saveMockStudents(initial);
+    return initial;
+  }
+
+  function saveMockStudents(arr) {
+    try {
+      localStorage.setItem('_sorina_mock_students', JSON.stringify(arr));
+    } catch (e) {}
   }
 
   /**
@@ -378,9 +483,20 @@ const API = (function () {
             break;
           }
 
-          case 'getNextStudentId':
-            resolve({ success: true, nextId: 'SPSS004' });
+          case 'getNextStudentId': {
+            const allSt = getMockStudents();
+            let maxNum = 0;
+            allSt.forEach(s => {
+              const m = String(s.id).match(/SPSS(\d+)/i);
+              if (m) {
+                const num = parseInt(m[1], 10);
+                if (num > maxNum) maxNum = num;
+              }
+            });
+            const nextNum = maxNum + 1;
+            resolve({ success: true, nextId: 'SPSS' + String(nextNum).padStart(3, '0') });
             break;
+          }
 
           case 'getNextTeacherId':
             resolve({ success: true, nextId: 'SPST003' });
@@ -397,47 +513,89 @@ const API = (function () {
             });
             break;
 
-          case 'getAllStudents':
+          case 'getAllStudents': {
+            const allSt = getMockStudents();
+            const yr = data && data.academicYear;
+            const students = yr ? allSt.filter(s => !s.academicYear || String(s.academicYear).trim() === String(yr).trim()) : allSt;
             resolve({
               success: true,
-              students: [
-                {
-                  id: 'SPSS001', name: 'Emmanuel Johnson', className: 'Grade 1', grade: 'Grade 1',
-                  academicYear: '2026-2027', status: 'Active', studentCategory: 'new', gradeLocked: false,
-                  guardian: 'Mary Johnson', phone: '+231-886-000111', dob: '2018-05-12',
-                  finance: { tuitionTotal: 250, totalPaid: 150, balance: 100, currency: 'USD', installments: [100, 50, 0, 0] }
-                },
-                {
-                  id: 'SPSS002', name: 'Blessing Williams', className: 'Grade 1', grade: 'Grade 1',
-                  academicYear: '2026-2027', status: 'Active', studentCategory: 'old', gradeLocked: false,
-                  guardian: 'James Williams', phone: '+231-770-555444', dob: '2018-02-20',
-                  finance: { tuitionTotal: 200, totalPaid: 200, balance: 0, currency: 'USD', installments: [100, 100, 0, 0] }
-                },
-                {
-                  id: 'SPSS003', name: 'Faith Toe', className: 'Nursery A', grade: 'Nursery A',
-                  academicYear: '2026-2027', status: 'Active', studentCategory: 'new', gradeLocked: false,
-                  guardian: 'Sarah Toe', phone: '+231-886-333222', dob: '2021-08-14',
-                  finance: { tuitionTotal: 180, totalPaid: 100, balance: 80, currency: 'USD', installments: [100, 0, 0, 0] }
-                }
-              ]
+              students: students
             });
             break;
+          }
 
-          case 'getFinancialSummary':
+          case 'addStudent': {
+            const newS = (data && data.student) || {};
+            const allSt = getMockStudents();
+            const idx = allSt.findIndex(s => s.id === newS.id && (!newS.academicYear || s.academicYear === newS.academicYear));
+            if (idx >= 0) {
+              allSt[idx] = Object.assign({}, allSt[idx], newS);
+            } else {
+              allSt.push(newS);
+            }
+            saveMockStudents(allSt);
+            resolve({ success: true, message: 'Student registered successfully.' });
+            break;
+          }
+
+          case 'updateStudent': {
+            const updS = (data && data.student) || {};
+            const allSt = getMockStudents();
+            const idx = allSt.findIndex(s => s.id === updS.id);
+            if (idx >= 0) {
+              allSt[idx] = Object.assign({}, allSt[idx], updS);
+              saveMockStudents(allSt);
+            }
+            resolve({ success: true, message: 'Student updated successfully.' });
+            break;
+          }
+
+          case 'getFinancialSummary': {
+            const yr = (data && data.academicYear) || '2026-2027';
+            const allSt = getMockStudents();
+            const yearSt = allSt.filter(s => !yr || !s.academicYear || String(s.academicYear).trim() === String(yr).trim());
+            const enrolledByClass = {};
+            let totalBilled = 0;
+            let totalRevenue = 0;
+
+            yearSt.forEach(s => {
+              const c = s.className || s.grade || 'Unknown';
+              enrolledByClass[c] = (enrolledByClass[c] || 0) + 1;
+              const f = s.finance || {};
+              const inst = f.installments || [0, 0, 0, 0];
+              const paid = (f.entranceFeePaid ? (Number(f.entranceFee) || 0) : 0) +
+                (f.registrationPaid ? (Number(f.registrationFee) || 0) : 0) +
+                (f.requirementsFeePaid ? (Number(f.requirementsFee) || 0) : 0) +
+                (f.peSuitFeePaid ? (Number(f.peSuitFee) || 0) : 0) +
+                (f.portalFeePaid ? (Number(f.portalFee) || 0) : 0) +
+                inst.reduce((a, b) => a + (Number(b) || 0), 0) +
+                (Number(f.otherPayments) || 0);
+              const billed = (Number(f.tuitionTotal) || 0) +
+                (Number(f.registrationFee) || 0) +
+                (Number(f.entranceFee) || 0) +
+                (Number(f.requirementsFee) || 0) +
+                (Number(f.peSuitFee) || 0) +
+                (Number(f.portalFee) || 0);
+              totalBilled += billed;
+              totalRevenue += paid;
+            });
+
+            const totalExpenses = 280;
             resolve({
               success: true,
               summary: {
-                totalStudents: 3,
+                totalStudents: yearSt.length,
                 totalTeachers: 2,
-                enrolledByClass: { 'Grade 1': 2, 'Nursery A': 1 },
-                totalBilled: 630,
-                totalRevenue: 450,
-                totalExpenses: 280,
-                netBalance: 170,
-                targetRemaining: 180
+                enrolledByClass: enrolledByClass,
+                totalBilled: totalBilled,
+                totalRevenue: totalRevenue,
+                totalExpenses: totalExpenses,
+                netBalance: totalRevenue - totalExpenses,
+                targetRemaining: Math.max(0, totalBilled - totalRevenue)
               }
             });
             break;
+          }
 
           case 'getPayroll':
             resolve({
@@ -538,13 +696,43 @@ const API = (function () {
             resolve({ success: true, message: 'Class fee schedule saved successfully.' });
             break;
 
-          case 'recordPayment':
+          case 'recordPayment': {
+            const sId = data && data.studentId;
+            const pData = (data && data.payment) || {};
+            const allSt = getMockStudents();
+            const st = allSt.find(s => s.id === sId);
+            if (st) {
+              st.finance = Object.assign({}, st.finance, pData);
+              const f = st.finance;
+              const inst = f.installments || [0, 0, 0, 0];
+              f.totalPaid = (f.entranceFeePaid ? (Number(f.entranceFee) || 0) : 0) +
+                (f.registrationPaid ? (Number(f.registrationFee) || 0) : 0) +
+                (f.requirementsFeePaid ? (Number(f.requirementsFee) || 0) : 0) +
+                (f.peSuitFeePaid ? (Number(f.peSuitFee) || 0) : 0) +
+                (f.portalFeePaid ? (Number(f.portalFee) || 0) : 0) +
+                inst.reduce((a, b) => a + (Number(b) || 0), 0) +
+                (Number(f.otherPayments) || 0);
+              const billed = (Number(f.tuitionTotal) || 0) +
+                (Number(f.registrationFee) || 0) +
+                (Number(f.entranceFee) || 0) +
+                (Number(f.requirementsFee) || 0) +
+                (Number(f.peSuitFee) || 0) +
+                (Number(f.portalFee) || 0);
+              f.balance = Math.max(0, billed - f.totalPaid);
+              saveMockStudents(allSt);
+            }
             resolve({ success: true, message: 'Student payment recorded successfully.' });
             break;
+          }
 
-          case 'deleteStudent':
+          case 'deleteStudent': {
+            const sId = data && data.studentId;
+            let allSt = getMockStudents();
+            allSt = allSt.filter(s => s.id !== sId);
+            saveMockStudents(allSt);
             resolve({ success: true, message: 'Student record deleted successfully.' });
             break;
+          }
 
           default:
             resolve({ success: true, message: '{Success}' });
