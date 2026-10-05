@@ -652,7 +652,7 @@ window.AdminPanel = (function () {
   // 2. STUDENTS TAB (SYSTEMATIC ID, NEW & OLD STUDENT ENROLLMENT)
   // =========================================================================
   async function renderStudentsTab(container) {
-    const res = await API.callBackend('getAllStudents', {}, 'Fetching students...');
+    const res = await API.callBackend('getAllStudents', { academicYear: selectedAcademicYear }, 'Fetching students...');
     cachedStudents = (res && res.success && Array.isArray(res.students)) ? res.students : [];
     selectedStudentIdsForPrint.clear();
 
@@ -913,7 +913,7 @@ window.AdminPanel = (function () {
 
     try {
       const [rcRes, finRes] = await Promise.all([
-        canScores ? API.callBackend('getReportCard', { studentId: studentId }) : Promise.resolve(null),
+        canScores ? API.callBackend('getReportCard', { studentId: studentId, academicYear: selectedAcademicYear }) : Promise.resolve(null),
         canFinance ? API.callBackend('getStudentFinance', { studentId: studentId }) : Promise.resolve(null)
       ]);
 
@@ -3629,7 +3629,7 @@ window.AdminPanel = (function () {
       document.querySelectorAll('.ag-score').forEach(input=>{input.addEventListener('input',()=>{const tr=input.closest('tr');if(!valid(input.value)){input.setCustomValidity('Enter a score from 0 to 100.');input.style.borderColor='#dc2626';}else{input.setCustomValidity('');input.style.borderColor='';}tr.dataset.dirty='1';const r={};tr.querySelectorAll('.ag-score').forEach(i=>r[i.dataset.p]=i.value.trim());const st=statusOf(r);tr.querySelector('.ag-status').innerHTML=st==='submitted'?'<span class="badge badge-success">Ready to Submit</span>':complete(r)?'<span class="badge badge-info">Complete</span>':any(r)?'<span class="badge badge-warning">In Progress</span>':'<span class="badge badge-light">Not Started</span>';updateSummary();});input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const a=[...document.querySelectorAll('.ag-score')],i=a.indexOf(input);if(a[i+1])a[i+1].focus();}});});updateSummary();}
     async function loadClass(){const cls=document.getElementById('agClass').value;const r=await API.callBackend('getStudentsByClass',{className:cls,academicYear:selectedAcademicYear},'Loading class roster...');currentStudents=(r&&r.success?r.students:[]).filter(s=>(s.status||'Active')==='Active');refreshSubjects();draw();await loadLog();}
     async function loadLog(){const r=await API.callBackend('getGradeActivityLog',{academicYear:selectedAcademicYear});const logs=r&&r.success?r.logs:[];const el=document.getElementById('agLog');el.innerHTML=logs.length?`<div style="display:grid;gap:6px;margin-top:9px;">${logs.slice(0,12).map(x=>`<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;"><span><b>${escapeHtml(x.action||'Grade activity')}</b> &mdash; ${escapeHtml(x.className||'')} / ${escapeHtml(x.subject||'')} (${escapeHtml(String(x.studentCount||0))} students)</span><span style="color:#64748b;">${escapeHtml(x.actorName||'Administrator')} &bull; ${escapeHtml(x.status||'')} &bull; ${escapeHtml(x.timestamp||'')}</span></div>`).join('')}</div>`:'<div style="padding:12px 0;color:#64748b;font-size:12px;">No grade activity recorded yet.</div>';}
-    async function saveGrades(mode){const rows=[...document.querySelectorAll('#agBody tr[data-id]')],grades=[];let invalid=false,incomplete=false;rows.forEach(tr=>{const g={studentId:tr.dataset.id};tr.querySelectorAll('.ag-score').forEach(i=>{const v=i.value.trim();if(!valid(v)){invalid=true;i.focus();}g[i.dataset.p]=v;});if(!complete(g))incomplete=true;if(tr.dataset.dirty==='1')grades.push(g);});if(invalid){API.toastNotification('Correct scores outside the 0–100 range before saving.',true);return;}if(!grades.length){API.toastNotification('No unsaved grade changes on this screen.');return;}if(mode==='submitted'&&incomplete&&!confirm('Some selected students do not have all grading periods completed. Submit these grades anyway?'))return;const r=await API.callBackend('teacherSubmitGrades',{teacherId:currentUser.id,actorRole:'admin',actorName:currentUser.name||'Administrator',className:document.getElementById('agClass').value,subject:document.getElementById('agSubject').value,academicYear:selectedAcademicYear,gradeStatus:mode,grades},mode==='submitted'?'Submitting official grades...':'Saving grade draft...');if(r&&r.success){API.toastSuccess(r.message||'Grades saved.');await loadClass();}else API.toastNotification((r&&r.message)||'Unable to save grades.',true);}
+    async function saveGrades(mode){const rows=[...document.querySelectorAll('#agBody tr[data-id]')],grades=[];let invalid=false,incomplete=false;rows.forEach(tr=>{const g={studentId:tr.dataset.id};tr.querySelectorAll('.ag-score').forEach(i=>{const v=i.value.trim();if(!valid(v)){invalid=true;i.focus();}g[i.dataset.p]=v;});if(!complete(g))incomplete=true;if(tr.dataset.dirty==='1')grades.push(g);});if(invalid){API.toastNotification('Correct scores outside the 0–100 range before saving.',true);return;}if(!grades.length){API.toastNotification('No unsaved grade changes on this screen.');return;}if(mode==='submitted'&&incomplete&&!confirm('Some selected students do not have all grading periods completed. Submit these grades anyway?'))return;const r=await API.callBackend('teacherSubmitGrades',{teacherId:currentUser.id,actorRole:'admin',actorName:currentUser.name||'Administrator',className:document.getElementById('agClass').value,subject:document.getElementById('agSubject').value,academicYear:selectedAcademicYear,gradeStatus:mode,grades},mode==='submitted'?'Submitting official grades...':'Saving grade draft...');if(r&&r.success){API.toastSuccess(r.message||'Grades saved.');await loadClass();const freshR=await API.callBackend('getAllStudents',{academicYear:selectedAcademicYear});if(freshR&&freshR.success&&Array.isArray(freshR.students)){cachedStudents=freshR.students;}}else API.toastNotification((r&&r.message)||'Unable to save grades.',true);}
     document.getElementById('agClass').onchange=loadClass;document.getElementById('agSubject').onchange=draw;document.getElementById('agSearch').oninput=draw;document.getElementById('agView').onchange=draw;document.getElementById('agReset').onclick=()=>{if(confirm('Discard unsaved changes?'))draw();};document.getElementById('agDraft').onclick=()=>saveGrades('draft');document.getElementById('agSubmit').onclick=()=>saveGrades('submitted');document.getElementById('agLogRefresh').onclick=loadLog;
     refreshSubjects();await loadClass();
   }
@@ -4551,7 +4551,7 @@ window.AdminPanel = (function () {
   }
 
   async function viewStudentReport(studentId) {
-    const res = await API.callBackend('getReportCard', { studentId: studentId }, 'Loading report card...');
+    const res = await API.callBackend('getReportCard', { studentId: studentId, academicYear: selectedAcademicYear }, 'Loading report card...');
     if (res && res.success && res.reportCard) {
       App.showModal({
         title: 'Student Report Card Preview',

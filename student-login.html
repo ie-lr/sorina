@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Student Portal Sign In - Sorina Daycare & Primary School System</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#003366">
+  <link rel="apple-touch-icon" href="assets/images/school-logo.png">
+  <link rel="icon" type="image/png" href="assets/images/school-logo.png">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+  <!-- Offline Status Bar -->
+  <div id="offlineIndicator" class="offline-bar hidden">You are currently offline. Changes are saved locally and will auto-sync when connected.</div>
+
+  <!-- Global Loader Overlay -->
+  <div id="globalLoader" class="global-loader-overlay hidden">
+    <div class="loader-spinner"></div>
+    <div class="loader-text">Communicating with Core System...</div>
+  </div>
+
+  <!-- Subtle {Success} Toast -->
+  <div id="globalToast" class="global-toast hidden"></div>
+
+  <!-- Site Header -->
+  <header id="siteHeader" class="site-header">
+    <div class="brand-wrap">
+      <img id="headerLogo" src="assets/images/school-logo.png" alt="School Logo" class="brand-logo">
+      <div class="brand-text">
+        <h1 id="headerSchoolName">Sorina Daycare & Primary School System</h1>
+        <div id="headerMotto" class="motto">Excellence in Knowledge, Character &amp; Integrity</div>
+      </div>
+    </div>
+    <div class="header-actions" id="headerActions">
+      <!-- Injected post-login -->
+    </div>
+  </header>
+
+  <!-- Dedicated Student Login Screen -->
+  <main id="loginScreen" class="gateway-container">
+    <div class="gateway-card">
+      
+      <!-- Left: Student Login Form -->
+      <div class="gateway-form-pane">
+        
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+          <span class="badge badge-primary" style="font-size: 11.5px; letter-spacing: 0.5px; padding: 4px 10px;">STUDENT &amp; PARENT GATEWAY</span>
+        </div>
+
+        <!-- Feedback Alert Container -->
+        <div id="loginAlert" class="alert alert-danger hidden" role="alert"></div>
+
+        <!-- Student Form -->
+        <form id="studentLoginForm" class="login-role-form" autocomplete="off" onsubmit="return false;">
+          <h2 style="margin: 0 0 6px; color: var(--color-primary); font-size: 21px;">Student Portal Sign In</h2>
+          <p style="margin: 0 0 18px; font-size: 13px; color: var(--color-text-muted);">
+            Enter your Systematic Student ID and password to access your academic grades, term evaluations, and fee statement.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label" for="studentLoginId">Student ID</label>
+            <input type="text" id="studentLoginId" class="input-field" placeholder="e.g. SPSS001" required autocomplete="username">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="studentLoginPass">Password</label>
+            <input type="password" id="studentLoginPass" class="input-field" placeholder="Enter your password" required autocomplete="current-password">
+          </div>
+
+          <button type="submit" id="studentLoginBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 8px;">
+            Sign In as Student
+          </button>
+
+          <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 14px; font-size: 13px;">
+            <a href="#" class="forgot-pass-trigger">Forgot Password?</a>
+          </div>
+
+          <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--color-border); font-size: 12.5px; color: var(--color-text-muted); line-height: 1.6;">
+            <div><b>Other School Portals:</b></div>
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px;">
+              <a href="teacher-login.html" style="color: var(--color-primary); font-weight: 600;">👨‍🏫 Teacher Portal &rarr;</a>
+              <a href="admin-login.html" style="color: var(--color-primary); font-weight: 600;">🔐 Administrator Portal &rarr;</a>
+              <a href="ie-portal.html" style="color: #1e3a8a; font-weight: 600;">🛠️ IE Developer Console &rarr;</a>
+            </div>
+            <div style="margin-top: 8px;">
+              <a href="index.html" style="color: #64748b; font-size: 12px;">&larr; Back to Main School Gateway</a>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Right: Branded School Panel -->
+      <div class="gateway-brand-pane">
+        <img id="paneLogo" src="assets/images/school-logo.png" alt="School Crest" class="pane-logo">
+        <div class="pane-title" id="paneSchoolName">Sorina Daycare & Primary School System</div>
+        <div class="pane-motto" id="paneMotto">Excellence in Knowledge, Character &amp; Integrity</div>
+        <div class="pane-badge">Student &amp; Parent Access</div>
+        <div style="margin-top: 25px; font-size: 12.5px; opacity: 0.9; z-index: 1; font-weight: 600;">
+          Academic Year 2026–2027
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- PWA Install Button (Fixed) -->
+  <button id="installAppBtn" class="hidden" type="button" aria-label="Install App" style="display: flex; align-items: center; gap: 6px;">
+    <img src="assets/icons/download (2).png" style="width: 16px; height: 16px;" alt="">
+    <span>Install App</span>
+  </button>
+
+  <!-- Role-specific Panel Mount Point (Loaded post-auth) -->
+  <div id="appRoot"></div>
+
+  <!-- Modal Container -->
+  <div id="modalContainer"></div>
+
+  <!-- Scripts -->
+  <script src="assets/js/api.js?v=2.1"></script>
+  <script src="assets/js/reportCard.js?v=2.1"></script>
+  <script src="assets/js/auth.js?v=2.1"></script>
+  <script src="assets/js/pwaInstall.js?v=2.1"></script>
+  <script src="assets/js/app.js?v=2.1"></script>
+
+</body>
+</html>

@@ -33,6 +33,14 @@ const Auth = (function () {
       });
     });
 
+    // Support direct links to specific portal forms (e.g. index.html?role=admin or index.html#admin)
+    const urlParams = new URLSearchParams(window.location.search);
+    const requestedRole = (urlParams.get('role') || window.location.hash.replace('#', '') || '').toLowerCase();
+    if (requestedRole && forms[requestedRole]) {
+      const targetTab = document.querySelector(`.role-tab-btn[data-role="${requestedRole}"]`);
+      if (targetTab) targetTab.click();
+    }
+
     // 1. Student Login Form Submit
     if (forms.student) {
       forms.student.addEventListener('submit', async (e) => {
