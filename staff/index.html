@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="robots" content="noindex, nofollow">
+  <base href="../">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Student Portal Sign In - Sorina Daycare & Primary School System</title>
-  <link rel="manifest" href="manifest.json">
+  <title>Teacher Portal Sign In - Sorina Daycare & Primary School System</title>
+  <link rel="manifest" href="staff/manifest.json">
   <meta name="theme-color" content="#003366">
   <link rel="apple-touch-icon" href="assets/images/school-logo.png">
   <link rel="icon" type="image/png" href="assets/images/school-logo.png">
@@ -40,39 +41,39 @@
     </div>
   </header>
 
-  <!-- Dedicated Student Login Screen -->
+  <!-- Dedicated Teacher Login Screen -->
   <main id="loginScreen" class="gateway-container">
     <div class="gateway-card">
       
-      <!-- Left: Student Login Form -->
+      <!-- Left: Teacher Login Form -->
       <div class="gateway-form-pane">
         
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
-          <span class="badge badge-primary" style="font-size: 11.5px; letter-spacing: 0.5px; padding: 4px 10px;">STUDENT &amp; PARENT GATEWAY</span>
+          <span class="badge badge-info" style="font-size: 11.5px; letter-spacing: 0.5px; padding: 4px 10px;">FACULTY &amp; INSTRUCTION GATEWAY</span>
         </div>
 
         <!-- Feedback Alert Container -->
         <div id="loginAlert" class="alert alert-danger hidden" role="alert"></div>
 
-        <!-- Student Form -->
-        <form id="studentLoginForm" class="login-role-form" autocomplete="off" onsubmit="return false;">
-          <h2 style="margin: 0 0 6px; color: var(--color-primary); font-size: 21px;">Student Portal Sign In</h2>
+        <!-- Teacher Form -->
+        <form id="teacherLoginForm" class="login-role-form" autocomplete="off" onsubmit="return false;">
+          <h2 style="margin: 0 0 6px; color: var(--color-primary); font-size: 21px;">Teacher Portal Sign In</h2>
           <p style="margin: 0 0 18px; font-size: 13px; color: var(--color-text-muted);">
-            Enter your Systematic Student ID and password to access your academic grades, term evaluations, and fee statement.
+            Enter your Systematic Teacher ID and password to access your assigned class rosters, record period scores, and submit lesson plans.
           </p>
 
           <div class="form-group">
-            <label class="form-label" for="studentLoginId">Student ID</label>
-            <input type="text" id="studentLoginId" class="input-field" placeholder="e.g. SPSS001" required autocomplete="username">
+            <label class="form-label" for="teacherLoginId">Teacher ID</label>
+            <input type="text" id="teacherLoginId" class="input-field" placeholder="e.g. SPST001" required autocomplete="username">
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="studentLoginPass">Password</label>
-            <input type="password" id="studentLoginPass" class="input-field" placeholder="Enter your password" required autocomplete="current-password">
+            <label class="form-label" for="teacherLoginPass">Password</label>
+            <input type="password" id="teacherLoginPass" class="input-field" placeholder="Enter your password" required autocomplete="current-password">
           </div>
 
-          <button type="submit" id="studentLoginBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 8px;">
-            Sign In as Student
+          <button type="submit" id="teacherLoginBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 8px;">
+            Sign In as Teacher
           </button>
 
           <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 14px; font-size: 13px;">
@@ -86,7 +87,7 @@
         <img id="paneLogo" src="assets/images/school-logo.png" alt="School Crest" class="pane-logo">
         <div class="pane-title" id="paneSchoolName">Sorina Daycare & Primary School System</div>
         <div class="pane-motto" id="paneMotto">Excellence in Knowledge, Character &amp; Integrity</div>
-        <div class="pane-badge">Student &amp; Parent Access</div>
+        <div class="pane-badge">Faculty &amp; Teacher Workstation</div>
         <div style="margin-top: 25px; font-size: 12.5px; opacity: 0.9; z-index: 1; font-weight: 600;">
           Academic Year 2026–2027
         </div>

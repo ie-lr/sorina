@@ -20,10 +20,7 @@ const App = (function () {
     // 3. Initialize Gateway Login Form
     Auth.initLoginForm();
 
-    // 4. Wire Endpoint Config Link
-    wireEndpointConfig();
-
-    // 5. Check if user already has an active session
+    // 4. Check if user already has an active session
     await Auth.checkExistingSession();
   }
 
@@ -77,41 +74,6 @@ const App = (function () {
       try { const cached=JSON.parse(localStorage.getItem('_sorina_school_settings_cache')||'null'); if(cached){ appSettings=cached; } } catch(_) {}
       console.warn('Could not load custom branding:', e);
     }
-  }
-
-  /**
-   * Modal dialog to configure backend Web App URL for deployment.
-   */
-  function wireEndpointConfig() {
-    const link = document.getElementById('backendSettingsLink');
-    if (!link) return;
-
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      const currentUrl = API.getBackendUrl();
-      showModal({
-        title: 'Backend Web App Endpoint Configuration',
-        content: `
-          <div style="font-size: 13.5px; line-height: 1.6; color: var(--color-text);">
-            <p>Paste the deployed <b>Google Apps Script Web App URL</b> below:</p>
-            <div class="form-group">
-              <label class="form-label" for="cfgBackendUrl">Web App URL (exec):</label>
-              <input type="url" id="cfgBackendUrl" class="input-field" placeholder="https://script.google.com/macros/s/.../exec" value="${escapeHtml(currentUrl)}">
-              <div class="form-hint">Leave blank to use the built-in offline simulation mode.</div>
-            </div>
-          </div>
-        `,
-        confirmText: 'Save Endpoint',
-        onConfirm: () => {
-          const input = document.getElementById('cfgBackendUrl');
-          if (input) {
-            API.setBackendUrl(input.value.trim());
-            showToast('Endpoint configuration saved.', 'success');
-            applyBranding();
-          }
-        }
-      });
-    });
   }
 
   /**

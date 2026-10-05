@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>IE Developer Operations Console</title>
+  <link rel="icon" type="image/png" href="assets/images/school-logo.png">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <style>
+    body {
+      background: #0b1320;
+      color: #e2e8f0;
+      font-family: var(--font-family-sans);
+    }
+    .dev-header {
+      background: #060c17;
+      border-bottom: 1px solid #1e293b;
+      padding: 14px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .dev-badge {
+      background: #1e3a8a;
+      color: #bfdbfe;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+    .dev-card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .kill-switch-box {
+      border: 2px solid;
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+    .kill-switch-box.active {
+      border-color: #10b981;
+      background: rgba(16, 185, 129, 0.06);
+    }
+    .kill-switch-box.suspended {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.08);
+    }
+    .signal-item {
+      border-bottom: 1px solid #1e293b;
+      padding: 12px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .signal-item:last-child {
+      border-bottom: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Global Loader & Toast -->
+  <div id="globalLoader" class="global-loader-overlay hidden">
+    <div class="loader-spinner"></div>
+    <div class="loader-text">Communicating with Core System...</div>
+  </div>
+  <div id="globalToast" class="global-toast hidden"></div>
+
+  <!-- Header -->
+  <header class="dev-header">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <img src="assets/images/school-logo.png" style="width: 36px; height: 36px; object-fit: contain; background: transparent;" alt="">
+      <div>
+        <div style="font-size: 16px; font-weight: 800; color: #ffffff; letter-spacing: 0.4px;">
+          IE DIGITAL WORKS &bull; DEVELOPER OPERATIONS CONSOLE
+        </div>
+        <div style="font-size: 11.5px; color: #94a3b8;">Standalone System Supervision, Signals &amp; Printing Dispatch</div>
+      </div>
+    </div>
+    <div id="devHeaderActions">
+      <span class="dev-badge">DEVELOPER ACCESS ONLY</span>
+    </div>
+  </header>
+
+  <!-- Login Screen (Separate from Main Portal) -->
+  <main id="devLoginView" style="display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 70px); padding: 20px;">
+    <div style="width: 100%; max-width: 440px; background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <img src="assets/icons/monitor-cog.png" style="width: 48px; height: 48px; filter: brightness(0) invert(1);" alt="">
+        <h2 style="margin: 10px 0 4px; font-size: 20px; color: #ffffff;">Developer Authentication</h2>
+        <p style="margin: 0; font-size: 13px; color: #94a3b8;">
+          Authorized developer credential required to access school kill-switch, print queue, and security telemetry.
+        </p>
+      </div>
+
+      <div id="devLoginError" class="alert alert-danger hidden" style="margin-bottom: 16px;"></div>
+
+      <form id="devLoginForm" onsubmit="return false;">
+        <div class="form-group">
+          <label class="form-label" style="color: #cbd5e1;">Developer Username</label>
+          <input type="text" id="devUser" class="input-field" placeholder="Developer username" autocomplete="off" required style="background: #1e293b; color: #fff; border-color: #334155;">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="color: #cbd5e1;">Developer Access Key</label>
+          <input type="password" id="devPass" class="input-field" placeholder="Enter developer master key" required style="background: #1e293b; color: #fff; border-color: #334155;">
+        </div>
+
+        <button type="submit" id="devLoginBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 10px; font-weight: 700;">
+          Authenticate to Console
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <!-- Developer Dashboard (Loaded Post-Authentication) -->
+  <main id="devDashboardView" class="hidden" style="padding: 24px; max-width: 1200px; margin: 0 auto;">
+    
+    <!-- Kill-Switch Suspension Banner -->
+    <div class="dev-card" style="padding: 0; overflow: hidden;">
+      <div id="killSwitchBox" class="kill-switch-box active">
+        <div>
+          <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase;">
+            SYSTEM OPERATION CONTROL (KILL-SWITCH)
+          </div>
+          <h2 id="killSwitchTitle" style="margin: 4px 0 6px; font-size: 20px; color: #ffffff;">
+            School Operations: ACTIVE
+          </h2>
+          <div id="killSwitchDesc" style="font-size: 13px; color: #94a3b8;">
+            Entire school portal is live and accepting student, teacher, and administrator connections.
+          </div>
+        </div>
+
+        <button type="button" id="toggleKillSwitchBtn" class="btn btn-danger" style="padding: 12px 24px; font-weight: 800; letter-spacing: 0.5px;">
+          SUSPEND SCHOOL SYSTEM
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs" style="border-color: #1e293b; margin-bottom: 20px;">
+      <button class="nav-tab-item active" data-tab="signals" style="color: #cbd5e1;">🚨 Security Signals &amp; Forceful Entries</button>
+      <button class="nav-tab-item" data-tab="printQueue" style="color: #cbd5e1;">🖨️ Printing Dispatch Queue</button>
+      <button class="nav-tab-item" data-tab="messages" style="color: #cbd5e1;">✉️ Admin Direct Messaging</button>
+      <button class="nav-tab-item" data-tab="database" style="color: #cbd5e1;">🗄️ Database &amp; Infrastructure</button>
+    </div>
+
+    <!-- Tab Container -->
+    <div id="devTabContainer"></div>
+  </main>
+
+  <!-- Modal Container for Developer Tools -->
+  <div id="modalContainer"></div>
+
+  <script src="assets/js/config.js?v=2.2"></script>
+
+  <script src="assets/js/api.js?v=2.2"></script>
+  <script src="assets/js/iePortal.js"></script>
+</body>
+</html>

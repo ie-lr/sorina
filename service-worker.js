@@ -7,14 +7,18 @@
  * -----------------------------------------------------------------------
  */
 
-const CACHE_NAME = 'ie-school-portal-v2.1';
+const CACHE_NAME = 'ie-school-portal-v2.3';
 const SHELL_ASSETS = [
   './',
   './index.html',
-  './ie-portal.html',
+  './admins/',
+  './staff/',
+  './admins/manifest.json',
+  './staff/manifest.json',
   './manifest.json',
   './assets/css/tokens.css',
   './assets/css/styles.css',
+  './assets/js/config.js',
   './assets/js/api.js',
   './assets/js/auth.js',
   './assets/js/admin.js',
@@ -49,6 +53,13 @@ self.addEventListener('activate', event => {
   );
 });
 
+// Offline fallback: each portal falls back to its own page, never to another portal's.
+function portalFallback(url) {
+  if (url.pathname.includes('/admins')) return './admins/';
+  if (url.pathname.includes('/staff')) return './staff/';
+  return './index.html';
+}
+
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
@@ -72,6 +83,15 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // Network-first for HTML pages so page updates reach installed apps immediately
+  const accept = event.request.headers.get('accept') || '';
+  if (event.request.mode === 'navigate' || accept.includes('text/html')) {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request).then(c => c || caches.match(portalFallback(url))))
+    );
+    return;
+  }
+
   // Cache-first, fallback to network for static shell assets (images, css)
   event.respondWith(
     caches.match(event.request).then(cached => {
@@ -80,7 +100,7 @@ self.addEventListener('fetch', event => {
         return response;
       }).catch(() => {
         if (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html')) {
-          return caches.match('./index.html');
+          return caches.match(portalFallback(url));
         }
       });
     })
