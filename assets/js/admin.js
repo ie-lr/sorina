@@ -27,6 +27,8 @@ window.AdminPanel = (function () {
   let cachedTeachers = [];
   let cachedAdmins = [];
   let cachedPayroll = [];
+  let cachedExpenses = JSON.parse(localStorage.getItem('sorina_expenses') || '[]');
+  let cachedAnnouncements = JSON.parse(localStorage.getItem('sorina_announcements') || '[]');
   let cachedCustomStaff = JSON.parse(localStorage.getItem('sorina_custom_staff') || '[]');
   let cachedSubjects = [];
   let isSidebarCollapsed = false;
@@ -49,10 +51,25 @@ window.AdminPanel = (function () {
     'Grade 3',
     'Grade 4',
     'Grade 5',
-    'Grade 6'
+    'Grade 6',
+    'Grade 7',
+    'Grade 8',
+    'Grade 9',
+    'Grade 10',
+    'Grade 11',
+    'Grade 12'
   ];
 
   let cachedClassFees = [];
+  let dashboardCurrency = localStorage.getItem('sorina_dashboard_currency') || 'USD';
+  function currencySymbol(code){ return code === 'LRD' ? 'LRD' : 'USD'; }
+  function previousAcademicYear(year){
+    const m=String(year||'').match(/^(\d{4})[-\/](\d{4})$/);
+    return m ? `${Number(m[1])-1}-${Number(m[2])-1}` : '';
+  }
+  function moneyLabel(v, code=dashboardCurrency){ return currencySymbol(code)+' '+toNum(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function getCatalogSubjects(){ try{const x=JSON.parse(localStorage.getItem('_sorina_subject_catalog')||'null'); if(Array.isArray(x)&&x.length){ const meta=JSON.parse(localStorage.getItem('_sorina_subject_meta')||'{}'); return x.filter(n=>!meta[n]||meta[n].status!=='Inactive'); }}catch(e){} return CURRICULUM_SUBJECTS; }
+  function selectedCurriculumForClass(cls){ try{const m=JSON.parse(localStorage.getItem('_sorina_curriculum_map')||'{}'); return Array.isArray(m[cls])?m[cls]:[];}catch(e){return [];} }
   const DEFAULT_CLASS_FEES = {
     'Daycare': {
       new: { entranceFee: 20, registrationFee: 30, tuitionTotal: 150, requirementsFee: 25, peSuitFee: 20, portalFee: 15 },
@@ -97,7 +114,13 @@ window.AdminPanel = (function () {
     'Grade 6': {
       new: { entranceFee: 25, registrationFee: 40, tuitionTotal: 260, requirementsFee: 35, peSuitFee: 25, portalFee: 20 },
       old: { entranceFee: 0, registrationFee: 35, tuitionTotal: 240, requirementsFee: 35, peSuitFee: 25, portalFee: 20 }
-    }
+    },
+    'Grade 7': { new: { entranceFee: 25, registrationFee: 40, tuitionTotal: 270, requirementsFee: 35, peSuitFee: 25, portalFee: 20 }, old: { entranceFee: 0, registrationFee: 35, tuitionTotal: 250, requirementsFee: 35, peSuitFee: 25, portalFee: 20 } },
+    'Grade 8': { new: { entranceFee: 25, registrationFee: 40, tuitionTotal: 280, requirementsFee: 35, peSuitFee: 25, portalFee: 20 }, old: { entranceFee: 0, registrationFee: 35, tuitionTotal: 260, requirementsFee: 35, peSuitFee: 25, portalFee: 20 } },
+    'Grade 9': { new: { entranceFee: 25, registrationFee: 40, tuitionTotal: 290, requirementsFee: 35, peSuitFee: 25, portalFee: 20 }, old: { entranceFee: 0, registrationFee: 35, tuitionTotal: 270, requirementsFee: 35, peSuitFee: 25, portalFee: 20 } },
+    'Grade 10': { new: { entranceFee: 25, registrationFee: 40, tuitionTotal: 300, requirementsFee: 35, peSuitFee: 25, portalFee: 20 }, old: { entranceFee: 0, registrationFee: 35, tuitionTotal: 280, requirementsFee: 35, peSuitFee: 25, portalFee: 20 } },
+    'Grade 11': { new: { entranceFee: 25, registrationFee: 40, tuitionTotal: 310, requirementsFee: 35, peSuitFee: 25, portalFee: 20 }, old: { entranceFee: 0, registrationFee: 35, tuitionTotal: 290, requirementsFee: 35, peSuitFee: 25, portalFee: 20 } },
+    'Grade 12': { new: { entranceFee: 25, registrationFee: 40, tuitionTotal: 320, requirementsFee: 35, peSuitFee: 25, portalFee: 20 }, old: { entranceFee: 0, registrationFee: 35, tuitionTotal: 300, requirementsFee: 35, peSuitFee: 25, portalFee: 20 } }
   };
 
   function getClassFeeSchedule(className, category) {
@@ -128,12 +151,13 @@ window.AdminPanel = (function () {
       if (s === 'D' || s === 'F') return `<span class="score-red">${escapeHtml(s)}</span>`;
       return escapeHtml(s);
     }
-    if (num >= 91) return `<span class="score-deep-green">${num}</span>`;
-    if (num >= 70) return `<span class="score-blue">${num}</span>`;
-    return `<span class="score-red">${num}</span>`;
+    if (num >= 70) return `<span style="color:#082f50;font-weight:800;">${num}</span>`;
+    if (num >= 60) return `<span style="color:#dc2626;font-weight:800;">${num}</span>`;
+    return `<span style="color:#dc2626;font-weight:800;">${num}</span>`;
   }
 
-  let selectedAcademicYear = '2026-2027';
+  const ACADEMIC_YEARS = ['2026-2027','2027-2028','2028-2029','2029-2030','2030-2031'];
+  let selectedAcademicYear = ACADEMIC_YEARS.includes(localStorage.getItem('sorina_selected_academic_year')) ? localStorage.getItem('sorina_selected_academic_year') : '2026-2027';
 
   function mount(container, user) {
     currentUser = user;
@@ -145,15 +169,17 @@ window.AdminPanel = (function () {
     else if (perms['teachers:view'] || perms['teachers:edit'] || perms['teachers:delete']) currentTab = 'teachers';
     else if (perms['finance:view'] || perms['finance:edit'] || perms['finance:delete']) currentTab = 'finance';
     else if (perms['payroll:view'] || perms['payroll:edit'] || perms['payroll:delete']) currentTab = 'payroll';
+    else if (perms['messaging:view'] || perms['messaging:send']) currentTab = 'announcements';
     else if (perms['printing:view'] || perms['printing:send']) currentTab = 'printing';
     else if (perms['subjects:view'] || perms['subjects:edit'] || perms['subjects:delete']) currentTab = 'subjects';
-    else if (perms['scores:view'] || perms['scores:edit']) currentTab = 'grading';
+    else if (isSuper || user.role === 'admin' || perms['scores:view'] || perms['scores:edit']) currentTab = 'gradeEntry';
     else if (perms['settings:edit']) currentTab = 'settings';
     else if (perms['audit:view']) currentTab = 'audit';
     else if (perms['export:view'] || perms['export:data']) currentTab = 'export';
     else currentTab = 'settings';
 
     renderPortalLayout(container);
+    const gc=document.getElementById('adminGlobalCurrency'); if(gc) gc.onchange=()=>{dashboardCurrency=gc.value;localStorage.setItem('sorina_dashboard_currency',dashboardCurrency);loadTab(currentTab);};
     loadTab(currentTab);
   }
 
@@ -168,7 +194,8 @@ window.AdminPanel = (function () {
     const canPayroll = isSuperAdmin || perms['payroll:view'] || perms['payroll:edit'] || perms['payroll:delete'];
     const canPrinting = isSuperAdmin || perms['printing:view'] || perms['printing:send'];
     const canSubjects = isSuperAdmin || perms['subjects:view'] || perms['subjects:edit'] || perms['subjects:delete'];
-    const canScores = isSuperAdmin || perms['scores:view'] || perms['scores:edit'];
+    const canScores = isSuperAdmin || currentUser?.role === 'admin' || perms['scores:view'] || perms['scores:edit'];
+    const canLessonPlans = isSuperAdmin || currentUser?.role === 'admin' || perms['lesson_plans:view'];
     const canSettings = isSuperAdmin || perms['settings:edit'];
     const canAudit = isSuperAdmin || perms['audit:view'];
     const canExport = isSuperAdmin || perms['export:view'] || perms['export:data'];
@@ -188,10 +215,7 @@ window.AdminPanel = (function () {
           <div class="sidebar-year-box" style="padding: 10px 14px; background: rgba(255,255,255,0.08); border-radius: 6px; margin: 10px 12px 14px;">
             <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; margin-bottom: 4px; color: #ffffff; font-weight: 600;">Academic Year</div>
             <select id="adminGlobalYearSelect" class="select-field" style="width: 100%; background: #ffffff; color: var(--color-primary); font-weight: 700; font-size: 12.5px; padding: 5px 8px; border-radius: 4px; cursor: pointer;">
-              <option value="2026-2027" ${selectedAcademicYear === '2026-2027' ? 'selected' : ''}>2026–2027</option>
-              <option value="2025-2026" ${selectedAcademicYear === '2025-2026' ? 'selected' : ''}>2025–2026</option>
-              <option value="2024-2025" ${selectedAcademicYear === '2024-2025' ? 'selected' : ''}>2024–2025</option>
-              <option value="2027-2028" ${selectedAcademicYear === '2027-2028' ? 'selected' : ''}>2027–2028</option>
+              ${ACADEMIC_YEARS.map(y => `<option value="${y}" ${selectedAcademicYear === y ? 'selected' : ''}>${y.replace('-', '–')}</option>`).join('')}
             </select>
           </div>
 
@@ -229,7 +253,7 @@ window.AdminPanel = (function () {
             ${canPayroll ? `
               <a class="sidebar-item ${currentTab === 'payroll' ? 'active' : ''}" data-tab="payroll">
                 <img src="assets/icons/landmark.png" class="sidebar-icon" alt="">
-                <span class="sidebar-item-label">Staff Payroll</span>
+                <span class="sidebar-item-label">All Expenses</span>
               </a>
             ` : ''}
 
@@ -250,9 +274,29 @@ window.AdminPanel = (function () {
             ` : ''}
 
             ${canScores ? `
+              <a class="sidebar-item ${currentTab === 'gradeEntry' ? 'active' : ''}" data-tab="gradeEntry">
+                <img src="assets/icons/pencil.png" class="sidebar-icon" alt="">
+                <span class="sidebar-item-label">Grade Entry &amp; Submission</span>
+              </a>
               <a class="sidebar-item ${currentTab === 'grading' ? 'active' : ''}" data-tab="grading">
                 <img src="assets/icons/pencil.png" class="sidebar-icon" alt="">
                 <span class="sidebar-item-label">Grading Controls</span>
+              </a>
+            ` : ''}
+
+            ${canLessonPlans ? `
+              <a class="sidebar-item ${currentTab === 'lessonPlans' ? 'active' : ''}" data-tab="lessonPlans">
+                <img src="assets/icons/file-text.png" class="sidebar-icon" alt="">
+                <span class="sidebar-item-label">Teacher Lesson Plans</span>
+              </a>
+            ` : ''}
+
+            <div class="nav-section-title">Communication</div>
+
+            ${isSuperAdmin || perms['messaging:view'] || perms['messaging:send'] ? `
+              <a class="sidebar-item ${currentTab === 'announcements' ? 'active' : ''}" data-tab="announcements">
+                <img src="assets/icons/bell-ring.png" class="sidebar-icon" alt="">
+                <span class="sidebar-item-label">School Announcements</span>
               </a>
             ` : ''}
 
@@ -318,6 +362,7 @@ window.AdminPanel = (function () {
     if (yearSelect) {
       yearSelect.addEventListener('change', (e) => {
         selectedAcademicYear = e.target.value;
+        localStorage.setItem('sorina_selected_academic_year', selectedAcademicYear);
         App.showToast(`Switched active academic year to ${selectedAcademicYear}`, 'info');
         loadTab(currentTab);
       });
@@ -360,9 +405,12 @@ window.AdminPanel = (function () {
       teachers: isSuper || perms['teachers:view'] || perms['teachers:edit'] || perms['teachers:delete'],
       finance: isSuper || perms['finance:view'] || perms['finance:edit'] || perms['finance:delete'],
       payroll: isSuper || perms['payroll:view'] || perms['payroll:edit'] || perms['payroll:delete'],
+      announcements: isSuper || perms['messaging:view'] || perms['messaging:send'],
       printing: isSuper || perms['printing:view'] || perms['printing:send'],
       subjects: isSuper || perms['subjects:view'] || perms['subjects:edit'] || perms['subjects:delete'],
-      grading: isSuper || perms['scores:view'] || perms['scores:edit'],
+      gradeEntry: isSuper || currentUser?.role === 'admin' || perms['scores:view'] || perms['scores:edit'],
+      lessonPlans: isSuper || currentUser?.role === 'admin' || perms['lesson_plans:view'],
+      grading: isSuper || currentUser?.role === 'admin' || perms['scores:view'] || perms['scores:edit'],
       developer: isSuper,
       admins: isSuper,
       settings: isSuper || perms['settings:edit'],
@@ -398,13 +446,25 @@ window.AdminPanel = (function () {
         await renderFinanceTab(container);
         break;
       case 'payroll':
-        await renderPayrollTab(container);
+        await renderExpensesTab(container);
+        break;
+      case 'announcements':
+        await renderAnnouncementsTab(container);
         break;
       case 'printing':
         await renderPrintingTab(container);
         break;
       case 'subjects':
         await renderSubjectsTab(container);
+        break;
+      case 'curriculum':
+        await renderCurriculumSubjectsTab(container);
+        break;
+      case 'gradeEntry':
+        await renderAdminGradeEntryTab(container);
+        break;
+      case 'lessonPlans':
+        await renderAdminLessonPlansTab(container);
         break;
       case 'grading':
         await renderGradingTab(container);
@@ -507,13 +567,15 @@ window.AdminPanel = (function () {
     };
 
     container.innerHTML = `
+      <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:10px;"><label class="form-label" style="margin:0;">Dashboard Currency</label><select id="dashboardCurrencySelect" class="select-field" style="width:100px;"><option value="USD" ${dashboardCurrency==='USD'?'selected':''}>USD</option><option value="LRD" ${dashboardCurrency==='LRD'?'selected':''}>LRD</option></select></div>
       <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <div>
           <h2 style="margin: 0 0 6px; color: var(--color-primary); font-size: 22px;">Institutional Executive Summary</h2>
           <div style="font-size: 13.5px; color: var(--color-text-muted);">Real-time institutional metrics, class enrollment, and cash flow balance.</div>
         </div>
-        <div class="badge badge-light" style="font-size: 13px; font-weight: 700; padding: 6px 12px; border: 1px solid #cbd5e1;">
-          Academic Year: <span style="color: var(--color-primary);">${escapeHtml(selectedAcademicYear)}</span>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <label for="summaryAcademicYear" style="font-size:12px;font-weight:700;color:#475569;">Academic Year</label>
+          <select id="summaryAcademicYear" class="select-field" style="min-width:150px;font-weight:700;">${ACADEMIC_YEARS.map(y => `<option value="${y}" ${y===selectedAcademicYear?'selected':''}>${y.replace('-', '–')}</option>`).join('')}</select>
         </div>
       </div>
 
@@ -524,26 +586,22 @@ window.AdminPanel = (function () {
           <div class="stat-value">${sum.totalStudents}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Active Teachers</div>
-          <div class="stat-value">${sum.totalTeachers}</div>
-        </div>
-        <div class="stat-card">
           <div class="stat-label">Revenue Collected</div>
-          <div class="stat-value" style="color: var(--color-success);">$${sum.totalRevenue.toLocaleString()}</div>
+          <div class="stat-value" style="color: var(--color-success);">${currencySymbol(dashboardCurrency)} ${sum.totalRevenue.toLocaleString()}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Payroll Expenses</div>
-          <div class="stat-value" style="color: var(--color-danger);">$${sum.totalExpenses.toLocaleString()}</div>
+          <div class="stat-label">Total Expenses</div>
+          <div class="stat-value" style="color: var(--color-danger);">${currencySymbol(dashboardCurrency)} ${sum.totalExpenses.toLocaleString()}</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Net Operating Balance</div>
           <div class="stat-value" style="color: ${sum.netBalance >= 0 ? 'var(--color-primary)' : 'var(--color-danger)'};">
-            $${sum.netBalance.toLocaleString()}
+            ${currencySymbol(dashboardCurrency)} ${sum.netBalance.toLocaleString()}
           </div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Target Remaining (Receivable)</div>
-          <div class="stat-value" style="color: #d97706;">$${sum.targetRemaining.toLocaleString()}</div>
+          <div class="stat-value" style="color: #d97706;">${currencySymbol(dashboardCurrency)} ${sum.targetRemaining.toLocaleString()}</div>
         </div>
       </div>
 
@@ -586,6 +644,8 @@ window.AdminPanel = (function () {
         </div>
       </div>
     `;
+    const dc=document.getElementById('dashboardCurrencySelect'); if(dc) dc.onchange=()=>{dashboardCurrency=dc.value;localStorage.setItem('sorina_dashboard_currency',dashboardCurrency);loadTab('summary');};
+    const sy=document.getElementById('summaryAcademicYear'); if(sy) sy.onchange=()=>{ selectedAcademicYear=sy.value; localStorage.setItem('sorina_selected_academic_year',selectedAcademicYear); const global=document.getElementById('adminGlobalYearSelect'); if(global) global.value=selectedAcademicYear; App.showToast(`Executive Summary set to academic year ${selectedAcademicYear}`, 'info'); loadTab('summary'); };
   }
 
   // =========================================================================
@@ -741,7 +801,7 @@ window.AdminPanel = (function () {
               </div>
               <div>
                 <div style="font-weight: 600;">${escapeHtml(s.name)}</div>
-                ${s.assignedSubjects && s.assignedSubjects.length ? `<div style="font-size: 10.5px; color: #64748b;">${s.assignedSubjects.length} Assigned Subjects</div>` : ''}
+                ${Array.isArray(s.curriculumSubjects) && s.curriculumSubjects.length ? `<div style="font-size: 10.5px; color: #64748b;">${s.curriculumSubjects.length} Assigned Subjects</div>` : '<div style="font-size: 10.5px; color: #94a3b8;">No Subjects Assigned</div>'}
               </div>
             </div>
           </td>
@@ -837,7 +897,7 @@ window.AdminPanel = (function () {
 
     const isSuper = currentUser.role === 'superadmin';
     const perms = currentUser.permissions || {};
-    const canScores = isSuper || perms['scores:view'];
+    const canScores = isSuper || currentUser?.role === 'admin' || perms['scores:view'] || perms['scores:edit'];
     const canFinance = isSuper || perms['finance:view'];
 
     if (!canScores && !canFinance) {
@@ -898,6 +958,12 @@ window.AdminPanel = (function () {
                 <h4 style="margin: 0; font-size: 15px; color: var(--color-primary);">${escapeHtml(s.name)} [${escapeHtml(s.id)}]</h4>
                 <div style="font-size: 12px; color: var(--color-text-muted);">
                   Class: <b>${escapeHtml(s.className || s.grade)}</b> &bull; Academic Year: <b>${escapeHtml(s.academicYear || selectedAcademicYear)}</b> &bull; Category: <b>${s.studentCategory === 'old' ? 'Returning Student' : 'New Enrollee'}</b>
+                </div>
+                <div style="margin-top:7px;font-size:12px;">
+                  <b>Assigned Subjects:</b>
+                  ${Array.isArray(s.curriculumSubjects) && s.curriculumSubjects.length
+                    ? s.curriculumSubjects.map(x=>`<span class="badge badge-light" style="margin:2px;">${escapeHtml(x)}</span>`).join('')
+                    : '<span style="color:#94a3b8;"> No subjects assigned</span>'}
                 </div>
               </div>
             </div>
@@ -1045,6 +1111,7 @@ window.AdminPanel = (function () {
   }
 
   function buildReceiptCardHtml(s) {
+    const branding = (window.App && App.getSettings && App.getSettings()) || {};
     const f = s.finance || {};
     const currency = f.currency || 'USD';
     const installments = f.installments || [0, 0, 0, 0];
@@ -1076,9 +1143,9 @@ window.AdminPanel = (function () {
     return `
       <div class="receiptCard">
         <div class="receiptTopBrand">
-          <img class="receiptTopLogo" src="assets/images/school-logo.png" alt="Logo" onerror="this.style.display='none'">
-          <div class="receiptTopSchoolName">Sorina Daycare &amp; Primary School System</div>
-          <div class="receiptTopMotto">Excellence in Knowledge, Character &amp; Integrity</div>
+          <img class="receiptTopLogo" src="${escapeHtml(branding.logoUrl || 'assets/images/school-logo.png')}" alt="Logo" onerror="this.style.display='none'">
+          <div class="receiptTopSchoolName">${escapeHtml(branding.schoolName || 'Sorina Daycare & Primary School System')}</div>
+          <div class="receiptTopMotto">${escapeHtml(branding.schoolMotto || 'Excellence in Knowledge, Character & Integrity')}</div>
         </div>
         <div class="receiptHeaderRule"></div>
         <div class="receiptStudentPhotoRow">
@@ -1270,20 +1337,9 @@ window.AdminPanel = (function () {
             </div>
           </div>
 
-          <!-- Assigned Curriculum Subjects -->
-          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin: 12px 0; background: #ffffff;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <label class="form-label" style="font-weight: 700; margin: 0;">Assigned Curriculum Subjects</label>
-              <button type="button" class="btn btn-light btn-sm" id="nsToggleAllSubjectsBtn" style="padding: 2px 8px; font-size: 11px;">Select All</button>
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; font-size: 12px;">
-              ${CURRICULUM_SUBJECTS.map((sub, i) => `
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                  <input type="checkbox" class="ns-subject-check" value="${escapeHtml(sub)}" checked>
-                  <span>${escapeHtml(sub)}</span>
-                </label>
-              `).join('')}
-            </div>
+          <!-- Curriculum is controlled separately by the Curriculum Subject log -->
+          <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:12px;margin:12px 0;font-size:13px;">
+            <b>Curriculum Subject</b><div style="color:#64748b;margin-top:4px;">Subjects are assigned automatically from the selected class curriculum. Admin manages them from the separate “Curriculum Subject” log.</div>
           </div>
 
           <!-- Guardian & Access Credentials -->
@@ -1320,10 +1376,7 @@ window.AdminPanel = (function () {
           return;
         }
 
-        const assignedSubjects = [];
-        document.querySelectorAll('.ns-subject-check:checked').forEach(cb => {
-          assignedSubjects.push(cb.value);
-        });
+        const assignedSubjects = selectedCurriculumForClass(cls);
 
         const feeSchedule = getClassFeeSchedule(cls, 'new');
         const totTuition = toNum(feeSchedule.tuitionTotal);
@@ -1348,7 +1401,7 @@ window.AdminPanel = (function () {
             guardian: guardian,
             phone: phone,
             password: pass,
-            assignedSubjects: assignedSubjects,
+            curriculumSubjects: assignedSubjects,
             finance: {
               tuitionTotal: totTuition,
               registrationFee: regFee,
@@ -1365,13 +1418,13 @@ window.AdminPanel = (function () {
               otherPayments: 0,
               totalPaid: 0,
               balance: totalBillable,
-              currency: 'USD'
+              currency: feeSchedule.currency || dashboardCurrency
             }
           }
         }, 'Registering student...');
 
         if (res && res.success) {
-          API.toastSuccess();
+          API.toastSuccess('Returning student advanced and registered for ' + selectedAcademicYear + '. Previous-year record preserved.');
           loadTab('students');
         } else {
           API.toastNotification(res.message || 'Error registering student.', true);
@@ -1434,13 +1487,24 @@ window.AdminPanel = (function () {
       title: 'Register Returning / Old Student (Advance to New Class)',
       content: `
         <div style="font-size: 13.5px; max-height: 75vh; overflow-y: auto; padding-right: 6px;">
-          <!-- Step 1: Filter by Previous Class -->
+          <!-- Step 1: Select previous academic year and class -->
           <div style="background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #cbd5e1; margin-bottom: 14px;">
-            <label class="form-label" for="prevClassFilter">1. Select Student's Previous Class / Grade Level:</label>
-            <select id="prevClassFilter" class="select-field">
-              <option value="">-- Choose Previous Class --</option>
-              ${GRADE_LEVELS.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}
-            </select>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div>
+                <label class="form-label" for="prevAcademicYear">Previous Academic School Year:</label>
+                <select id="prevAcademicYear" class="select-field">
+                  ${[previousAcademicYear(selectedAcademicYear), previousAcademicYear(previousAcademicYear(selectedAcademicYear)), previousAcademicYear(previousAcademicYear(previousAcademicYear(selectedAcademicYear)))].filter(Boolean).map(y => `<option value="${escapeHtml(y)}" ${y===previousAcademicYear(selectedAcademicYear)?'selected':''}>${escapeHtml(y)}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="prevClassFilter">1. Select Student's Previous Class / Grade Level:</label>
+                <select id="prevClassFilter" class="select-field">
+                  <option value="">-- Choose Previous Class --</option>
+                  ${GRADE_LEVELS.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <div style="font-size:11px;color:#64748b;margin-top:6px;">Students are loaded only from the selected previous academic year and are carried forward with their existing records.</div>
 
             <div style="margin-top: 10px;">
               <label class="form-label" for="oldStudentPicker">2. Select Returning Student:</label>
@@ -1496,21 +1560,7 @@ window.AdminPanel = (function () {
             </div>
           </div>
 
-          <!-- Assigned Curriculum Subjects -->
-          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin: 12px 0; background: #ffffff;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <label class="form-label" style="font-weight: 700; margin: 0;">Assigned Curriculum Subjects</label>
-              <button type="button" class="btn btn-light btn-sm" id="osToggleAllSubjectsBtn" style="padding: 2px 8px; font-size: 11px;">Select All</button>
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; font-size: 12px;">
-              ${CURRICULUM_SUBJECTS.map((sub, i) => `
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                  <input type="checkbox" class="os-subject-check" value="${escapeHtml(sub)}" checked>
-                  <span>${escapeHtml(sub)}</span>
-                </label>
-              `).join('')}
-            </div>
-          </div>
+          <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:12px;margin:12px 0;font-size:13px;"><b>Curriculum Subject</b><div style="color:#64748b;margin-top:4px;">Subjects are controlled by the class Curriculum Subject log.</div></div>
 
           <div class="form-group">
             <label class="form-label" for="osPhone">Parent / Guardian Phone</label>
@@ -1530,10 +1580,7 @@ window.AdminPanel = (function () {
           return;
         }
 
-        const assignedSubjects = [];
-        document.querySelectorAll('.os-subject-check:checked').forEach(cb => {
-          assignedSubjects.push(cb.value);
-        });
+        const assignedSubjects = selectedCurriculumForClass(newClass);
 
         const feeSchedule = getClassFeeSchedule(newClass, 'old');
         const totTuition = toNum(feeSchedule.tuitionTotal);
@@ -1543,36 +1590,42 @@ window.AdminPanel = (function () {
         const portFee = toNum(feeSchedule.portalFee);
         const totalBillable = totTuition + regFee + reqFee + peFee + portFee;
 
-        const res = await API.callBackend('updateStudent', {
-          student: {
-            id: studentId,
-            className: newClass,
-            grade: newClass,
-            academicYear: selectedAcademicYear,
-            studentCategory: 'old',
-            guardian: guardian,
-            phone: phone,
-            assignedSubjects: assignedSubjects,
-            finance: {
-              tuitionTotal: totTuition,
-              registrationFee: regFee,
-              registrationPaid: false,
-              entranceFee: 0,
-              entranceFeePaid: true,
-              requirementsFee: reqFee,
-              requirementsFeePaid: false,
-              peSuitFee: peFee,
-              peSuitFeePaid: false,
-              portalFee: portFee,
-              portalFeePaid: false,
-              installments: [0, 0, 0, 0],
-              otherPayments: 0,
-              totalPaid: 0,
-              balance: totalBillable,
-              currency: 'USD'
-            }
+        const previousYear = document.getElementById('prevAcademicYear').value || previousAcademicYear(selectedAcademicYear);
+        const sourceStudent = classStudents.find(x => x.id === studentId) || {};
+        const currentRecord = Object.assign({}, sourceStudent, {
+          id: studentId,
+          className: newClass,
+          grade: newClass,
+          academicYear: selectedAcademicYear,
+          studentCategory: 'old',
+          guardian: guardian || sourceStudent.guardian || '',
+          phone: phone || sourceStudent.phone || '',
+          curriculumSubjects: assignedSubjects,
+          assignedSubjects: undefined,
+          promotedFromAcademicYear: previousYear,
+          previousClass: sourceStudent.className || sourceStudent.grade || '',
+          promotionDate: new Date().toISOString(),
+          finance: {
+            tuitionTotal: totTuition,
+            registrationFee: regFee,
+            registrationPaid: false,
+            entranceFee: 0,
+            entranceFeePaid: true,
+            requirementsFee: reqFee,
+            requirementsFeePaid: false,
+            peSuitFee: peFee,
+            peSuitFeePaid: false,
+            portalFee: portFee,
+            portalFeePaid: false,
+            installments: [0, 0, 0, 0, 0],
+            otherPayments: 0,
+            totalPaid: 0,
+            balance: totalBillable,
+            currency: feeSchedule.currency || dashboardCurrency
           }
-        }, 'Advancing student...');
+        });
+        delete currentRecord.years;
+        const res = await API.callBackend('addStudent', { student: currentRecord }, 'Advancing student to the current academic year...');
 
         if (res && res.success) {
           API.toastSuccess();
@@ -1618,7 +1671,8 @@ window.AdminPanel = (function () {
       studentPicker.disabled = false;
       studentPicker.innerHTML = '<option value="">Loading students...</option>';
 
-      const res = await API.callBackend('getOldStudentsByClass', { className: cls }, 'Filtering students...');
+      const previousYear = document.getElementById('prevAcademicYear').value || previousAcademicYear(selectedAcademicYear);
+      const res = await API.callBackend('getOldStudentsByClass', { className: cls, academicYear: previousYear, currentAcademicYear: selectedAcademicYear }, 'Filtering students from previous academic year...');
       classStudents = (res && res.success && Array.isArray(res.students)) ? res.students : [];
 
       if (classStudents.length === 0) {
@@ -1655,17 +1709,7 @@ window.AdminPanel = (function () {
       }
     };
 
-    setTimeout(() => {
-      const toggleSubjectsBtn = document.getElementById('osToggleAllSubjectsBtn');
-      if (toggleSubjectsBtn) {
-        toggleSubjectsBtn.onclick = () => {
-          const cbs = document.querySelectorAll('.os-subject-check');
-          const allChecked = Array.from(cbs).every(c => c.checked);
-          cbs.forEach(c => c.checked = !allChecked);
-          toggleSubjectsBtn.textContent = allChecked ? 'Select All' : 'Deselect All';
-        };
-      }
-    }, 50);
+;
   }
 
   // --- Edit Student Modal ---
@@ -1677,7 +1721,6 @@ window.AdminPanel = (function () {
     }
 
     let updatedPhoto = s.photo || '';
-    const currentSubjects = s.assignedSubjects || CURRICULUM_SUBJECTS;
 
     App.showModal({
       title: `Edit Student Profile: ${escapeHtml(s.name)} [${escapeHtml(s.id)}]`,
@@ -1727,6 +1770,14 @@ window.AdminPanel = (function () {
             </div>
           </div>
 
+          <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:12px;margin:12px 0;">
+            <div style="font-weight:700;color:var(--color-primary);margin-bottom:6px;">Assigned Subjects</div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:8px;">Only these student-specific subjects appear on the student's report card.</div>
+            <div>${Array.isArray(s.curriculumSubjects) && s.curriculumSubjects.length
+              ? s.curriculumSubjects.map(x=>`<span class="badge badge-light" style="margin:2px;">${escapeHtml(x)}</span>`).join('')
+              : '<span style="color:#94a3b8;">No subjects assigned</span>'}</div>
+          </div>
+
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
               <label class="form-label" for="editSGuardian">Parent / Guardian</label>
@@ -1738,18 +1789,6 @@ window.AdminPanel = (function () {
             </div>
           </div>
 
-          <!-- Assigned Subjects -->
-          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin: 12px 0; background: #ffffff;">
-            <label class="form-label" style="font-weight: 700; margin-bottom: 8px; display: block;">Curriculum Subjects Assignment</label>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; font-size: 12px;">
-              ${CURRICULUM_SUBJECTS.map(sub => `
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                  <input type="checkbox" class="edit-s-subject-check" value="${escapeHtml(sub)}" ${currentSubjects.includes(sub) ? 'checked' : ''}>
-                  <span>${escapeHtml(sub)}</span>
-                </label>
-              `).join('')}
-            </div>
-          </div>
         </div>
       `,
       confirmText: 'Save Profile Changes',
@@ -1767,10 +1806,9 @@ window.AdminPanel = (function () {
           return;
         }
 
-        const assignedSubjects = [];
-        document.querySelectorAll('.edit-s-subject-check:checked').forEach(cb => {
-          assignedSubjects.push(cb.value);
-        });
+        const assignedSubjects = Array.isArray(s.curriculumSubjects)
+          ? Array.from(new Set(s.curriculumSubjects.map(x=>String(x||'').trim()).filter(Boolean)))
+          : [];
 
         const res = await API.callBackend('updateStudent', {
           student: {
@@ -1784,7 +1822,7 @@ window.AdminPanel = (function () {
             photo: updatedPhoto,
             guardian: guardian,
             phone: phone,
-            assignedSubjects: assignedSubjects
+            curriculumSubjects: assignedSubjects
           }
         }, 'Updating student...');
 
@@ -1854,325 +1892,133 @@ window.AdminPanel = (function () {
   }
 
   // =========================================================================
-  // 3. TEACHING STAFF TAB (SYSTEMATIC ID: SPST001)
+  // 3. TEACHING STAFF TAB — YEAR-SPECIFIC FACULTY DIRECTORY
   // =========================================================================
-  async function renderTeachersTab(container) {
-    const res = await API.callBackend('getTeachers', {}, 'Fetching teachers...');
-    cachedTeachers = (res && res.success && Array.isArray(res.teachers)) ? res.teachers : [];
+  const TEACHER_YEARS = ACADEMIC_YEARS;
 
+  async function renderTeachersTab(container) {
+    const res = await API.callBackend('getTeachers', {}, 'Fetching teaching staff...');
+    cachedTeachers = (res && res.success && Array.isArray(res.teachers)) ? res.teachers : [];
     const canEdit = currentUser.role === 'superadmin' || (currentUser.permissions && currentUser.permissions['teachers:edit']);
+    const canDelete = currentUser.role === 'superadmin' || (currentUser.permissions && currentUser.permissions['teachers:delete']);
+
+    const yearCounts = TEACHER_YEARS.map(y => ({year:y,count:cachedTeachers.filter(t=>String(t.academicYear||'')===y).length}));
+    const activeCount = cachedTeachers.filter(t=>String(t.status||'Active')==='Active').length;
+    const assignedCount = cachedTeachers.filter(t=>Array.isArray(t.assignments)&&t.assignments.length).length;
 
     container.innerHTML = `
-      <div class="content-card">
-        <div class="card-header-row">
+      <div class="content-card" style="overflow:hidden;">
+        <div class="card-header-row" style="flex-wrap:wrap;gap:12px;">
           <div>
-            <h3 class="card-title">Teaching Staff Directory</h3>
-            <div style="font-size: 13px; color: var(--color-text-muted);">
-              Manage faculty credentials, multi-class assignments, and staff ID cards.
-            </div>
+            <h3 class="card-title">Teaching Staff Management</h3>
+            <div style="font-size:13px;color:var(--color-text-muted);">Year-specific teacher accounts, credentials, photos, classes, subjects and contact records.</div>
           </div>
-          ${canEdit ? `
-            <button type="button" class="btn btn-primary" id="addTeacherBtn" style="display: flex; align-items: center; gap: 6px;">
-              <img src="assets/icons/user.png" style="width: 15px; height: 15px; filter: brightness(0) invert(1);" alt="">
-              Add Teaching Faculty
-            </button>
-          ` : ''}
+          ${canEdit ? `<button type="button" class="btn btn-primary" id="addTeacherBtn" style="display:flex;align-items:center;gap:7px;white-space:nowrap;"><img src="assets/icons/user.png" style="width:15px;height:15px;filter:brightness(0) invert(1);"> Add Teaching Staff</button>` : ''}
         </div>
 
-        <div class="table-responsive" style="margin-top: 14px;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Teacher ID</th>
-                <th>Full Name</th>
-                <th>Assigned Classes &amp; Subjects</th>
-                <th>Contact Phone</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${cachedTeachers.length === 0 ? `
-                <tr><td colspan="6" style="text-align: center; padding: 25px; color: var(--color-text-muted);">No faculty registered.</td></tr>
-              ` : cachedTeachers.map(t => `
-                <tr>
-                  <td><b>[${escapeHtml(t.id)}]</b></td>
-                  <td>${escapeHtml(t.name)}</td>
-                  <td>
-                    ${Array.isArray(t.assignments) && t.assignments.length > 0 ? t.assignments.map(a => `
-                      <span class="badge badge-light" style="margin: 2px;">
-                        <b>${escapeHtml(a.class)}:</b> ${Array.isArray(a.subjects) && a.subjects.length > 0 ? a.subjects.map(escapeHtml).join(', ') : 'All'}
-                      </span>
-                    `).join('') : '<span style="color:#94a3b8;">No Classes Assigned</span>'}
-                  </td>
-                  <td>${escapeHtml(t.phone || '—')}</td>
-                  <td><span class="badge ${t.status === 'Active' ? 'badge-success' : 'badge-danger'}">${escapeHtml(t.status || 'Active')}</span></td>
-                  <td>
-                    <div style="display: flex; gap: 4px;">
-                      <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.previewTeacherIdCard('${escapeHtml(t.id)}')">ID Card</button>
-                      <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.openEditTeacherModal('${escapeHtml(t.id)}')">Edit</button>
-                      ${canEdit ? `<button type="button" class="btn btn-danger btn-sm" onclick="window.AdminPanel.deleteTeacher('${escapeHtml(t.id)}')">Delete</button>` : ''}
-                    </div>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0;">
+          <div style="padding:14px;border:1px solid var(--color-border);border-radius:10px;background:#f8fafc;"><div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Total Staff</div><div style="font-size:25px;font-weight:800;color:var(--color-primary);">${cachedTeachers.length}</div></div>
+          <div style="padding:14px;border:1px solid var(--color-border);border-radius:10px;background:#f8fafc;"><div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Active</div><div style="font-size:25px;font-weight:800;color:#15803d;">${activeCount}</div></div>
+          <div style="padding:14px;border:1px solid var(--color-border);border-radius:10px;background:#f8fafc;"><div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">With Assignments</div><div style="font-size:25px;font-weight:800;color:#7c3aed;">${assignedCount}</div></div>
+          <div style="padding:14px;border:1px solid var(--color-border);border-radius:10px;background:#f8fafc;"><div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Academic Years</div><div style="font-size:25px;font-weight:800;color:#0f766e;">${yearCounts.filter(x=>x.count).length}</div></div>
         </div>
-      </div>
-    `;
 
-    if (canEdit) {
-      document.getElementById('addTeacherBtn').onclick = () => openAddTeacherModal();
-    }
+        <div style="display:grid;grid-template-columns:minmax(180px,1.4fr) repeat(2,minmax(150px,1fr));gap:10px;margin-bottom:14px;">
+          <input id="teacherSearch" class="input-field" placeholder="Search name, ID, phone or email...">
+          <select id="teacherYearFilter" class="select-field"><option value="all">All Academic Years</option>${TEACHER_YEARS.map(y=>`<option value="${y}" ${y===selectedAcademicYear?'selected':''}>${y.replace('-', '–')}</option>`).join('')}</select>
+          <select id="teacherStatusFilter" class="select-field"><option value="all">All Status</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select>
+        </div>
+        <div id="teacherDirectoryBody"></div>
+      </div>`;
+
+    const renderRows = () => {
+      const q=(document.getElementById('teacherSearch')?.value||'').trim().toLowerCase();
+      const y=document.getElementById('teacherYearFilter')?.value||'all';
+      const st=document.getElementById('teacherStatusFilter')?.value||'all';
+      const rows=cachedTeachers.filter(t=>{
+        const hay=[t.id,t.name,t.phone,t.email,t.title,t.academicYear].join(' ').toLowerCase();
+        return (!q||hay.includes(q))&&(y==='all'||String(t.academicYear||'')===y)&&(st==='all'||String(t.status||'Active')===st);
+      });
+      const body=document.getElementById('teacherDirectoryBody');
+      if(!body)return;
+      body.innerHTML=rows.length?`<div class="table-responsive"><table class="data-table" style="min-width:950px;"><thead><tr><th>Staff</th><th>Academic Year</th><th>Systematic ID</th><th>Assigned Class / Subject</th><th>Contact</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows.map(t=>{
+        const assignments=(t.assignments||[]).map(a=>`<div style="margin:2px 0;"><b>${escapeHtml(a.class)}</b><span style="color:#64748b;"> — ${Array.isArray(a.subjects)&&a.subjects.length?a.subjects.map(escapeHtml).join(', '):'All Subjects'}</span></div>`).join('');
+        return `<tr><td><div style="display:flex;align-items:center;gap:9px;min-width:185px;"><div style="width:42px;height:42px;border-radius:50%;overflow:hidden;background:#e2e8f0;display:flex;align-items:center;justify-content:center;border:1px solid #cbd5e1;flex-shrink:0;">${t.photo?`<img src="${escapeHtml(t.photo)}" style="width:100%;height:100%;object-fit:cover;">`:'<img src="assets/icons/user.png" style="width:23px;height:23px;opacity:.65;">'}</div><div><b>${escapeHtml(t.name)}</b><div style="font-size:11px;color:#64748b;">${escapeHtml(t.title||'Teacher')}</div></div></div></td><td><span class="badge badge-light">${escapeHtml(String(t.academicYear||'—').replace('-', '–'))}</span></td><td><b style="color:var(--color-primary);">${escapeHtml(t.id)}</b><div style="font-size:10px;color:#64748b;">Login ID</div></td><td style="max-width:360px;">${assignments||'<span style="color:#94a3b8;">Not assigned</span>'}</td><td>${escapeHtml(t.phone||'—')}<br><span style="font-size:11px;color:#64748b;">${escapeHtml(t.email||'')}</span></td><td><span class="badge ${t.status==='Active'?'badge-success':'badge-danger'}">${escapeHtml(t.status||'Active')}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap;"><button class="btn btn-light btn-sm" onclick="window.AdminPanel.previewTeacherIdCard('${escapeHtml(t.id)}')">ID Card</button><button class="btn btn-light btn-sm" onclick="window.AdminPanel.openEditTeacherModal('${escapeHtml(t.id)}')">Edit</button>${canDelete?`<button class="btn btn-danger btn-sm" onclick="window.AdminPanel.deleteTeacher('${escapeHtml(t.id)}')">Delete</button>`:''}</div></td></tr>`;
+      }).join('')}</tbody></table></div>`:`<div style="padding:42px 20px;text-align:center;color:#64748b;border:1px dashed #cbd5e1;border-radius:10px;">No teaching staff found. Use <b>Add Teaching Staff</b> to create a year-specific teacher account.</div>`;
+    };
+    ['teacherSearch','teacherYearFilter','teacherStatusFilter'].forEach(id=>document.getElementById(id)?.addEventListener('input',renderRows));
+    document.getElementById('teacherYearFilter')?.addEventListener('change',renderRows);
+    if(canEdit)document.getElementById('addTeacherBtn').onclick=()=>openAddTeacherModal();
+    renderRows();
   }
 
+  function teacherYearOptions(selected){ return TEACHER_YEARS.map(y=>`<option value="${y}" ${String(selected||'')===y?'selected':''}>${y.replace('-', '–')}</option>`).join(''); }
+
   async function openAddTeacherModal() {
-    const idRes = await API.callBackend('getNextTeacherId', {}, 'Fetching next teacher ID...');
-    const nextId = (idRes && idRes.success) ? idRes.nextId : 'SPST001';
-
-    App.showModal({
-      title: 'Add Teaching Faculty (Attach Classes & Subjects)',
-      content: `
-        <div style="font-size: 13.5px; max-height: 75vh; overflow-y: auto; padding-right: 6px;">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div class="form-group">
-              <label class="form-label" for="ntId">Systematic Teacher ID *</label>
-              <input type="text" id="ntId" class="input-field" value="${escapeHtml(nextId)}" required style="font-weight: 700; color: var(--color-primary);">
-              <div class="form-hint">Systematic format [SPST001].</div>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="ntName">Full Name *</label>
-              <input type="text" id="ntName" class="input-field" placeholder="e.g. David K. Kollie" required>
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div class="form-group">
-              <label class="form-label" for="ntPhone">Contact Phone</label>
-              <input type="text" id="ntPhone" class="input-field" placeholder="+231-...">
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="ntPass">Account Password *</label>
-              <input type="password" id="ntPass" class="input-field" value="teacher123" required>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="ntTitle">Professional Title / Designation</label>
-            <input type="text" id="ntTitle" class="input-field" value="Subject Instructor">
-          </div>
-
-          <!-- Attach Classes Checkboxes -->
-          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin: 12px 0; background: #f8fafc;">
-            <label class="form-label" style="font-weight: 700; margin-bottom: 6px; display: block;">Attach Assigned Teaching Classes</label>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; font-size: 12px;">
-              ${GRADE_LEVELS.map(g => `
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                  <input type="checkbox" class="nt-class-check" value="${escapeHtml(g)}">
-                  <span>${escapeHtml(g)}</span>
-                </label>
-              `).join('')}
-            </div>
-          </div>
-
-          <!-- Attach Subjects Checkboxes -->
-          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin: 12px 0; background: #f8fafc;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-              <label class="form-label" style="font-weight: 700; margin: 0;">Attach Assigned Teaching Subjects</label>
-              <button type="button" class="btn btn-light btn-sm" id="ntToggleAllSubjectsBtn" style="padding: 2px 8px; font-size: 11px;">Select All</button>
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; font-size: 12px;">
-              ${CURRICULUM_SUBJECTS.map(sub => `
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                  <input type="checkbox" class="nt-subject-check" value="${escapeHtml(sub)}">
-                  <span>${escapeHtml(sub)}</span>
-                </label>
-              `).join('')}
-            </div>
-          </div>
+    const idRes=await API.callBackend('getNextTeacherId',{},'Fetching next teacher ID...');
+    const nextId=idRes&&idRes.success?idRes.nextId:'SPST001';
+    App.showModal({title:'Register Teaching Staff',content:`
+      <div style="font-size:13.5px;max-height:78vh;overflow-y:auto;padding-right:5px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;">
+          <div class="form-group"><label class="form-label">Academic Year *</label><select id="ntYear" class="select-field">${teacherYearOptions(selectedAcademicYear)}</select></div>
+          <div class="form-group"><label class="form-label">Systematic ID *</label><input id="ntId" class="input-field" value="${escapeHtml(nextId)}" required><div class="form-hint">Format: SPST001, SPST002...</div></div>
+          <div class="form-group"><label class="form-label">Full Name *</label><input id="ntName" class="input-field" placeholder="Teacher full name" required></div>
+          <div class="form-group"><label class="form-label">Professional Title</label><input id="ntTitle" class="input-field" value="Teacher"></div>
+          <div class="form-group"><label class="form-label">Contact Phone *</label><input id="ntPhone" class="input-field" placeholder="+231..."></div>
+          <div class="form-group"><label class="form-label">Email</label><input id="ntEmail" type="email" class="input-field" placeholder="teacher@school.com"></div>
+          <div class="form-group"><label class="form-label">Password *</label><input id="ntPass" type="password" class="input-field" value="teacher123" required></div>
+          <div class="form-group"><label class="form-label">Status</label><select id="ntStatus" class="select-field"><option>Active</option><option>Inactive</option></select></div>
         </div>
-      `,
-      confirmText: 'Create Faculty Account',
-      onConfirm: async () => {
-        const id = document.getElementById('ntId').value.trim();
-        const name = document.getElementById('ntName').value.trim();
-        const phone = document.getElementById('ntPhone').value.trim();
-        const pass = document.getElementById('ntPass').value.trim();
-        const title = document.getElementById('ntTitle').value.trim();
-
-        if (!name || !pass) {
-          API.toastNotification('Teacher name and password required.', true);
-          return;
-        }
-
-        const classes = [];
-        document.querySelectorAll('.nt-class-check:checked').forEach(c => classes.push(c.value));
-
-        const subjects = [];
-        document.querySelectorAll('.nt-subject-check:checked').forEach(s => subjects.push(s.value));
-
-        const assignments = classes.map(cls => ({
-          class: cls,
-          subjects: subjects
-        }));
-
-        const res = await API.callBackend('saveTeacher', {
-          teacher: {
-            id: id,
-            name: name,
-            phone: phone,
-            password: pass,
-            title: title,
-            status: 'Active',
-            assignments: assignments
-          }
-        }, 'Saving teacher...');
-
-        if (res && res.success) {
-          API.toastSuccess();
-          loadTab('teachers');
-        } else {
-          API.toastNotification(res.message || 'Error creating teacher.', true);
-        }
-      }
-    });
-
-    setTimeout(() => {
-      const toggleSubjectsBtn = document.getElementById('ntToggleAllSubjectsBtn');
-      if (toggleSubjectsBtn) {
-        toggleSubjectsBtn.onclick = () => {
-          const cbs = document.querySelectorAll('.nt-subject-check');
-          const allChecked = Array.from(cbs).every(c => c.checked);
-          cbs.forEach(c => c.checked = !allChecked);
-          toggleSubjectsBtn.textContent = allChecked ? 'Select All' : 'Deselect All';
-        };
-      }
-    }, 50);
+        <div class="form-group"><label class="form-label">Staff Photo</label><input type="file" id="ntPhoto" class="input-field" accept="image/*"><div class="form-hint">Passport/profile photo used throughout the teacher portal and ID card.</div></div>
+        <div style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin:12px 0;background:#f8fafc;"><label class="form-label" style="font-weight:700;">Assigned Classes</label><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:6px;font-size:12px;">${GRADE_LEVELS.map(g=>`<label><input type="checkbox" class="nt-class-check" value="${escapeHtml(g)}"> ${escapeHtml(g)}</label>`).join('')}</div></div>
+        <div style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;background:#f8fafc;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><label class="form-label" style="font-weight:700;">Assigned Subjects</label><button type="button" class="btn btn-light btn-sm" id="ntToggleAllSubjectsBtn">Select All</button></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px;font-size:12px;">${getCatalogSubjects().map(sub=>`<label><input type="checkbox" class="nt-subject-check" value="${escapeHtml(sub)}"> ${escapeHtml(sub)}</label>`).join('')}</div></div>
+      </div>`,confirmText:'Create Teacher Account',onConfirm:async()=>{
+        const id=document.getElementById('ntId').value.trim(),name=document.getElementById('ntName').value.trim(),year=document.getElementById('ntYear').value,pass=document.getElementById('ntPass').value.trim();
+        if(!id||!name||!pass){API.toastNotification('Academic year, Systematic ID, name and password are required.',true);return false;}
+        const classes=[...document.querySelectorAll('.nt-class-check:checked')].map(x=>x.value),subjects=[...document.querySelectorAll('.nt-subject-check:checked')].map(x=>x.value);
+        const assignments=classes.map(cls=>({class:cls,subjects:subjects}));
+        const file=document.getElementById('ntPhoto').files[0];
+        const photo=file?await readFileAsDataUrl(file):'';
+        const teacher={id,name,academicYear:year,title:document.getElementById('ntTitle').value.trim()||'Teacher',phone:document.getElementById('ntPhone').value.trim(),email:document.getElementById('ntEmail').value.trim(),password:pass,photo,status:document.getElementById('ntStatus').value,assignments,createdAt:new Date().toISOString()};
+        const r=await API.callBackend('saveTeacher',{teacher},'Creating teacher account...');
+        if(r&&r.success){API.toastSuccess(`${id} created for ${year}. Teacher can now sign in from the Teacher Portal.`);loadTab('teachers');return true;}else{API.toastNotification((r&&r.message)||'Could not create teacher.',true);return false;}
+      }});
+    setTimeout(()=>{const b=document.getElementById('ntToggleAllSubjectsBtn');if(b)b.onclick=()=>{const c=[...document.querySelectorAll('.nt-subject-check')],all=c.length&&c.every(x=>x.checked);c.forEach(x=>x.checked=!all);b.textContent=all?'Select All':'Deselect All';};},50);
   }
 
   function openEditTeacherModal(teacherId) {
-    const t = cachedTeachers.find(x => x.id === teacherId);
-    if (!t) return;
-
-    const assignedClasses = (t.assignments || []).map(a => a.class);
-    const assignedSubjects = (t.assignments && t.assignments[0] && t.assignments[0].subjects) || [];
-
-    App.showModal({
-      title: `Edit Teaching Faculty: ${escapeHtml(t.name)} [${escapeHtml(t.id)}]`,
-      content: `
-        <div style="font-size: 13.5px; max-height: 75vh; overflow-y: auto; padding-right: 6px;">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div class="form-group">
-              <label class="form-label" for="etName">Full Name *</label>
-              <input type="text" id="etName" class="input-field" value="${escapeHtml(t.name)}" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="etPhone">Contact Phone</label>
-              <input type="text" id="etPhone" class="input-field" value="${escapeHtml(t.phone || '')}">
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div class="form-group">
-              <label class="form-label" for="etTitle">Title / Designation</label>
-              <input type="text" id="etTitle" class="input-field" value="${escapeHtml(t.title || 'Teacher')}">
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="etStatus">Status</label>
-              <select id="etStatus" class="select-field">
-                <option value="Active" ${t.status === 'Active' ? 'selected' : ''}>Active</option>
-                <option value="Inactive" ${t.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="etPass">Reset Password (Optional)</label>
-            <input type="password" id="etPass" class="input-field" placeholder="Leave blank to keep unchanged">
-          </div>
-
-          <!-- Attach Classes Checkboxes -->
-          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin: 12px 0; background: #f8fafc;">
-            <label class="form-label" style="font-weight: 700; margin-bottom: 6px; display: block;">Assigned Teaching Classes</label>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; font-size: 12px;">
-              ${GRADE_LEVELS.map(g => `
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                  <input type="checkbox" class="et-class-check" value="${escapeHtml(g)}" ${assignedClasses.includes(g) ? 'checked' : ''}>
-                  <span>${escapeHtml(g)}</span>
-                </label>
-              `).join('')}
-            </div>
-          </div>
-
-          <!-- Attach Subjects Checkboxes -->
-          <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin: 12px 0; background: #f8fafc;">
-            <label class="form-label" style="font-weight: 700; margin-bottom: 6px; display: block;">Assigned Teaching Subjects</label>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; font-size: 12px;">
-              ${CURRICULUM_SUBJECTS.map(sub => `
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                  <input type="checkbox" class="et-subject-check" value="${escapeHtml(sub)}" ${assignedSubjects.includes(sub) ? 'checked' : ''}>
-                  <span>${escapeHtml(sub)}</span>
-                </label>
-              `).join('')}
-            </div>
-          </div>
+    const t=cachedTeachers.find(x=>x.id===teacherId); if(!t)return;
+    const assignedClasses=(t.assignments||[]).map(a=>a.class), assignedSubjects=[...new Set((t.assignments||[]).flatMap(a=>a.subjects||[]))];
+    App.showModal({title:`Edit Teaching Staff — ${escapeHtml(t.name)}`,content:`
+      <div style="font-size:13.5px;max-height:78vh;overflow-y:auto;padding-right:5px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;">
+          <div class="form-group"><label class="form-label">Academic Year</label><select id="etYear" class="select-field">${teacherYearOptions(t.academicYear)}</select></div>
+          <div class="form-group"><label class="form-label">Systematic ID</label><input id="etId" class="input-field" value="${escapeHtml(t.id)}" disabled></div>
+          <div class="form-group"><label class="form-label">Full Name</label><input id="etName" class="input-field" value="${escapeHtml(t.name)}"></div>
+          <div class="form-group"><label class="form-label">Professional Title</label><input id="etTitle" class="input-field" value="${escapeHtml(t.title||'Teacher')}"></div>
+          <div class="form-group"><label class="form-label">Contact Phone</label><input id="etPhone" class="input-field" value="${escapeHtml(t.phone||'')}"></div>
+          <div class="form-group"><label class="form-label">Email</label><input id="etEmail" type="email" class="input-field" value="${escapeHtml(t.email||'')}"></div>
+          <div class="form-group"><label class="form-label">Status</label><select id="etStatus" class="select-field"><option ${t.status==='Active'?'selected':''}>Active</option><option ${t.status==='Inactive'?'selected':''}>Inactive</option></select></div>
+          <div class="form-group"><label class="form-label">Reset Password</label><input id="etPass" type="password" class="input-field" placeholder="Leave blank to keep current"></div>
         </div>
-      `,
-      confirmText: 'Save Teacher Profile',
-      onConfirm: async () => {
-        const name = document.getElementById('etName').value.trim();
-        const phone = document.getElementById('etPhone').value.trim();
-        const title = document.getElementById('etTitle').value.trim();
-        const status = document.getElementById('etStatus').value;
-        const pass = document.getElementById('etPass').value.trim();
-
-        if (!name) {
-          API.toastNotification('Teacher name required.', true);
-          return;
-        }
-
-        const classes = [];
-        document.querySelectorAll('.et-class-check:checked').forEach(c => classes.push(c.value));
-
-        const subjects = [];
-        document.querySelectorAll('.et-subject-check:checked').forEach(s => subjects.push(s.value));
-
-        const assignments = classes.map(cls => ({
-          class: cls,
-          subjects: subjects
-        }));
-
-        const payload = {
-          id: t.id,
-          name: name,
-          phone: phone,
-          title: title,
-          status: status,
-          assignments: assignments
-        };
-        if (pass) payload.password = pass;
-
-        const res = await API.callBackend('saveTeacher', { teacher: payload }, 'Updating teacher...');
-        if (res && res.success) {
-          API.toastSuccess();
-          loadTab('teachers');
-        } else {
-          API.toastNotification(res.message || 'Error updating teacher.', true);
-        }
-      }
-    });
+        <div class="form-group"><label class="form-label">Replace Staff Photo</label><input type="file" id="etPhoto" class="input-field" accept="image/*"></div>
+        <div style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;background:#f8fafc;margin:12px 0;"><label class="form-label" style="font-weight:700;">Assigned Classes</label><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:6px;font-size:12px;">${GRADE_LEVELS.map(g=>`<label><input type="checkbox" class="et-class-check" value="${escapeHtml(g)}" ${assignedClasses.includes(g)?'checked':''}> ${escapeHtml(g)}</label>`).join('')}</div></div>
+        <div style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;background:#f8fafc;"><label class="form-label" style="font-weight:700;">Assigned Subjects</label><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px;font-size:12px;">${getCatalogSubjects().map(sub=>`<label><input type="checkbox" class="et-subject-check" value="${escapeHtml(sub)}" ${assignedSubjects.includes(sub)?'checked':''}> ${escapeHtml(sub)}</label>`).join('')}</div></div>
+      </div>`,confirmText:'Save Teacher Profile',onConfirm:async()=>{
+        const name=document.getElementById('etName').value.trim(); if(!name){API.toastNotification('Teacher name is required.',true);return false;}
+        const classes=[...document.querySelectorAll('.et-class-check:checked')].map(x=>x.value),subjects=[...document.querySelectorAll('.et-subject-check:checked')].map(x=>x.value);
+        const file=document.getElementById('etPhoto').files[0];
+        const payload={id:t.id,originalId:t.id,name,academicYear:document.getElementById('etYear').value,title:document.getElementById('etTitle').value.trim(),phone:document.getElementById('etPhone').value.trim(),email:document.getElementById('etEmail').value.trim(),status:document.getElementById('etStatus').value,photo:file?await readFileAsDataUrl(file):(t.photo||''),assignments:classes.map(cls=>({class:cls,subjects}))};
+        const pass=document.getElementById('etPass').value.trim();if(pass)payload.password=pass;
+        const r=await API.callBackend('saveTeacher',{teacher:payload},'Saving teacher profile...');if(r&&r.success){API.toastSuccess('Teacher profile updated.');loadTab('teachers');return true;}else{API.toastNotification((r&&r.message)||'Could not update teacher.',true);return false;}
+      }});
   }
 
   async function deleteTeacher(teacherId) {
-    if (!confirm(`Are you sure you want to remove faculty member [${teacherId}]?`)) return;
-    const res = await API.callBackend('deleteTeacher', { teacherId: teacherId }, 'Removing teacher...');
-    if (res && res.success) {
-      API.toastSuccess();
-      loadTab('teachers');
-    } else {
-      API.toastNotification(res.message || 'Error removing teacher.', true);
-    }
+    const t=cachedTeachers.find(x=>x.id===teacherId); if(!t)return;
+    if(!confirm(`Remove ${t.name} (${t.id}) from ${t.academicYear}?`))return;
+    const r=await API.callBackend('deleteTeacher',{teacherId},'Removing teacher...');
+    if(r&&r.success){API.toastSuccess('Teaching staff removed.');loadTab('teachers');}else API.toastNotification(r.message||'Could not remove teacher.',true);
   }
 
   // =========================================================================
@@ -2262,6 +2108,10 @@ window.AdminPanel = (function () {
             </tbody>
           </table>
         </div>
+        <div class="content-card" style="margin-top:14px;background:#f8fafc;border:1px solid #cbd5e1;">
+          <div class="card-header-row" style="flex-wrap:wrap;gap:10px;"><div><h4 class="card-title" style="margin:0;">Additional Payment Items</h4><div style="font-size:12px;color:#64748b;">Add custom charges for this academic year.</div></div><button type="button" class="btn btn-primary btn-sm" id="addFeeItemBtn">+ Add Payment</button></div>
+          <div id="feeItemsList" style="margin-top:10px;"></div>
+        </div>
       </div>
 
       <!-- Card 2: Student Tuition & Fee Payments Table -->
@@ -2309,6 +2159,15 @@ window.AdminPanel = (function () {
         </div>
       </div>
     `;
+
+    async function renderFeeItems(){
+      const box=document.getElementById('feeItemsList'); if(!box)return;
+      const r=await API.callBackend('getFeeItems',{studentCategory:financeCategoryView,academicYear:selectedAcademicYear},'Loading payment items...');
+      const items=(r&&r.success&&Array.isArray(r.feeItems))?r.feeItems:[];
+      box.innerHTML=items.length?items.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 10px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:6px;flex-wrap:wrap;"><div><b>${escapeHtml(x.description)}</b><div style="font-size:11px;color:#64748b;">${escapeHtml(x.academicYear||selectedAcademicYear)} • ${x.studentCategory==='old'?'Returning':'New'}${x.className?' • '+escapeHtml(x.className):''}</div></div><div style="display:flex;align-items:center;gap:8px;"><b>${formatMoney(Number(x.amount)||0,x.currency||dashboardCurrency)}</b><button class="btn btn-light btn-sm" onclick="window.AdminPanel.deleteFeeItem('${escapeHtml(x.id)}')">Delete</button></div></div>`).join(''):'<div style="padding:15px;text-align:center;color:#94a3b8;">No additional payment items added yet.</div>';
+    }
+    document.getElementById('addFeeItemBtn').onclick=()=>openAddFeeItemModal();
+    await renderFeeItems();
 
     // Filter and Render Student Finance Rows
     function renderFinRows() {
@@ -2395,6 +2254,11 @@ window.AdminPanel = (function () {
     document.getElementById('finStatusFilter').onchange = renderFinRows;
   }
 
+  async function openAddFeeItemModal(){
+    App.showModal({title:'Add Payment',content:`<div style="display:grid;gap:12px;"><div class="form-group"><label class="form-label">Description *</label><input id="afiDesc" class="input-field" placeholder="e.g. Examination Fee" required></div><div class="form-group"><label class="form-label">Amount *</label><input id="afiAmount" type="number" min="0" step="0.01" class="input-field" placeholder="0.00" required></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div><label class="form-label">Academic Year</label><select id="afiYear" class="select-field">${TEACHER_YEARS.map(y=>`<option value="${y}" ${y===selectedAcademicYear?'selected':''}>${y.replace('-', '–')}</option>`).join('')}</select></div><div><label class="form-label">Student Type</label><select id="afiCat" class="select-field"><option value="new">New Students</option><option value="old">Returning Students</option></select></div></div><div><label class="form-label">Class (optional)</label><select id="afiClass" class="select-field"><option value="">All Classes</option>${GRADE_LEVELS.map(g=>`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}</select></div></div>`,confirmText:'Save',onConfirm:async()=>{const description=document.getElementById('afiDesc').value.trim();const amount=Number(document.getElementById('afiAmount').value);if(!description||!isFinite(amount)||amount<0){API.toastNotification('Description and a valid amount are required.',true);return false;}const r=await API.callBackend('saveFeeItem',{description,amount,academicYear:document.getElementById('afiYear').value,studentCategory:document.getElementById('afiCat').value,className:document.getElementById('afiClass').value,currency:dashboardCurrency},'Saving payment...');if(r&&r.success){API.toastSuccess('Payment saved.');loadTab('finance');return true;}API.toastNotification(r.message||'Could not save payment.',true);return false;}});
+  }
+  async function deleteFeeItem(id){if(!confirm('Delete this payment item?'))return;const r=await API.callBackend('deleteFeeItem',{id},'Deleting payment...');if(r&&r.success){API.toastSuccess('Payment removed.');loadTab('finance');}else API.toastNotification(r.message||'Could not delete payment.',true);}
+
   // --- Modal to Configure Class Fee Schedule ---
   function openClassFeeModal(className, category) {
     category = String(category || 'new').toLowerCase();
@@ -2413,11 +2277,11 @@ window.AdminPanel = (function () {
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
-              <label class="form-label" for="cfTuition">Tuition Total ($) *</label>
+              <label class="form-label" for="cfCurrency">Currency *</label><select id="cfCurrency" class="select-field"><option value="USD" ${((sched.currency||dashboardCurrency)==="USD")?"selected":""}>USD</option><option value="LRD" ${((sched.currency||dashboardCurrency)==="LRD")?"selected":""}>LRD</option></select><label class="form-label" for="cfTuition">Tuition Total *</label>
               <input type="number" id="cfTuition" class="input-field" value="${sched.tuitionTotal || 0}" required>
             </div>
             <div class="form-group">
-              <label class="form-label" for="cfReg">Registration Fee ($) *</label>
+              <label class="form-label" for="cfReg">Registration Fee *</label>
               <input type="number" id="cfReg" class="input-field" value="${sched.registrationFee || 0}" required>
             </div>
           </div>
@@ -2444,6 +2308,13 @@ window.AdminPanel = (function () {
               <input type="number" id="cfPortal" class="input-field" value="${sched.portalFee || 0}">
             </div>
           </div>
+          <div style="border:1px solid #cbd5e1;border-radius:8px;padding:12px;margin-top:12px;">
+            <b style="color:var(--color-primary);">5-Installment Tuition Schedule &amp; Deadlines</b>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;">
+              ${[1,2,3,4,5].map(i=>`<div><label class="form-label">${i}${i===1?'st':i===2?'nd':i===3?'rd':'th'} Deadline</label><input type="date" id="cfD${i}" class="input-field" value="${escapeHtml((sched.deadlines&&sched.deadlines[i-1])||'')}"></div>`).join('')}
+            </div>
+            <div class="form-hint">Each installment is tracked against these dates. Students with unpaid installments after the deadline receive an easy-to-read warning in their portal.</div>
+          </div>
         </div>
       `,
       confirmText: 'Save Class Fee Schedule',
@@ -2458,17 +2329,19 @@ window.AdminPanel = (function () {
         const feeData = {
           className: className,
           studentCategory: category,
-          currency: 'USD',
+          currency: document.getElementById('cfCurrency').value,
           tuitionTotal: tuition,
           registrationFee: reg,
           entranceFee: entrance,
           requirementsFee: req,
           peSuitFee: pe,
           portalFee: portal,
-          inst1Amount: Math.round(tuition / 4),
-          inst2Amount: Math.round(tuition / 4),
-          inst3Amount: Math.round(tuition / 4),
-          inst4Amount: Math.round(tuition / 4)
+          inst1Amount: Math.round(tuition / 5),
+          inst2Amount: Math.round(tuition / 5),
+          inst3Amount: Math.round(tuition / 5),
+          inst4Amount: Math.round(tuition / 5),
+          inst5Amount: Math.round(tuition / 5),
+          deadlines: [1,2,3,4,5].map(i=>document.getElementById('cfD'+i).value)
         };
 
         const res = await API.callBackend('saveClassFee', feeData, 'Saving fee schedule...');
@@ -2603,9 +2476,11 @@ window.AdminPanel = (function () {
                 <input type="number" id="epInst4" class="input-field ep-calc-input" value="${inst[3] || 0}">
               </div>
             </div>
+            <div class="form-group"><label class="form-label" for="epInst5">5th Installment Paid</label><input type="number" id="epInst5" class="input-field ep-calc-input" value="${inst[4] || 0}"></div>
+            <div style="background:#fff7ed;border:1px solid #fed7aa;padding:10px;border-radius:7px;font-size:12px;color:#9a3412;">${[0,1,2,3,4].map(i=>{const d=(getClassFeeSchedule(student.className||student.grade,student.studentCategory||'new').deadlines||[])[i]; return d && new Date(d)<new Date() && !(inst[i]>0) ? `Payment warning: The ${i+1}${i===0?'st':i===1?'nd':i===2?'rd':'th'} installment deadline has passed. Please make this payment as soon as possible.`:''}).filter(Boolean).join('<br>')}</div>
 
             <div class="form-group" style="margin-top: 6px;">
-              <label class="form-label" for="epOther">Other / Sundry Payments ($)</label>
+              <label class="form-label" for="epOther">Add Another Payment</label>
               <input type="number" id="epOther" class="input-field ep-calc-input" value="${f.otherPayments || 0}">
             </div>
           </div>
@@ -2645,6 +2520,7 @@ window.AdminPanel = (function () {
         const i2 = Number(document.getElementById('epInst2').value) || 0;
         const i3 = Number(document.getElementById('epInst3').value) || 0;
         const i4 = Number(document.getElementById('epInst4').value) || 0;
+        const i5 = Number(document.getElementById('epInst5').value) || 0;
         const other = Number(document.getElementById('epOther').value) || 0;
 
         const paymentData = {
@@ -2661,7 +2537,7 @@ window.AdminPanel = (function () {
           peSuitFeePaid: pePaid,
           portalFee: portalFee,
           portalFeePaid: portalPaid,
-          installments: [i1, i2, i3, i4],
+          installments: [i1, i2, i3, i4, i5],
           otherPayments: other
         };
 
@@ -2767,109 +2643,73 @@ window.AdminPanel = (function () {
     return list;
   }
 
-  async function renderPayrollTab(container) {
-    await ensureStaffLoadedForPayroll();
-    const res = await API.callBackend('getPayroll', {}, 'Loading payroll...');
-    cachedPayroll = (res && res.success && Array.isArray(res.payroll)) ? res.payroll : [];
-
-    const now = new Date();
-    const currentMonthName = PAYROLL_MONTHS[now.getMonth()];
-    const currentYearNum = now.getFullYear();
-
+  async function renderExpensesTab(container) {
+    const stored = JSON.parse(localStorage.getItem('sorina_expenses') || '[]');
+    cachedExpenses = Array.isArray(stored) ? stored : [];
+    const total = cachedExpenses.reduce((sum, e) => sum + (Number(e.total) || 0), 0);
+    const today = new Date().toISOString().slice(0,10);
     container.innerHTML = `
       <div class="content-card">
-        <div class="card-header-row" style="flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
-          <div>
-            <h3 class="card-title">Staff Monthly Payroll Management</h3>
-            <div style="font-size: 13px; color: var(--color-text-muted);">
-              Manage compensation for teachers, administrators, and general staff with custom deductions, tax and disbursement records.
-            </div>
-          </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button type="button" class="btn btn-light" id="openDownloadPayrollBtn" style="display: flex; align-items: center; gap: 6px;">
-              <img src="assets/icons/download (2).png" style="width: 15px; height: 15px;" alt="">
-              Download Payroll Report
-            </button>
-            <button type="button" class="btn btn-secondary" id="openAddCustomStaffBtn" style="display: flex; align-items: center; gap: 6px;">
-              <img src="assets/icons/user-plus.png" style="width: 15px; height: 15px;" alt="">
-              + Add Staff Member
-            </button>
-            <button type="button" class="btn btn-primary" id="openAddPayrollBtn" style="display: flex; align-items: center; gap: 6px;">
-              <img src="assets/icons/file-plus.png" style="width: 15px; height: 15px; filter: brightness(0) invert(1);" alt="">
-              Record Salary Entry
-            </button>
+        <div class="card-header-row" style="flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+          <div><h3 class="card-title">All Expenses</h3><div style="font-size:13px;color:var(--color-text-muted);">Record and manage every school expense with complete audit-ready details.</div></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-light" id="downloadExpensesBtn">Download CSV</button>
+            <button type="button" class="btn btn-primary" id="addExpenseBtn">+ Add Expense</button>
           </div>
         </div>
-
-        <!-- Filter Bar -->
-        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; background: #f8fafc; padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; border: 1px solid var(--color-border);">
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="font-size: 12.5px; font-weight: 600; color: var(--color-text-muted);">Filter Month:</span>
-            <select id="payrollMonthFilter" class="select-field" style="width: 140px; padding: 5px 8px; font-size: 13px;">
-              <option value="">All Months</option>
-              ${PAYROLL_MONTHS.map(m => `<option value="${m}">${m}</option>`).join('')}
-            </select>
-          </div>
-
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="font-size: 12.5px; font-weight: 600; color: var(--color-text-muted);">Year:</span>
-            <select id="payrollYearFilter" class="select-field" style="width: 100px; padding: 5px 8px; font-size: 13px;">
-              <option value="">All Years</option>
-              ${PAYROLL_YEARS.map(y => `<option value="${y}" ${y === currentYearNum ? 'selected' : ''}>${y}</option>`).join('')}
-            </select>
-          </div>
-
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="font-size: 12.5px; font-weight: 600; color: var(--color-text-muted);">Status:</span>
-            <select id="payrollStatusFilter" class="select-field" style="width: 120px; padding: 5px 8px; font-size: 13px;">
-              <option value="">All Statuses</option>
-              <option value="paid">Paid</option>
-              <option value="unpaid">Unpaid</option>
-            </select>
-          </div>
-
-          <button type="button" class="btn btn-light btn-sm" id="resetPayrollFilterBtn" style="margin-left: auto;">Reset Filters</button>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px;">
+          <div class="stat-card"><div class="stat-label">Total Expenses</div><div class="stat-value">$${total.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+          <div class="stat-card"><div class="stat-label">Expense Entries</div><div class="stat-value">${cachedExpenses.length}</div></div>
+          <div class="stat-card"><div class="stat-label">Today</div><div class="stat-value" style="font-size:18px;">${today}</div></div>
         </div>
-
-        <div class="table-responsive">
-          <table class="data-table" id="payrollDataTable">
-            <thead>
-              <tr>
-                <th>Staff Member</th>
-                <th>Role / Dept</th>
-                <th>Month / Year</th>
-                <th>Base Salary</th>
-                <th>Deductions</th>
-                <th>Tax</th>
-                <th>Net Salary</th>
-                <th>Disbursement</th>
-                <th>Pay Slip / Voucher</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="payrollTableBody">
-              <!-- Rendered via renderFilteredPayrollTable -->
+        <div style="overflow:auto;">
+          <table class="data-table">
+            <thead><tr><th>Number</th><th>Description</th><th>Category</th><th>Quantity</th><th>Amount</th><th>Total</th><th>Date</th><th>Payment Method</th><th>Vendor / Payee</th><th>Reference</th><th>Notes</th><th>Actions</th></tr></thead>
+            <tbody>
+              ${cachedExpenses.length ? cachedExpenses.map((e,i)=>`<tr>
+                <td>${escapeHtml(e.number || String(i+1).padStart(3,'0'))}</td><td>${escapeHtml(e.description||'')}</td><td>${escapeHtml(e.category||'General')}</td>
+                <td>${Number(e.quantity||1)}</td><td>$${Number(e.amount||0).toLocaleString(undefined,{minimumFractionDigits:2})}</td><td><b>$${Number(e.total||0).toLocaleString(undefined,{minimumFractionDigits:2})}</b></td>
+                <td>${escapeHtml(e.date||'')}</td><td>${escapeHtml(e.paymentMethod||'')}</td><td>${escapeHtml(e.vendor||'')}</td><td>${escapeHtml(e.reference||'')}</td><td>${escapeHtml(e.notes||'')}</td>
+                <td><button class="btn btn-light btn-sm" onclick="window.AdminPanel.editExpense(${i})">Edit</button> <button class="btn btn-danger btn-sm" onclick="window.AdminPanel.deleteExpense(${i})">Delete</button></td>
+              </tr>`).join('') : '<tr><td colspan="12" style="text-align:center;padding:30px;color:#64748b;">No expenses recorded yet.</td></tr>'}
             </tbody>
           </table>
         </div>
-      </div>
-    `;
-
-    renderFilteredPayrollTable();
-
-    document.getElementById('openAddPayrollBtn').onclick = () => openAddPayrollModal();
-    document.getElementById('openAddCustomStaffBtn').onclick = () => openAddCustomStaffModal();
-    document.getElementById('openDownloadPayrollBtn').onclick = () => downloadPayrollReport();
-    document.getElementById('payrollMonthFilter').onchange = () => renderFilteredPayrollTable();
-    document.getElementById('payrollYearFilter').onchange = () => renderFilteredPayrollTable();
-    document.getElementById('payrollStatusFilter').onchange = () => renderFilteredPayrollTable();
-    document.getElementById('resetPayrollFilterBtn').onclick = () => {
-      document.getElementById('payrollMonthFilter').value = '';
-      document.getElementById('payrollYearFilter').value = '';
-      document.getElementById('payrollStatusFilter').value = '';
-      renderFilteredPayrollTable();
-    };
+      </div>`;
+    document.getElementById('addExpenseBtn').onclick=()=>openExpenseModal();
+    document.getElementById('downloadExpensesBtn').onclick=downloadExpenses;
   }
+
+  function openExpenseModal(index=null) {
+    const e = index===null ? {number:String(cachedExpenses.length+1).padStart(3,'0'),quantity:1,date:new Date().toISOString().slice(0,10),paymentMethod:'Cash'} : cachedExpenses[index];
+    App.showModal({title:index===null?'Add School Expense':'Edit School Expense',content:`
+      <div class="form-group"><label class="form-label">Number</label><input id="exNumber" class="input-field" value="${escapeHtml(e.number||'')}"></div>
+      <div class="form-group"><label class="form-label">Description *</label><input id="exDescription" class="input-field" value="${escapeHtml(e.description||'')}" placeholder="What was purchased or paid for?"></div>
+      <div class="form-group"><label class="form-label">Category</label><select id="exCategory" class="select-field"><option>General</option><option>Utilities</option><option>Teaching Materials</option><option>Maintenance</option><option>Transportation</option><option>Food / Cafeteria</option><option>Salary / Staff</option><option>Office Supplies</option><option>Other</option></select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div class="form-group"><label class="form-label">Quantity</label><input type="number" min="1" id="exQuantity" class="input-field" value="${Number(e.quantity||1)}"></div><div class="form-group"><label class="form-label">Amount (per unit)</label><input type="number" min="0" step="0.01" id="exAmount" class="input-field" value="${Number(e.amount||0)}"></div></div>
+      <div class="form-group"><label class="form-label">Date</label><input type="date" id="exDate" class="input-field" value="${escapeHtml(e.date||'')}"></div>
+      <div class="form-group"><label class="form-label">Payment Method</label><select id="exPayment" class="select-field"><option>Cash</option><option>Bank Transfer</option><option>Mobile Money</option><option>Cheque</option><option>Card</option><option>Other</option></select></div>
+      <div class="form-group"><label class="form-label">Vendor / Payee</label><input id="exVendor" class="input-field" value="${escapeHtml(e.vendor||'')}"></div>
+      <div class="form-group"><label class="form-label">Reference / Receipt No.</label><input id="exReference" class="input-field" value="${escapeHtml(e.reference||'')}"></div>
+      <div class="form-group"><label class="form-label">Notes</label><textarea id="exNotes" class="input-field" rows="3">${escapeHtml(e.notes||'')}</textarea></div>`,confirmText:index===null?'Save Expense':'Update Expense',onConfirm:()=>{
+        const desc=document.getElementById('exDescription').value.trim(); if(!desc){API.toastNotification('Description is required.',true);return;}
+        const q=Math.max(1,Number(document.getElementById('exQuantity').value)||1), a=Math.max(0,Number(document.getElementById('exAmount').value)||0);
+        const item={number:document.getElementById('exNumber').value.trim()||String(cachedExpenses.length+1).padStart(3,'0'),description:desc,category:document.getElementById('exCategory').value,quantity:q,amount:a,total:q*a,date:document.getElementById('exDate').value,paymentMethod:document.getElementById('exPayment').value,vendor:document.getElementById('exVendor').value.trim(),reference:document.getElementById('exReference').value.trim(),notes:document.getElementById('exNotes').value.trim()};
+        if(index===null) cachedExpenses.push(item); else cachedExpenses[index]=item; localStorage.setItem('sorina_expenses',JSON.stringify(cachedExpenses)); API.toastSuccess(); loadTab('payroll');
+      }});
+  }
+  function editExpense(i){openExpenseModal(i)}
+  function deleteExpense(i){ if(!confirm('Delete this expense record?')) return; cachedExpenses.splice(i,1); localStorage.setItem('sorina_expenses',JSON.stringify(cachedExpenses)); loadTab('payroll'); }
+  function downloadExpenses(){ const headers=['Number','Description','Category','Quantity','Amount','Total','Date','Payment Method','Vendor / Payee','Reference','Notes']; const rows=[headers.join(',')].concat(cachedExpenses.map(e=>[e.number,e.description,e.category,e.quantity,e.amount,e.total,e.date,e.paymentMethod,e.vendor,e.reference,e.notes].map(escapeCsv).map(x=>'"'+x+'"').join(','))); const blob=new Blob([rows.join('\r\n')],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Sorina_All_Expenses_'+new Date().toISOString().slice(0,10)+'.csv'; a.click(); URL.revokeObjectURL(a.href); }
+
+  async function renderAnnouncementsTab(container) {
+    const res=await API.callBackend('getAnnouncements',{},'Loading announcements...'); cachedAnnouncements=(res&&res.success&&Array.isArray(res.announcements))?res.announcements:cachedAnnouncements;
+    container.innerHTML=`<div class="content-card"><div class="card-header-row" style="margin-bottom:16px;"><div><h3 class="card-title">School Notice & Announcement</h3><div style="font-size:13px;color:var(--color-text-muted);">Publish notices directly to teachers, students, or everyone.</div></div><button class="btn btn-primary" id="newAnnouncementBtn">+ New Announcement</button></div><div>${cachedAnnouncements.length?cachedAnnouncements.map((m,i)=>`<div style="border:1px solid var(--color-border);border-radius:8px;padding:15px;margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:10px;"><div><b>${escapeHtml(m.subject||'School Announcement')}</b><span class="badge badge-light" style="margin-left:8px;">${escapeHtml(m.audience||'Both')}</span></div><span style="font-size:12px;color:#64748b;">${escapeHtml(m.sentAt||'')}</span></div><p style="margin:8px 0;line-height:1.5;">${escapeHtml(m.body||'')}</p>${m.recipientId?`<div style="font-size:12px;color:#475569;">Recipient ID: <b>${escapeHtml(m.recipientId)}</b></div>`:''}${m.attachmentUrl?`<div style="margin-top:8px;"><a class="btn btn-light btn-sm" href="${escapeHtml(m.attachmentUrl)}" target="_blank">View Attachment${m.attachmentName?' — '+escapeHtml(m.attachmentName):''}</a></div>`:''}<div style="font-size:12px;color:#64748b;">From: ${escapeHtml(m.senderName||'School Administration')} <button class="btn btn-danger btn-sm" style="float:right;" onclick="window.AdminPanel.deleteAnnouncement(${i})">Delete</button></div></div>`).join(''):'<div style="padding:30px;text-align:center;color:#64748b;">No announcements published yet.</div>'}</div></div>`;
+    document.getElementById('newAnnouncementBtn').onclick=openAnnouncementModal;
+  }
+  function openAnnouncementModal(){ App.showModal({title:'Create School Announcement',content:`<div class="form-group"><label class="form-label">Subject *</label><input id="annSubject" class="input-field" placeholder="e.g. Mid-Term Examination Notice"></div><div class="form-group"><label class="form-label">Send To *</label><select id="annAudience" class="select-field"><option value="Both">Teachers & Students</option><option value="Teachers">Teachers Only</option><option value="Students">Students Only</option><option value="Individual">Individual ID</option></select></div><div class="form-group" id="annRecipientWrap" style="display:none"><label class="form-label">Recipient Student/Teacher ID</label><input id="annRecipientId" class="input-field" placeholder="e.g. SPSS001 or SPST001"></div><div class="form-group"><label class="form-label">Announcement *</label><textarea id="annBody" class="input-field" rows="6" placeholder="Write the school notice here..."></textarea></div><div class="form-group"><label class="form-label">Attachment</label><input type="file" id="annAttachment" class="input-field" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"></div>`,confirmText:'Publish Announcement',onConfirm:async()=>{const subject=document.getElementById('annSubject').value.trim(),body=document.getElementById('annBody').value.trim(),audience=document.getElementById('annAudience').value,recipientId=document.getElementById('annRecipientId').value.trim();const file=document.getElementById('annAttachment').files[0];if(!subject||!body){API.toastNotification('Subject and announcement text are required.',true);return;}if(audience==='Individual'&&!recipientId){API.toastNotification('Enter the recipient ID.',true);return;}const attachmentUrl=file?await readFileAsDataUrl(file):'';const item={id:'ANN-'+Date.now(),subject,body,audience:audience==='Individual'?'Individual':audience,recipientId:audience==='Individual'?recipientId:'',attachmentUrl,attachmentName:file?file.name:'',senderName:currentUser.name||'School Administration',sentAt:new Date().toLocaleString()};const r=await API.callBackend('saveAnnouncement',{announcement:item},'Publishing announcement...');if(r&&r.success){cachedAnnouncements=r.announcements||[item,...cachedAnnouncements];localStorage.setItem('sorina_announcements',JSON.stringify(cachedAnnouncements));API.toastSuccess('Announcement published.');loadTab('announcements')}else API.toastNotification(r.message||'Could not publish announcement.',true);}});setTimeout(()=>{const a=document.getElementById('annAudience');if(a)a.onchange=()=>{document.getElementById('annRecipientWrap').style.display=a.value==='Individual'?'block':'none';};},50); }
+
+  async function deleteAnnouncement(i){const item=cachedAnnouncements[i];if(!item||!confirm('Delete this announcement?'))return;const r=await API.callBackend('deleteAnnouncement',{id:item.id},'Deleting announcement...');if(r&&r.success){cachedAnnouncements.splice(i,1);localStorage.setItem('sorina_announcements',JSON.stringify(cachedAnnouncements));loadTab('announcements')}}
 
   function getFilteredPayrollRecords() {
     const monthFilter = document.getElementById('payrollMonthFilter') ? document.getElementById('payrollMonthFilter').value : '';
@@ -3471,7 +3311,7 @@ window.AdminPanel = (function () {
             <div style="font-size: 16px; font-weight: 800; line-height: 1.2;">${escapeHtml(student.name)}</div>
             <div style="font-size: 13px; font-weight: 700; color: #ffd000; margin-top: 4px;">ID: [${escapeHtml(student.id)}]</div>
             <div style="font-size: 12px; margin-top: 4px; opacity: 0.9;">Grade: ${escapeHtml(student.className || student.grade)}</div>
-            <div style="font-size: 11px; margin-top: 2px; opacity: 0.8;">Academic Year: 2026–2027</div>
+            <div style="font-size: 11px; margin-top: 2px; opacity: 0.8;">Academic Year: ${escapeHtml(String(teacher.academicYear || '—').replace('-', '–'))}</div>
 
             <div style="margin-top: auto; font-size: 9.5px; opacity: 0.7;">Official Student Credential</div>
           </div>
@@ -3521,7 +3361,7 @@ window.AdminPanel = (function () {
             <div style="font-size: 16px; font-weight: 800; line-height: 1.2;">${escapeHtml(teacher.name)}</div>
             <div style="font-size: 13px; font-weight: 700; color: #10b981; margin-top: 4px;">ID: [${escapeHtml(teacher.id)}]</div>
             <div style="font-size: 12px; margin-top: 4px; opacity: 0.9;">Title: ${escapeHtml(teacher.title || 'Teacher')}</div>
-            <div style="font-size: 11px; margin-top: 2px; opacity: 0.8;">Academic Year: 2026–2027</div>
+            <div style="font-size: 11px; margin-top: 2px; opacity: 0.8;">Academic Year: ${escapeHtml(String(teacher.academicYear || '—').replace('-', '–'))}</div>
 
             <div style="margin-top: auto; font-size: 9.5px; opacity: 0.7;">Official School Faculty Staff</div>
           </div>
@@ -3570,120 +3410,240 @@ window.AdminPanel = (function () {
   }
 
   // =========================================================================
-  // 7. SUBJECTS MANAGEMENT TAB
+  // 7. SUBJECTS MANAGEMENT & CURRICULUM CATALOG
   // =========================================================================
+  const SUBJECT_LEVEL_GROUPS = [
+    { key:'early', label:'Daycare to ABC', levels:['Daycare','Nursery','ABC'] },
+    { key:'kindergarten', label:'K1 to K2', levels:['K1','K2'] },
+    { key:'primary', label:'Grade 1 to Grade 6', levels:['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6'] },
+    { key:'secondary', label:'Grade 7 to Grade 12', levels:['Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'] }
+  ];
+  function subjectMetaStore(){
+    try { return JSON.parse(localStorage.getItem('_sorina_subject_meta') || '{}') || {}; } catch(e){ return {}; }
+  }
+  function saveSubjectMetaStore(meta){ localStorage.setItem('_sorina_subject_meta', JSON.stringify(meta || {})); }
+  function getSubjectMeta(name){
+    const meta=subjectMetaStore();
+    return Object.assign({code:'',category:'Core',status:'Active',description:'',sortOrder:0}, meta[name]||{});
+  }
+  function getActiveCatalogSubjects(){
+    return getCatalogSubjects().filter(name=>getSubjectMeta(name).status!=='Inactive');
+  }
+  function ensureSubjectMeta(names){
+    const meta=subjectMetaStore();
+    (names||[]).forEach((name,i)=>{ if(!meta[name]) meta[name]={code:'',category:'Core',status:'Active',description:'',sortOrder:i+1}; });
+    saveSubjectMetaStore(meta); return meta;
+  }
+  function subjectLevelCount(name, map){ return GRADE_LEVELS.filter(c=>(map[c]||[]).includes(name)).length; }
+
   async function renderSubjectsTab(container) {
-    const res = await API.callBackend('getSubjects', {}, 'Loading subjects...');
-    cachedSubjects = (res && res.success && Array.isArray(res.subjects)) ? res.subjects : [];
+    const res = await API.callBackend('getSubjects', {}, 'Loading subjects catalog...');
+    cachedSubjects = (res && res.success && Array.isArray(res.subjects)) ? res.subjects : getCatalogSubjects();
+    ensureSubjectMeta(cachedSubjects);
+    let mapRes=await API.callBackend('getCurriculumSubjects', {}, 'Loading level assignments...');
+    let curriculum=(mapRes&&mapRes.success&&mapRes.curriculum)||{};
+    const activeSubjects=getActiveCatalogSubjects();
 
-    container.innerHTML = `
+    container.innerHTML=`
       <div class="content-card">
-        <div class="card-header-row">
+        <div class="card-header-row" style="align-items:flex-start;gap:12px;">
           <div>
-            <h3 class="card-title">School Curriculum &amp; Subjects Catalog</h3>
-            <div style="font-size: 13px; color: var(--color-text-muted);">
-              Configure, add, update, or remove subjects taught in the curriculum.
-            </div>
+            <h3 class="card-title">Subjects Catalog &amp; Curriculum Manager</h3>
+            <div style="font-size:13px;color:var(--color-text-muted);margin-top:4px;">One place to create subjects, maintain subject details, assign them to every school level, and control what appears across the portal.</div>
           </div>
-          <button type="button" class="btn btn-primary" id="openAddSubBtn" style="display: flex; align-items: center; gap: 6px;">
-            <img src="assets/icons/square-dashed-plus.png" style="width: 15px; height: 15px; filter: brightness(0) invert(1);" alt="">
-            Add New Subject
-          </button>
+          <button class="btn btn-primary" id="openAddSubBtn">+ Add New Subject</button>
         </div>
 
-        <div class="table-responsive" style="margin-top: 14px;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Subject Name</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${cachedSubjects.map(s => `
-                <tr>
-                  <td><b>${escapeHtml(s)}</b></td>
-                  <td><span class="badge badge-success">Active Curriculum</span></td>
-                  <td>
-                    <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.openEditSubjectModal('${escapeHtml(s)}')">Rename</button>
-                    <button type="button" class="btn btn-danger btn-sm" onclick="window.AdminPanel.deleteSubject('${escapeHtml(s)}')">Remove</button>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0;">
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#64748b;">Total Subjects</div><b style="font-size:21px;">${cachedSubjects.length}</b></div>
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#64748b;">Active</div><b style="font-size:21px;">${activeSubjects.length}</b></div>
+          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#64748b;">Assigned</div><b style="font-size:21px;">${activeSubjects.filter(x=>subjectLevelCount(x,curriculum)>0).length}</b></div>
+          <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#64748b;">School Levels</div><b style="font-size:21px;">${GRADE_LEVELS.length}</b></div>
         </div>
-      </div>
-    `;
 
-    document.getElementById('openAddSubBtn').onclick = () => openAddSubjectModal();
-  }
-
-  function openAddSubjectModal() {
-    App.showModal({
-      title: 'Add New Academic Subject',
-      content: `
-        <div class="form-group">
-          <label class="form-label" for="newSubName">Subject Name *</label>
-          <input type="text" id="newSubName" class="input-field" placeholder="e.g. Computer Science" required>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+          <input id="subjectSearch" class="input-field" style="flex:1;min-width:220px;" placeholder="Search subject name or code...">
+          <select id="subjectStatusFilter" class="select-field" style="min-width:145px;"><option value="all">All Status</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select>
+          <select id="subjectCategoryFilter" class="select-field" style="min-width:145px;"><option value="all">All Categories</option><option>Core</option><option>Language</option><option>Mathematics</option><option>Science</option><option>Social Studies</option><option>Arts</option><option>ICT</option><option>Physical Education</option><option>Religious</option><option>Other</option></select>
+          <button class="btn btn-light" id="bulkAssignBtn">Assign Selected to Levels</button>
         </div>
-      `,
-      confirmText: 'Add Subject',
-      onConfirm: async () => {
-        const name = document.getElementById('newSubName').value.trim();
-        if (!name) return;
 
-        const res = await API.callBackend('addSubject', { subjectName: name }, 'Adding subject...');
-        if (res && res.success) {
-          API.toastSuccess();
-          loadTab('subjects');
-        } else {
-          API.toastNotification(res.message || 'Error adding subject.', true);
-        }
-      }
-    });
-  }
-
-  function openEditSubjectModal(oldName) {
-    App.showModal({
-      title: `Rename Subject: ${oldName}`,
-      content: `
-        <div class="form-group">
-          <label class="form-label" for="editSubName">New Subject Name *</label>
-          <input type="text" id="editSubName" class="input-field" value="${escapeHtml(oldName)}" required>
+        <div class="table-responsive">
+          <table class="data-table"><thead><tr><th><input type="checkbox" id="subjectSelectAll"></th><th>Subject</th><th>Code</th><th>Category</th><th>Levels</th><th>Status</th><th>Actions</th></tr></thead><tbody id="subjectCatalogBody"></tbody></table>
         </div>
-      `,
-      confirmText: 'Update Subject',
-      onConfirm: async () => {
-        const newName = document.getElementById('editSubName').value.trim();
-        if (!newName || newName === oldName) return;
+        <div style="margin-top:12px;padding:10px;background:#f8fafc;border-radius:8px;font-size:12px;color:#64748b;"><b>Portal behavior:</b> Active subjects can be selected for curriculum, teacher assignments and grade entry. Renaming a subject updates existing teacher, student curriculum, curriculum-map and grade references. Removing a subject also removes it from those assignments.</div>
+      </div>`;
 
-        const res = await API.callBackend('updateSubject', {
-          oldSubjectName: oldName,
-          newSubjectName: newName
-        }, 'Renaming subject...');
-
-        if (res && res.success) {
-          API.toastSuccess();
-          loadTab('subjects');
-        } else {
-          API.toastNotification(res.message || 'Error renaming subject.', true);
-        }
-      }
-    });
-  }
-
-  async function deleteSubject(subjectName) {
-    if (!confirm(`Are you sure you want to remove subject "${subjectName}"?`)) return;
-
-    const res = await API.callBackend('deleteSubject', { subjectName: subjectName }, 'Removing subject...');
-    if (res && res.success) {
-      API.toastSuccess();
-      loadTab('subjects');
-    } else {
-      API.toastNotification(res.message || 'Error removing subject.', true);
+    const body=document.getElementById('subjectCatalogBody');
+    function draw(){
+      const q=(document.getElementById('subjectSearch').value||'').toLowerCase().trim();
+      const st=document.getElementById('subjectStatusFilter').value;
+      const cat=document.getElementById('subjectCategoryFilter').value;
+      const meta=subjectMetaStore();
+      const rows=cachedSubjects.filter(name=>{
+        const m=meta[name]||{}; const hay=(name+' '+(m.code||'')).toLowerCase();
+        return (!q||hay.includes(q)) && (st==='all'||(m.status||'Active')===st) && (cat==='all'||(m.category||'Core')===cat);
+      });
+      body.innerHTML=rows.length?rows.map(name=>{const m=getSubjectMeta(name), count=subjectLevelCount(name,curriculum); return `<tr>
+        <td><input type="checkbox" class="subject-row-check" value="${escapeHtml(name)}"></td>
+        <td><b>${escapeHtml(name)}</b>${m.description?`<div style="font-size:11px;color:#64748b;margin-top:2px;">${escapeHtml(m.description)}</div>`:''}</td>
+        <td>${escapeHtml(m.code||'—')}</td><td>${escapeHtml(m.category||'Core')}</td>
+        <td><span class="badge badge-light">${count}/${GRADE_LEVELS.length} levels</span></td>
+        <td><span class="badge ${m.status==='Inactive'?'badge-light':'badge-success'}">${escapeHtml(m.status||'Active')}</span></td>
+        <td style="white-space:nowrap;"><button class="btn btn-light btn-sm" data-edit-sub="${escapeHtml(name)}">Edit</button> <button class="btn btn-light btn-sm" data-assign-sub="${escapeHtml(name)}">Assign</button> <button class="btn ${m.status==='Inactive'?'btn-primary':'btn-light'} btn-sm" data-toggle-sub="${escapeHtml(name)}">${m.status==='Inactive'?'Activate':'Deactivate'}</button> <button class="btn btn-danger btn-sm" data-delete-sub="${escapeHtml(name)}">Delete</button></td>
+      </tr>`;}).join(''):`<tr><td colspan="7" style="text-align:center;padding:28px;color:#64748b;">No subjects match your filters.</td></tr>`;
+      body.querySelectorAll('[data-edit-sub]').forEach(b=>b.onclick=()=>openEditSubjectModal(b.dataset.editSub));
+      body.querySelectorAll('[data-assign-sub]').forEach(b=>b.onclick=()=>openSubjectLevelAssignment(b.dataset.assignSub,curriculum));
+      body.querySelectorAll('[data-toggle-sub]').forEach(b=>b.onclick=()=>toggleSubjectStatus(b.dataset.toggleSub));
+      body.querySelectorAll('[data-delete-sub]').forEach(b=>b.onclick=()=>deleteSubject(b.dataset.deleteSub));
     }
+    document.getElementById('openAddSubBtn').onclick=openAddSubjectModal;
+    ['subjectSearch','subjectStatusFilter','subjectCategoryFilter'].forEach(id=>document.getElementById(id).addEventListener('input',draw));
+    document.getElementById('subjectSelectAll').onchange=e=>body.querySelectorAll('.subject-row-check').forEach(x=>x.checked=e.target.checked);
+    document.getElementById('bulkAssignBtn').onclick=()=>{
+      const selected=[...body.querySelectorAll('.subject-row-check:checked')].map(x=>x.value);
+      if(!selected.length){API.toastNotification('Select at least one subject first.',true);return;}
+      openBulkSubjectAssignment(selected,curriculum);
+    };
+    draw();
+  }
+
+  function openAddSubjectModal(){
+    App.showModal({title:'Add New Subject',content:`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Subject Name *</label><input id="newSubName" class="input-field" placeholder="e.g. Computer Science"></div>
+      <div class="form-group"><label class="form-label">Subject Code</label><input id="newSubCode" class="input-field" placeholder="e.g. ICT101"></div>
+      <div class="form-group"><label class="form-label">Category</label><select id="newSubCategory" class="select-field" style="width:100%;"><option>Core</option><option>Language</option><option>Mathematics</option><option>Science</option><option>Social Studies</option><option>Arts</option><option>ICT</option><option>Physical Education</option><option>Religious</option><option>Other</option></select></div>
+      <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Description</label><textarea id="newSubDesc" class="input-field" rows="2" placeholder="Optional description"></textarea></div>
+      <div style="grid-column:1/-1;"><b>Assign immediately to levels</b><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px;margin-top:8px;">${GRADE_LEVELS.map(c=>`<label style="font-size:12px;"><input type="checkbox" class="new-sub-level" value="${escapeHtml(c)}"> ${escapeHtml(c)}</label>`).join('')}</div></div>
+    </div>`,confirmText:'Create Subject',onConfirm:async()=>{
+      const name=document.getElementById('newSubName').value.trim(), code=document.getElementById('newSubCode').value.trim(), category=document.getElementById('newSubCategory').value, description=document.getElementById('newSubDesc').value.trim();
+      if(!name){API.toastNotification('Subject name is required.',true);return;}
+      if(cachedSubjects.some(x=>x.toLowerCase()===name.toLowerCase())){API.toastNotification('That subject already exists.',true);return;}
+      const r=await API.callBackend('addSubject',{subject:name,subjectName:name},'Creating subject...');
+      if(!r||!r.success){API.toastNotification((r&&r.message)||'Could not create subject.',true);return;}
+      const meta=subjectMetaStore();meta[name]={code,category,status:'Active',description,sortOrder:cachedSubjects.length+1};saveSubjectMetaStore(meta);
+      const levels=[...document.querySelectorAll('.new-sub-level:checked')].map(x=>x.value);let cr=JSON.parse(localStorage.getItem('_sorina_curriculum_map')||'{}');levels.forEach(c=>{cr[c]=Array.from(new Set([...(cr[c]||[]),name]));});
+      await API.callBackend('saveCurriculumSubjects',{curriculum:cr},'Applying subject to levels...');
+      API.toastSuccess('Subject created and curriculum updated.');loadTab('subjects');
+    }});
+  }
+
+  function openEditSubjectModal(oldName){
+    const m=getSubjectMeta(oldName);
+    App.showModal({title:'Edit Subject',content:`<div class="form-group"><label class="form-label">Subject Name *</label><input id="editSubName" class="input-field" value="${escapeHtml(oldName)}"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div class="form-group"><label class="form-label">Subject Code</label><input id="editSubCode" class="input-field" value="${escapeHtml(m.code)}"></div><div class="form-group"><label class="form-label">Category</label><select id="editSubCategory" class="select-field" style="width:100%;">${['Core','Language','Mathematics','Science','Social Studies','Arts','ICT','Physical Education','Religious','Other'].map(x=>`<option ${x===m.category?'selected':''}>${x}</option>`).join('')}</select></div></div><div class="form-group"><label class="form-label">Description</label><textarea id="editSubDesc" class="input-field" rows="2">${escapeHtml(m.description)}</textarea></div>`,confirmText:'Save Changes',onConfirm:async()=>{
+      const newName=document.getElementById('editSubName').value.trim();if(!newName){API.toastNotification('Subject name is required.',true);return;}
+      if(newName.toLowerCase()!==oldName.toLowerCase()&&cachedSubjects.some(x=>x.toLowerCase()===newName.toLowerCase())){API.toastNotification('Another subject already uses that name.',true);return;}
+      const r=await API.callBackend('updateSubject',{oldSubjectName:oldName,newSubjectName:newName,oldName,newName},'Updating subject...');if(!r||!r.success){API.toastNotification((r&&r.message)||'Could not update subject.',true);return;}
+      const meta=subjectMetaStore();delete meta[oldName];meta[newName]={code:document.getElementById('editSubCode').value.trim(),category:document.getElementById('editSubCategory').value,status:m.status,description:document.getElementById('editSubDesc').value.trim(),sortOrder:m.sortOrder};saveSubjectMetaStore(meta);API.toastSuccess('Subject updated across the portal.');loadTab('subjects');
+    }});
+  }
+
+  async function toggleSubjectStatus(name){const meta=subjectMetaStore();meta[name]=Object.assign({},getSubjectMeta(name),{status:getSubjectMeta(name).status==='Inactive'?'Active':'Inactive'});saveSubjectMetaStore(meta);API.toastSuccess(meta[name].status==='Active'?'Subject activated.':'Subject deactivated from new selections.');loadTab('subjects');}
+
+  function levelCheckboxes(selected){return GRADE_LEVELS.map(c=>`<label style="font-size:12px;"><input type="checkbox" class="assign-level" value="${escapeHtml(c)}" ${selected.includes(c)?'checked':''}> ${escapeHtml(c)}</label>`).join('');}
+  function openSubjectLevelAssignment(name,map){
+    const selected=GRADE_LEVELS.filter(c=>(map[c]||[]).includes(name));
+    App.showModal({title:'Assign Subject to School Levels',content:`<div style="margin-bottom:10px;"><b>${escapeHtml(name)}</b><div style="font-size:12px;color:#64748b;">Select every class where this subject should be part of the curriculum.</div></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:7px;">${levelCheckboxes(selected)}</div>`,confirmText:'Save Level Assignment',onConfirm:async()=>{const chosen=[...document.querySelectorAll('.assign-level:checked')].map(x=>x.value);GRADE_LEVELS.forEach(c=>{const arr=(map[c]||[]).filter(x=>x!==name);if(chosen.includes(c))arr.push(name);map[c]=Array.from(new Set(arr));});const r=await API.callBackend('saveCurriculumSubjects',{curriculum:map},'Saving subject assignments...');if(r&&r.success){API.toastSuccess('Subject assignments saved.');loadTab('subjects')}else API.toastNotification((r&&r.message)||'Could not save assignments.',true);}});
+  }
+  function openBulkSubjectAssignment(names,map){
+    App.showModal({title:'Bulk Assign Subjects to Levels',content:`<div style="margin-bottom:10px;"><b>${names.length} selected subject(s)</b><div style="font-size:12px;color:#64748b;">Choose levels to add these subjects to. Existing assignments are preserved.</div></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:7px;">${levelCheckboxes([])}</div>`,confirmText:'Apply Assignments',onConfirm:async()=>{const chosen=[...document.querySelectorAll('.assign-level:checked')].map(x=>x.value);if(!chosen.length){API.toastNotification('Select at least one level.',true);return;}chosen.forEach(c=>{map[c]=Array.from(new Set([...(map[c]||[]),...names]));});const r=await API.callBackend('saveCurriculumSubjects',{curriculum:map},'Applying bulk assignments...');if(r&&r.success){API.toastSuccess('Bulk curriculum assignment completed.');loadTab('subjects')}else API.toastNotification((r&&r.message)||'Could not apply assignments.',true);}});
+  }
+
+  async function deleteSubject(subjectName){
+    if(!confirm(`Remove subject "${subjectName}"? This will remove it from curriculum and teacher/student subject assignments.`)) return;
+    const res=await API.callBackend('deleteSubject',{subject:subjectName,subjectName:subjectName},'Removing subject...');
+    if(res&&res.success){const meta=subjectMetaStore();delete meta[subjectName];saveSubjectMetaStore(meta);API.toastSuccess('Subject removed from the portal.');loadTab('subjects');}else API.toastNotification((res&&res.message)||'Error removing subject.',true);
+  }
+
+  async function renderCurriculumSubjectsTab(container){
+    // Keep the existing navigation entry, but use the same redesigned catalog manager.
+    await renderSubjectsTab(container);
+  }
+
+  async function renderAdminGradeEntryTab(container) {
+    const stRes = await API.callBackend('getAllStudents', { academicYear: selectedAcademicYear }, 'Loading academic roster...');
+    cachedStudents = (stRes && stRes.success ? stRes.students : []);
+    const subRes = await API.callBackend('getSubjects');
+    const allSubjects = subRes && subRes.success ? subRes.subjects : CURRICULUM_SUBJECTS;
+    const classes = [...new Set(cachedStudents.map(s => s.className || s.grade).filter(Boolean))];
+    const periods = [
+      {key:'p1',label:'1st Period'},{key:'p2',label:'2nd Period'},{key:'p3',label:'3rd Period'},{key:'exam1',label:'1st Sem. Exam'},
+      {key:'p4',label:'4th Period'},{key:'p5',label:'5th Period'},{key:'p6',label:'6th Period'},{key:'exam2',label:'2nd Sem. Exam'}
+    ];
+    const firstClass=classes[0]||GRADE_LEVELS[0]||'';
+    container.innerHTML=`
+      <div class="content-card" style="padding:0;overflow:hidden;">
+        <div style="padding:20px 22px;border-bottom:1px solid var(--color-border);background:linear-gradient(135deg,#f7fafc,#fff);">
+          <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap;">
+            <div><div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;"><h3 class="card-title" style="margin:0;">Grade Entry &amp; Submission Center</h3><span class="badge badge-info">ADMIN CONTROL</span></div>
+            <div style="font-size:13px;color:var(--color-text-muted);margin-top:5px;max-width:820px;">The administrator can enter, correct, save, submit and finalize academic grades for any student, class or subject. Every submission is recorded in the grade activity log.</div></div>
+            <div style="text-align:right;font-size:12px;color:#64748b;">Academic Year<br><b style="font-size:15px;color:var(--color-primary);">${escapeHtml(selectedAcademicYear)}</b></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:17px;">
+            <div><label class="form-label">Class / Grade</label><select id="agClass" class="select-field" style="width:100%;">${classes.map(c=>`<option value="${escapeHtml(c)}" ${c===firstClass?'selected':''}>${escapeHtml(c)}</option>`).join('')}</select></div>
+            <div><label class="form-label">Subject</label><select id="agSubject" class="select-field" style="width:100%;"></select></div>
+            <div><label class="form-label">Search Student</label><input id="agSearch" class="input-field" style="width:100%;" placeholder="Name or Student ID"></div>
+            <div><label class="form-label">Grade Status</label><select id="agView" class="select-field" style="width:100%;"><option value="all">All Students</option><option value="incomplete">Incomplete</option><option value="complete">Complete</option><option value="submitted">Submitted</option></select></div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px;padding:13px 22px;border-bottom:1px solid var(--color-border);">
+          <div class="content-card" style="padding:10px 12px;margin:0;"><small>Students</small><div id="agTotal" style="font-size:21px;font-weight:800;">0</div></div>
+          <div class="content-card" style="padding:10px 12px;margin:0;"><small>Complete</small><div id="agComplete" style="font-size:21px;font-weight:800;">0</div></div>
+          <div class="content-card" style="padding:10px 12px;margin:0;"><small>Missing</small><div id="agMissing" style="font-size:21px;font-weight:800;">0</div></div>
+          <div class="content-card" style="padding:10px 12px;margin:0;"><small>Submitted</small><div id="agSubmitted" style="font-size:21px;font-weight:800;">0</div></div>
+          <div class="content-card" style="padding:10px 12px;margin:0;"><small>Unsaved</small><div id="agDirty" style="font-size:21px;font-weight:800;">0</div></div>
+        </div>
+        <div style="padding:11px 22px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;background:#f8fafc;border-bottom:1px solid var(--color-border);">
+          <div style="font-size:12px;color:#64748b;"><b>Admin workflow:</b> Save Draft for incomplete work. Use Submit / Finalize when the selected grade sheet is ready for official academic records.</div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;"><button type="button" class="btn btn-light btn-sm" id="agReset">Reset Unsaved</button><button type="button" class="btn btn-light" id="agDraft">Save Draft</button><button type="button" class="btn btn-primary" id="agSubmit">Submit / Finalize Grades</button></div>
+        </div>
+        <div class="table-responsive" style="max-height:56vh;overflow:auto;">
+          <table class="data-table" style="min-width:1180px;"><thead style="position:sticky;top:0;z-index:2;background:#f8fafc;"><tr><th style="min-width:220px;">Student</th>${periods.map(p=>`<th style="min-width:105px;text-align:center;">${escapeHtml(p.label)}</th>`).join('')}<th>Status</th></tr></thead><tbody id="agBody"></tbody></table>
+        </div>
+        <div style="padding:12px 22px;border-top:1px solid var(--color-border);background:#fff;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;"><div><b>Grade Activity Log</b><div style="font-size:12px;color:#64748b;">Recent admin and teacher grade submissions for ${escapeHtml(selectedAcademicYear)}.</div></div><button type="button" class="btn btn-light btn-sm" id="agLogRefresh">Refresh Log</button></div>
+        <div id="agLog" style="padding:0 22px 16px;max-height:220px;overflow:auto;"></div>
+      </div>`;
+
+    let currentStudents=[];
+    const scoreKeys=periods.map(p=>p.key);
+    function subjectOptionsForClass(cls,students){
+      const assigned=new Set(selectedCurriculumForClass(cls));
+      students.forEach(s=>(Array.isArray(s.curriculumSubjects)?s.curriculumSubjects:[]).forEach(x=>assigned.add(x)));
+      const list=[...assigned].filter(x=>allSubjects.some(a=>String(a).toLowerCase()===String(x).toLowerCase()));
+      return (list.length?list:allSubjects).filter(Boolean);
+    }
+    function refreshSubjects(preferred){
+      const cls=document.getElementById('agClass').value; const students=cachedStudents.filter(s=>String(s.className||s.grade)===String(cls)&&(s.status||'Active')==='Active');
+      const list=subjectOptionsForClass(cls,students); const el=document.getElementById('agSubject'); el.innerHTML=list.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join(''); if(preferred&&list.includes(preferred))el.value=preferred;
+    }
+    function getRec(st,sub){return ((st.years||{})[selectedAcademicYear]||[]).find(x=>String(x.subject).toLowerCase()===String(sub).toLowerCase())||{};}
+    function any(rec){return scoreKeys.some(k=>String(rec[k]??'').trim()!=='');}
+    function complete(rec){return scoreKeys.every(k=>String(rec[k]??'').trim()!=='');}
+    function valid(v){return v===''||(Number.isFinite(Number(v))&&Number(v)>=0&&Number(v)<=100);}
+    function statusOf(rec){if(rec.status==='submitted')return 'submitted'; if(complete(rec))return 'complete'; return any(rec)?'incomplete':'notstarted';}
+    function updateSummary(){const rows=[...document.querySelectorAll('#agBody tr[data-id]')];let c=0,m=0,s=0,d=0;rows.forEach(tr=>{const r={};tr.querySelectorAll('.ag-score').forEach(i=>r[i.dataset.p]=i.value.trim());const st=statusOf(r);if(st==='complete'||st==='submitted')c++;if(st==='incomplete'||st==='notstarted')m++;if(tr.dataset.originalStatus==='submitted'||st==='submitted')s++;if(tr.dataset.dirty==='1')d++;});document.getElementById('agTotal').textContent=rows.length;document.getElementById('agComplete').textContent=c;document.getElementById('agMissing').textContent=m;document.getElementById('agSubmitted').textContent=s;document.getElementById('agDirty').textContent=d;}
+    function draw(){
+      const subject=document.getElementById('agSubject').value,q=document.getElementById('agSearch').value.trim().toLowerCase(),view=document.getElementById('agView').value;
+      const filtered=currentStudents.filter(st=>{const rec=getRec(st,subject),stt=statusOf(rec);const match=!q||String(st.name||'').toLowerCase().includes(q)||String(st.id||'').toLowerCase().includes(q);const mode=view==='all'||(view==='complete'&&(stt==='complete'||stt==='submitted'))||(view==='incomplete'&&(stt==='incomplete'||stt==='notstarted'))||(view==='submitted'&&stt==='submitted');return match&&mode;});
+      const body=document.getElementById('agBody'); body.innerHTML=filtered.map(st=>{const rec=getRec(st,subject),stt=statusOf(rec);const badge=stt==='submitted'?'<span class="badge badge-success">Submitted</span>':stt==='complete'?'<span class="badge badge-info">Complete</span>':stt==='incomplete'?'<span class="badge badge-warning">In Progress</span>':'<span class="badge badge-light">Not Started</span>';return `<tr data-id="${escapeHtml(st.id)}" data-dirty="0" data-original-status="${escapeHtml(stt)}"><td><div style="font-weight:700;">${escapeHtml(st.name||'Unnamed Student')}</div><div style="font-size:11px;color:#64748b;">${escapeHtml(st.id)} &bull; ${escapeHtml(st.className||st.grade||'')}</div></td>${scoreKeys.map(k=>`<td style="text-align:center;"><input type="number" min="0" max="100" step="0.01" class="input-field ag-score" data-p="${k}" value="${escapeHtml(rec[k]??'')}" style="width:82px;text-align:center;margin:auto;"></td>`).join('')}<td class="ag-status" style="font-size:12px;font-weight:700;">${badge}</td></tr>`;}).join('')||`<tr><td colspan="10" style="text-align:center;padding:30px;color:#64748b;">No students match the current filters.</td></tr>`;
+      document.querySelectorAll('.ag-score').forEach(input=>{input.addEventListener('input',()=>{const tr=input.closest('tr');if(!valid(input.value)){input.setCustomValidity('Enter a score from 0 to 100.');input.style.borderColor='#dc2626';}else{input.setCustomValidity('');input.style.borderColor='';}tr.dataset.dirty='1';const r={};tr.querySelectorAll('.ag-score').forEach(i=>r[i.dataset.p]=i.value.trim());const st=statusOf(r);tr.querySelector('.ag-status').innerHTML=st==='submitted'?'<span class="badge badge-success">Ready to Submit</span>':complete(r)?'<span class="badge badge-info">Complete</span>':any(r)?'<span class="badge badge-warning">In Progress</span>':'<span class="badge badge-light">Not Started</span>';updateSummary();});input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const a=[...document.querySelectorAll('.ag-score')],i=a.indexOf(input);if(a[i+1])a[i+1].focus();}});});updateSummary();}
+    async function loadClass(){const cls=document.getElementById('agClass').value;const r=await API.callBackend('getStudentsByClass',{className:cls,academicYear:selectedAcademicYear},'Loading class roster...');currentStudents=(r&&r.success?r.students:[]).filter(s=>(s.status||'Active')==='Active');refreshSubjects();draw();await loadLog();}
+    async function loadLog(){const r=await API.callBackend('getGradeActivityLog',{academicYear:selectedAcademicYear});const logs=r&&r.success?r.logs:[];const el=document.getElementById('agLog');el.innerHTML=logs.length?`<div style="display:grid;gap:6px;margin-top:9px;">${logs.slice(0,12).map(x=>`<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;"><span><b>${escapeHtml(x.action||'Grade activity')}</b> &mdash; ${escapeHtml(x.className||'')} / ${escapeHtml(x.subject||'')} (${escapeHtml(String(x.studentCount||0))} students)</span><span style="color:#64748b;">${escapeHtml(x.actorName||'Administrator')} &bull; ${escapeHtml(x.status||'')} &bull; ${escapeHtml(x.timestamp||'')}</span></div>`).join('')}</div>`:'<div style="padding:12px 0;color:#64748b;font-size:12px;">No grade activity recorded yet.</div>';}
+    async function saveGrades(mode){const rows=[...document.querySelectorAll('#agBody tr[data-id]')],grades=[];let invalid=false,incomplete=false;rows.forEach(tr=>{const g={studentId:tr.dataset.id};tr.querySelectorAll('.ag-score').forEach(i=>{const v=i.value.trim();if(!valid(v)){invalid=true;i.focus();}g[i.dataset.p]=v;});if(!complete(g))incomplete=true;if(tr.dataset.dirty==='1')grades.push(g);});if(invalid){API.toastNotification('Correct scores outside the 0–100 range before saving.',true);return;}if(!grades.length){API.toastNotification('No unsaved grade changes on this screen.');return;}if(mode==='submitted'&&incomplete&&!confirm('Some selected students do not have all grading periods completed. Submit these grades anyway?'))return;const r=await API.callBackend('teacherSubmitGrades',{teacherId:currentUser.id,actorRole:'admin',actorName:currentUser.name||'Administrator',className:document.getElementById('agClass').value,subject:document.getElementById('agSubject').value,academicYear:selectedAcademicYear,gradeStatus:mode,grades},mode==='submitted'?'Submitting official grades...':'Saving grade draft...');if(r&&r.success){API.toastSuccess(r.message||'Grades saved.');await loadClass();}else API.toastNotification((r&&r.message)||'Unable to save grades.',true);}
+    document.getElementById('agClass').onchange=loadClass;document.getElementById('agSubject').onchange=draw;document.getElementById('agSearch').oninput=draw;document.getElementById('agView').onchange=draw;document.getElementById('agReset').onclick=()=>{if(confirm('Discard unsaved changes?'))draw();};document.getElementById('agDraft').onclick=()=>saveGrades('draft');document.getElementById('agSubmit').onclick=()=>saveGrades('submitted');document.getElementById('agLogRefresh').onclick=loadLog;
+    refreshSubjects();await loadClass();
+  }
+
+  async function renderAdminLessonPlansTab(container) {
+    const res=await API.callBackend('getLessonPlans',{filters:{academicYear:selectedAcademicYear}},'Loading teacher lesson plans...');
+    const plans=res&&res.success?res.plans:[]; const pending=plans.filter(p=>(p.status||'pending')==='pending').length;
+    container.innerHTML=`<div class="content-card"><div class="card-header-row"><div><h3 class="card-title">Teacher Lesson Plan Inbox</h3><div style="font-size:13px;color:var(--color-text-muted);">All lesson plans submitted by teachers appear here for administrative review, approval or return for revision.</div></div><span class="badge ${pending?'badge-warning':'badge-success'}">${pending} Pending Review</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:15px 0;"><div class="content-card" style="padding:11px;margin:0;"><small>Total Submitted</small><div style="font-size:21px;font-weight:800;">${plans.length}</div></div><div class="content-card" style="padding:11px;margin:0;"><small>Pending</small><div style="font-size:21px;font-weight:800;">${pending}</div></div><div class="content-card" style="padding:11px;margin:0;"><small>Approved</small><div style="font-size:21px;font-weight:800;">${plans.filter(p=>p.status==='approved').length}</div></div><div class="content-card" style="padding:11px;margin:0;"><small>Revision Needed</small><div style="font-size:21px;font-weight:800;">${plans.filter(p=>p.status==='revision').length}</div></div></div>
+      <div class="table-responsive"><table class="data-table"><thead><tr><th>Lesson</th><th>Teacher</th><th>Class</th><th>Subject</th><th>Submitted</th><th>Status</th><th>Action</th></tr></thead><tbody>${plans.length?plans.map(p=>`<tr><td><b>${escapeHtml(p.title||'Untitled Lesson')}</b><div style="font-size:11px;color:#64748b;">${escapeHtml((p.details||'').slice(0,100))}${(p.details||'').length>100?'…':''}</div></td><td>${escapeHtml(p.teacherName||p.teacherId||'')}</td><td>${escapeHtml(p.class||p.className||'')}</td><td>${escapeHtml(p.subject||'')}</td><td>${escapeHtml(p.submittedAt||'')}</td><td>${p.status==='approved'?'<span class="badge badge-success">Approved</span>':p.status==='revision'?'<span class="badge badge-warning">Revision</span>':'<span class="badge badge-info">Pending</span>'}</td><td><button type="button" class="btn btn-light btn-sm lp-review" data-id="${escapeHtml(p.id)}">Review</button></td></tr>`).join(''):'<tr><td colspan="7" style="text-align:center;padding:28px;color:#64748b;">No teacher lesson plans have been submitted for this academic year.</td></tr>'}</tbody></table></div></div>`;
+    document.querySelectorAll('.lp-review').forEach(btn=>btn.onclick=()=>{
+      const p=plans.find(x=>String(x.id)===String(btn.dataset.id)); if(!p)return;
+      App.showModal({title:'Review Teacher Lesson Plan',content:`<div style="font-size:13px;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;"><div><b>Teacher</b><br>${escapeHtml(p.teacherName||p.teacherId||'')}</div><div><b>Class / Subject</b><br>${escapeHtml(p.class||p.className||'')} &bull; ${escapeHtml(p.subject||'')}</div></div><div style="padding:12px;background:#f8fafc;border-radius:8px;"><b>${escapeHtml(p.title||'Untitled Lesson')}</b><p style="white-space:pre-wrap;margin:8px 0 0;">${escapeHtml(p.details||'No lesson details supplied.')}</p></div>${p.attachmentUrl?`<div style="margin-top:12px;"><a class="btn btn-light btn-sm" href="${p.attachmentUrl}" target="_blank">Open Attachment: ${escapeHtml(p.attachmentName||'Lesson Plan File')}</a></div>`:''}<div class="form-group" style="margin-top:12px;"><label class="form-label">Decision</label><select id="lpReviewDecision" class="select-field"><option value="approved">Approve Lesson Plan</option><option value="revision">Return for Revision</option></select></div><div class="form-group"><label class="form-label">Admin Review Comment</label><textarea id="lpReviewComment" class="textarea-field" rows="3" placeholder="Add approval note or revision instructions..."></textarea></div></div>`,confirmText:p.status==='approved'?'Close':'Submit Review',onConfirm:async()=>{if(p.status==='approved')return;const decision=document.getElementById('lpReviewDecision').value;const c=document.getElementById('lpReviewComment').value.trim();if(decision==='revision'&&!c){API.toastNotification('Please enter the revision instructions for the teacher.',true);return;}const rr=await API.callBackend('reviewLessonPlan',{id:p.id,status:decision,comment:c,reviewedBy:currentUser.name||'Administrator'},decision==='approved'?'Approving lesson plan...':'Returning lesson plan...');if(rr&&rr.success){API.toastSuccess(rr.message);await renderAdminLessonPlansTab(container);}else API.toastNotification((rr&&rr.message)||'Unable to review lesson plan.',true);}});
+    });
   }
 
   // =========================================================================
@@ -3841,6 +3801,15 @@ window.AdminPanel = (function () {
           </div>
 
           <div class="form-group">
+            <label class="form-label" for="setLogo">School Logo</label>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <div id="schoolLogoPreview" style="width:64px;height:64px;border:1px solid #dbe3ec;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fff;"><img src="${escapeHtml(s.logoUrl || 'assets/images/school-logo.png')}" alt="School logo" style="width:100%;height:100%;object-fit:contain;"></div>
+              <input type="file" id="setLogo" class="input-field" accept="image/*" style="max-width:280px;">
+            </div>
+            <div class="form-hint">This logo will be used throughout the entire portal, headers, reports and receipts. Maximum 2 MB.</div>
+          </div>
+
+          <div class="form-group">
             <label class="form-label" for="setYear">Current Academic Year</label>
             <input type="text" id="setYear" class="input-field" value="${escapeHtml(s.academicYear || '2026-2027')}">
           </div>
@@ -3864,12 +3833,28 @@ window.AdminPanel = (function () {
             <h3 class="card-title" style="margin-bottom: 14px;">Administrator Profile &amp; Password</h3>
 
             <div class="form-group">
+              <label class="form-label">Profile Photo</label>
+              <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                <div id="adminProfilePhotoBox" style="width:84px;height:84px;border-radius:50%;overflow:hidden;border:2px solid var(--color-primary);display:flex;align-items:center;justify-content:center;background:#eef2f7;font-size:28px;">
+                  ${currentUser.photo ? `<img src="${escapeHtml(currentUser.photo)}" alt="Profile photo" style="width:100%;height:100%;object-fit:cover;">` : '👤'}
+                </div>
+                <div>
+                  <input type="file" id="adminProfilePhotoInput" class="input-field" accept="image/*" style="max-width:280px;">
+                  <div class="form-hint">JPG, PNG or WEBP. Recommended passport-style photo. Maximum 2 MB.</div>
+                  <button type="button" class="btn btn-light btn-sm" id="removeAdminProfilePhotoBtn" style="margin-top:6px;">Remove Photo</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
               <label class="form-label">Display Name</label>
               <input type="text" class="input-field" value="${escapeHtml(currentUser.name || currentUser.username)}" disabled>
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="adminNewPass">New Password</label>
+              <label class="form-label" for="adminCurrentPass">Current Password</label>
+              <input type="password" id="adminCurrentPass" class="input-field" placeholder="Enter current password">
+              <label class="form-label" for="adminNewPass" style="margin-top:10px;">New Password</label>
               <input type="password" id="adminNewPass" class="input-field" placeholder="Enter new password (min. 6 characters)">
             </div>
 
@@ -3901,32 +3886,53 @@ window.AdminPanel = (function () {
       </div>
     `;
 
-    document.getElementById('saveBrandingBtn').onclick = async () => {
-      const schoolName = document.getElementById('setSchoolName').value.trim();
-      const schoolMotto = document.getElementById('setSchoolMotto').value.trim();
-      const academicYear = document.getElementById('setYear').value.trim();
-      const phone = document.getElementById('setPhone').value.trim();
-      const email = document.getElementById('setEmail').value.trim();
-
-      const res = await API.callBackend('updateSettings', {
-        settings: { schoolName, schoolMotto, academicYear, contactPhone: phone, contactEmail: email, logoUrl: 'assets/images/school-logo.png' }
-      }, 'Updating settings...');
-
-      if (res && res.success) {
-        API.toastSuccess();
-      } else {
-        API.toastNotification(res.message || 'Error updating settings.', true);
-      }
+    let adminProfilePhoto = currentUser.photo || '';
+    const photoInput = document.getElementById('adminProfilePhotoInput');
+    const photoBox = document.getElementById('adminProfilePhotoBox');
+    const removePhotoBtn = document.getElementById('removeAdminProfilePhotoBtn');
+    if (photoInput) photoInput.onchange = async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) { API.toastNotification('Please select an image file.', true); return; }
+      if (file.size > 2 * 1024 * 1024) { API.toastNotification('Profile photo must be 2 MB or smaller.', true); photoInput.value=''; return; }
+      adminProfilePhoto = await readFileAsDataUrl(file);
+      if (photoBox) photoBox.innerHTML = `<img src="${adminProfilePhoto}" alt="Profile photo" style="width:100%;height:100%;object-fit:cover;">`;
+      const rr = await API.callBackend('updateAdminProfile',{username:currentUser.username,photo:adminProfilePhoto},'Saving profile photo...');
+      if (rr && rr.success) { currentUser.photo=adminProfilePhoto; sessionStorage.setItem('sorina_user_data',JSON.stringify(currentUser)); API.toastSuccess('Profile photo saved.'); }
+      else API.toastNotification((rr&&rr.message)||'Could not save profile photo.',true);
+    };
+    if (removePhotoBtn) removePhotoBtn.onclick = async () => {
+      adminProfilePhoto='';
+      if (photoBox) photoBox.innerHTML='👤';
+      const rr=await API.callBackend('updateAdminProfile',{username:currentUser.username,photo:''},'Removing profile photo...');
+      if(rr&&rr.success){currentUser.photo='';sessionStorage.setItem('sorina_user_data',JSON.stringify(currentUser));API.toastSuccess('Profile photo removed.');}
+      else API.toastNotification((rr&&rr.message)||'Could not remove profile photo.',true);
     };
 
-    document.getElementById('saveAdminPassBtn').onclick = () => {
-      const p = document.getElementById('adminNewPass').value;
-      if (!p || p.length < 6) {
-        API.toastNotification('Password must be at least 6 characters.', true);
-        return;
-      }
-      API.toastSuccess();
-      document.getElementById('adminNewPass').value = '';
+    let pendingLogo = s.logoUrl || 'assets/images/school-logo.png';
+    const logoInput = document.getElementById('setLogo');
+    if (logoInput) logoInput.onchange = async (e) => {
+      const file=e.target.files && e.target.files[0]; if(!file)return;
+      if(!file.type.startsWith('image/')){API.toastNotification('Please select an image file.',true);return;}
+      if(file.size>2*1024*1024){API.toastNotification('School logo must be 2 MB or smaller.',true);logoInput.value='';return;}
+      pendingLogo=await readFileAsDataUrl(file);
+      const preview=document.getElementById('schoolLogoPreview'); if(preview)preview.innerHTML=`<img src="${pendingLogo}" alt="School logo" style="width:100%;height:100%;object-fit:contain;">`;
+    };
+
+    document.getElementById('saveBrandingBtn').onclick = async () => {
+      const schoolName=document.getElementById('setSchoolName').value.trim(), schoolMotto=document.getElementById('setSchoolMotto').value.trim(), academicYear=document.getElementById('setYear').value.trim(), phone=document.getElementById('setPhone').value.trim(), email=document.getElementById('setEmail').value.trim();
+      const res=await API.callBackend('updateSettings',{settings:{schoolName,schoolMotto,academicYear,contactPhone:phone,contactEmail:email,logoUrl:pendingLogo}},'Updating school branding...');
+      if(res&&res.success){ if(window.App&&App.applyBranding) await App.applyBranding(); API.toastSuccess('School branding and configuration are now active across the portal.'); }
+      else API.toastNotification((res&&res.message)||'Error updating settings.',true);
+    };
+
+    document.getElementById('saveAdminPassBtn').onclick = async () => {
+      const currentPassword=document.getElementById('adminCurrentPass').value, newPassword=document.getElementById('adminNewPass').value;
+      if(!currentPassword){API.toastNotification('Enter your current password.',true);return;}
+      if(!newPassword||newPassword.length<6){API.toastNotification('Password must be at least 6 characters.',true);return;}
+      const res=await API.callBackend('changePassword',{username:currentUser.username,currentPassword,newPassword},'Updating administrator password...');
+      if(res&&res.success){API.toastSuccess('Administrator password updated successfully. It will be required at the next sign-in.');document.getElementById('adminCurrentPass').value='';document.getElementById('adminNewPass').value='';}
+      else API.toastNotification((res&&res.message)||'Could not update password.',true);
     };
 
     document.getElementById('adminPwaBtn').onclick = () => {
@@ -3963,9 +3969,9 @@ window.AdminPanel = (function () {
     { key: 'finance:delete', label: 'Tuition & Fees (Delete)', desc: 'Delete payment records or fee entries', group: 'Finance' },
 
     // Payroll Module
-    { key: 'payroll:view', label: 'Staff Payroll (View)', desc: 'Inspect staff compensation and payment vouchers', group: 'Payroll' },
-    { key: 'payroll:edit', label: 'Staff Payroll (Manage/Edit)', desc: 'Process payroll, edit salary amounts, add staff, mark paid', group: 'Payroll' },
-    { key: 'payroll:delete', label: 'Staff Payroll (Delete)', desc: 'Delete payroll records or salary entries', group: 'Payroll' },
+    { key: 'payroll:view', label: 'All Expenses (View)', desc: 'Inspect staff compensation and payment vouchers', group: 'Payroll' },
+    { key: 'payroll:edit', label: 'All Expenses (Manage/Edit)', desc: 'Process payroll, edit salary amounts, add staff, mark paid', group: 'Payroll' },
+    { key: 'payroll:delete', label: 'All Expenses (Delete)', desc: 'Delete payroll records or salary entries', group: 'Payroll' },
 
     // Curriculum Module
     { key: 'subjects:view', label: 'Subjects Catalog (View)', desc: 'Browse official school curriculum subjects', group: 'Curriculum' },
@@ -3991,10 +3997,14 @@ window.AdminPanel = (function () {
   ];
 
   const ROLE_PRESETS = {
-    'custom': { name: 'Custom Responsibilities', perms: [] },
+    'custom': { name: 'Other Staff — Manually Selected Responsibilities', perms: [] },
     'registrar': {
-      name: 'School Registrar / Admissions Officer',
-      perms: ['students:view', 'students:edit', 'finance:view', 'finance:edit', 'printing:view', 'printing:send', 'subjects:view']
+      name: 'School Registrar',
+      perms: ['summary:view', 'students:view', 'students:edit', 'students:delete', 'finance:view', 'finance:edit', 'finance:delete', 'payroll:view', 'payroll:edit', 'payroll:delete', 'messaging:view', 'messaging:send', 'settings:edit', 'printing:view', 'printing:send', 'export:view']
+    },
+    'vpi': {
+      name: 'Vice Principal for Instruction (VPI)',
+      perms: ['summary:view', 'teachers:view', 'teachers:edit', 'subjects:view', 'subjects:edit', 'subjects:delete', 'scores:view', 'scores:edit', 'lesson_plans:view', 'messaging:view', 'messaging:send', 'settings:edit', 'export:view']
     },
     'bursar': {
       name: 'Bursar / Financial Officer',
@@ -4052,8 +4062,12 @@ window.AdminPanel = (function () {
                 return `
                   <tr>
                     <td>
-                      <b>${escapeHtml(a.name || a.username)}</b>
-                      <div style="font-size: 11px; color: var(--color-text-muted); font-family: monospace;">@${escapeHtml(a.username)}</div>
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="width:38px;height:38px;border-radius:50%;overflow:hidden;border:1px solid #cbd5e1;display:flex;align-items:center;justify-content:center;background:#f8fafc;flex-shrink:0;">${a.photo ? `<img src="${escapeHtml(a.photo)}" style="width:100%;height:100%;object-fit:cover;">` : '👤'}</div>
+                        <div><b>${escapeHtml(a.name || a.username)}</b>
+                          <div style="font-size: 11px; color: var(--color-text-muted); font-family: monospace;">@${escapeHtml(a.username)}</div>
+                        </div>
+                      </div>
                     </td>
                     <td>
                       <span class="badge ${a.isSuperAdmin ? 'badge-success' : 'badge-info'}">${escapeHtml(a.title || a.roleTier)}</span>
@@ -4107,7 +4121,7 @@ window.AdminPanel = (function () {
       content: `
         <div style="font-size: 13.5px; max-height: 70vh; overflow-y: auto; padding-right: 6px;">
           <p style="color: var(--color-text-muted); margin-bottom: 14px;">
-            Create an administrator user account and assign their granular role and responsibilities (View, Edit, Delete per module).
+            SuperAdmin creates a separate login account for each administrator. Choose Registrar or VPI for a ready-made responsibility set, or choose Others to manually select exactly what the person can access.
           </p>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -4132,12 +4146,22 @@ window.AdminPanel = (function () {
             </div>
           </div>
 
+          <div class="form-group">
+            <label class="form-label" for="newAdmPhoto">Administrator Profile Photo</label>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div id="newAdmPhotoBox" style="width:72px;height:72px;border-radius:50%;overflow:hidden;border:2px dashed #94a3b8;display:flex;align-items:center;justify-content:center;background:#f8fafc;font-size:24px;">👤</div>
+              <input type="file" id="newAdmPhoto" class="input-field" accept="image/*" style="max-width:300px;">
+            </div>
+            <div class="form-hint">Optional. JPG, PNG or WEBP, maximum 2 MB.</div>
+          </div>
+
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
               <label class="form-label" for="newAdmPreset">Role Template / Preset</label>
               <select id="newAdmPreset" class="select-field">
-                <option value="custom">Custom Configuration</option>
-                <option value="registrar" selected>School Registrar / Admissions Officer</option>
+                <option value="custom">Others — Manually Select Responsibilities</option>
+                <option value="registrar" selected>School Registrar</option>
+                <option value="vpi">Vice Principal for Instruction (VPI)</option>
                 <option value="bursar">Bursar / Financial Officer</option>
                 <option value="principal">Academic Dean / Principal</option>
                 <option value="auditor">Staff Auditor (View Only)</option>
@@ -4148,6 +4172,8 @@ window.AdminPanel = (function () {
               <input type="text" id="newAdmTitle" class="input-field" placeholder="e.g. School Registrar, Bursar, Vice Principal" value="School Registrar">
             </div>
           </div>
+
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;padding:10px 12px;border-radius:8px;margin-top:14px;color:#1e3a8a;font-size:12px;"><b>Role setup:</b> Registrar and VPI use the recommended access below. Select <b>Others</b> when adding another staff member and manually tick only the responsibilities that person needs.</div>
 
           <div style="margin-top: 18px; border-top: 1px solid var(--color-border); padding-top: 12px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -4190,6 +4216,14 @@ window.AdminPanel = (function () {
           return;
         }
 
+        let photo = '';
+        const photoFile = document.getElementById('newAdmPhoto')?.files?.[0];
+        if (photoFile) {
+          if (!photoFile.type.startsWith('image/')) { API.toastNotification('Administrator photo must be an image.', true); return; }
+          if (photoFile.size > 2 * 1024 * 1024) { API.toastNotification('Administrator photo must be 2 MB or smaller.', true); return; }
+          photo = await readFileAsDataUrl(photoFile);
+        }
+
         const permissions = {};
         document.querySelectorAll('.adm-perm-check').forEach(chk => {
           if (chk.checked) permissions[chk.dataset.key] = true;
@@ -4201,7 +4235,8 @@ window.AdminPanel = (function () {
           email: email,
           password: password,
           title: title,
-          permissions: permissions
+          permissions: permissions,
+          photo: photo
         }, 'Creating administrator...');
 
         if (res && res.success) {
@@ -4214,6 +4249,13 @@ window.AdminPanel = (function () {
     });
 
     setTimeout(() => {
+      const photoInput = document.getElementById('newAdmPhoto');
+      const photoBox = document.getElementById('newAdmPhotoBox');
+      if (photoInput) photoInput.onchange = (e) => {
+        const f=e.target.files&&e.target.files[0]; if(!f)return;
+        if(!f.type.startsWith('image/')||f.size>2*1024*1024){API.toastNotification('Choose an image no larger than 2 MB.',true);photoInput.value='';return;}
+        const r=new FileReader(); r.onload=()=>{if(photoBox)photoBox.innerHTML=`<img src="${r.result}" style="width:100%;height:100%;object-fit:cover;">`;}; r.readAsDataURL(f);
+      };
       const selectAllBtn = document.getElementById('admSelectAllPermsBtn');
       const clearAllBtn = document.getElementById('admClearAllPermsBtn');
       const presetSelect = document.getElementById('newAdmPreset');
@@ -4262,9 +4304,13 @@ window.AdminPanel = (function () {
       title: `Permissions: ${escapeHtml(a.name || a.username)}`,
       content: `
         <div style="font-size: 13.5px; max-height: 70vh; overflow-y: auto; padding-right: 6px;">
-          <div style="background: #f1f5f9; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px;">
-            <div><b>Administrator:</b> ${escapeHtml(a.name || a.username)} (@${escapeHtml(a.username)})</div>
-            <div><b>Email:</b> ${escapeHtml(a.email)}</div>
+          <div style="background: #f1f5f9; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; display:flex;align-items:center;gap:12px;">
+            <div id="editAdmPhotoBox" style="width:64px;height:64px;border-radius:50%;overflow:hidden;border:2px solid var(--color-primary);display:flex;align-items:center;justify-content:center;background:#fff;font-size:22px;">${a.photo ? `<img src="${escapeHtml(a.photo)}" style="width:100%;height:100%;object-fit:cover;">` : '👤'}</div>
+            <div>
+              <div><b>Administrator:</b> ${escapeHtml(a.name || a.username)} (@${escapeHtml(a.username)})</div>
+              <div><b>Email:</b> ${escapeHtml(a.email)}</div>
+              <label style="display:block;margin-top:6px;font-size:11px;">Change Profile Photo <input type="file" id="editAdmPhoto" accept="image/*" style="max-width:240px;font-size:11px;"></label>
+            </div>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -4272,7 +4318,8 @@ window.AdminPanel = (function () {
               <label class="form-label" for="editAdmPreset">Apply Role Preset</label>
               <select id="editAdmPreset" class="select-field">
                 <option value="custom">Keep Current Custom</option>
-                <option value="registrar">School Registrar / Admissions Officer</option>
+                <option value="registrar">School Registrar</option>
+                <option value="vpi">Vice Principal for Instruction (VPI)</option>
                 <option value="bursar">Bursar / Financial Officer</option>
                 <option value="principal">Academic Dean / Principal</option>
                 <option value="auditor">Staff Auditor (View Only)</option>
@@ -4322,10 +4369,17 @@ window.AdminPanel = (function () {
           if (chk.checked) permissions[chk.dataset.key] = true;
         });
 
+        let photo = a.photo || '';
+        const photoFile = document.getElementById('editAdmPhoto')?.files?.[0];
+        if (photoFile) {
+          if (!photoFile.type.startsWith('image/') || photoFile.size > 2*1024*1024) { API.toastNotification('Choose an image no larger than 2 MB.', true); return; }
+          photo = await readFileAsDataUrl(photoFile);
+        }
         const payload = {
           username: a.username,
           title: title,
-          permissions: permissions
+          permissions: permissions,
+          photo: photo
         };
         if (newPass) {
           payload.newPassword = newPass;
@@ -4343,6 +4397,13 @@ window.AdminPanel = (function () {
     });
 
     setTimeout(() => {
+      const editPhotoInput = document.getElementById('editAdmPhoto');
+      const editPhotoBox = document.getElementById('editAdmPhotoBox');
+      if (editPhotoInput) editPhotoInput.onchange = (e) => {
+        const f=e.target.files&&e.target.files[0]; if(!f)return;
+        if(!f.type.startsWith('image/')||f.size>2*1024*1024){API.toastNotification('Choose an image no larger than 2 MB.',true);editPhotoInput.value='';return;}
+        const r=new FileReader(); r.onload=()=>{if(editPhotoBox)editPhotoBox.innerHTML=`<img src="${r.result}" style="width:100%;height:100%;object-fit:cover;">`;}; r.readAsDataURL(f);
+      };
       const selectAllBtn = document.getElementById('admEditSelectAllBtn');
       const clearAllBtn = document.getElementById('admEditClearAllBtn');
       const presetSelect = document.getElementById('editAdmPreset');
@@ -4546,10 +4607,15 @@ window.AdminPanel = (function () {
     removeAdmin: removeAdmin,
     openAddCustomStaffModal: openAddCustomStaffModal,
     openEditPayrollModal: openEditPayrollModal,
-    downloadPayrollReport: downloadPayrollReport,
+    downloadPayrollReport: downloadExpenses,
+    editExpense: editExpense,
+    deleteExpense: deleteExpense,
+    deleteAnnouncement: deleteAnnouncement,
     openEditPaymentModal: openEditPaymentModal,
     openRecordPaymentModal: openRecordPaymentModal,
     openClassFeeModal: openClassFeeModal,
+    openAddFeeItemModal: openAddFeeItemModal,
+    deleteFeeItem: deleteFeeItem,
     openEditStudentModal: openEditStudentModal,
     deleteStudent: deleteStudent,
     openEditTeacherModal: openEditTeacherModal,

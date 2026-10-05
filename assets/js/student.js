@@ -18,6 +18,7 @@ window.StudentPanel = (function () {
   let currentTab = 'reportCard';
   let selectedAcademicYear = '2026-2027';
   let isSidebarCollapsed = false;
+  let paymentNotifications = [];
 
   async function mount(container, user) {
     currentStudent = user;
@@ -29,6 +30,8 @@ window.StudentPanel = (function () {
     if (res && res.success && res.student) {
       currentStudent = Object.assign({}, user, res.student);
     }
+    const noticeRes = await API.callBackend('getStudentPaymentNotifications', { studentId: currentStudent.id }, 'Checking payment notices...');
+    paymentNotifications = (noticeRes && noticeRes.success && Array.isArray(noticeRes.notifications)) ? noticeRes.notifications : [];
 
     renderPortalLayout(container);
     await loadTab(currentTab);
@@ -63,7 +66,7 @@ window.StudentPanel = (function () {
 
             <a class="sidebar-item ${currentTab === 'messages' ? 'active' : ''}" data-tab="messages">
               <img src="assets/icons/mail-open.png" class="sidebar-icon" alt="">
-              <span class="sidebar-item-label">School Notices</span>
+              <span class="sidebar-item-label">School Notices${paymentNotifications.length ? ` <span class="badge badge-danger" style="margin-left:5px;">${paymentNotifications.length}</span>` : ''}</span>
             </a>
 
             <div class="nav-section-title">Account</div>
@@ -82,6 +85,15 @@ window.StudentPanel = (function () {
 
         <!-- Main Content Area -->
         <main class="portal-content">
+          ${paymentNotifications.length ? `<div class="content-card" style="margin-bottom:16px;border:1px solid #fed7aa;background:#fff7ed;">
+            <div style="display:flex;align-items:flex-start;gap:12px;">
+              <div style="width:38px;height:38px;border-radius:50%;background:#ffedd5;display:flex;align-items:center;justify-content:center;flex-shrink:0;">🔔</div>
+              <div style="flex:1;">
+                <div style="font-weight:800;color:#9a3412;margin-bottom:4px;">Payment Notice${paymentNotifications.length>1?'s':''}</div>
+                <div style="font-size:13px;color:#7c2d12;line-height:1.55;">${paymentNotifications.map(n=>`<div style="margin-top:5px;"><b>${escapeHtml(n.title)}:</b> ${escapeHtml(n.message)}</div>`).join('')}</div>
+              </div>
+            </div>
+          </div>` : ''}
           <!-- Student Overview Banner -->
           <div class="content-card" style="margin-bottom: 20px;">
             <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap;">
@@ -240,6 +252,7 @@ window.StudentPanel = (function () {
   // 2. FINANCIAL STATEMENT WITH PRINT & DOWNLOAD
   // =========================================================================
   async function renderFinanceTab(container) {
+    const branding = (window.App && App.getSettings && App.getSettings()) || {};
     const res = await API.callBackend('getStudentFinance', { studentId: currentStudent.id }, 'Fetching fee statement...');
     const f = (res && res.success && res.finance) ? res.finance : (currentStudent.finance || {});
     const inst = f.installments || [0, 0, 0, 0];
@@ -265,7 +278,7 @@ window.StudentPanel = (function () {
       <div id="printableFinanceStatement" class="content-card">
         <div style="border-bottom: 2px solid var(--color-primary); padding-bottom: 12px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <h2 style="margin: 0; color: var(--color-primary); font-size: 19px;">SORINA DAYCARE &amp; PRIMARY SCHOOL SYSTEM</h2>
+            <h2 style="margin: 0; color: var(--color-primary); font-size: 19px;">${escapeHtml(branding.schoolName || 'Sorina Daycare & Primary School System')}</h2>
             <div style="font-size: 12.5px; color: var(--color-text-muted);">Official Student Account Financial Statement</div>
           </div>
           <div style="text-align: right; font-size: 12.5px;">
@@ -340,9 +353,11 @@ window.StudentPanel = (function () {
                 <td>${currency} ${inst[3] || 0}</td>
                 <td>${inst[3] > 0 ? '<span class="badge badge-success">Recorded</span>' : '<span class="badge badge-light">Pending</span>'}</td>
               </tr>
+              <tr><td>5th Installment</td><td>${currency} ${(f.tuitionTotal || 0) / 5}</td><td>${currency} ${inst[4] || 0}</td><td>${inst[4] > 0 ? '<span class="badge badge-success">Recorded</span>' : '<span class="badge badge-light">Pending</span>'}</td></tr>
             </tbody>
           </table>
         </div>
+        ${Array.isArray(f.deadlines)?f.deadlines.map((d,i)=>d&&new Date(d)<new Date()&&!(inst[i]>0)?`<div style="margin-top:8px;background:#fff7ed;border:1px solid #fed7aa;padding:10px;border-radius:7px;color:#9a3412;font-size:13px;">Payment warning: Your ${i+1}${i===0?'st':i===1?'nd':i===2?'rd':'th'} installment deadline has passed. Please contact the school business office and make this payment as soon as possible.</div>`:'').join(''):''}
 
         <div style="margin-top: 30px; display: flex; justify-content: space-between; font-size: 12px; color: var(--color-text-muted);">
           <div>School Business Office Registrar Signature: _________________________</div>
@@ -379,10 +394,15 @@ window.StudentPanel = (function () {
   // 3. MESSAGES TAB
   // =========================================================================
   async function renderMessagesTab(container) {
-    const res = await API.callBackend('getMessages', {}, 'Fetching notices...');
+    const res = await API.callBackend('getMessages', {studentId: currentStudent.id, role:'student'}, 'Fetching notices...');
     const messages = (res && res.success && Array.isArray(res.messages)) ? res.messages : [];
+    const paymentHtml = paymentNotifications.length ? `<div style="margin-bottom:16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:14px;">
+      <div style="font-weight:800;color:#9a3412;margin-bottom:7px;">Outstanding Payment Notifications</div>
+      ${paymentNotifications.map(n=>`<div style="padding:9px 0;border-top:1px solid #fed7aa;font-size:13px;color:#7c2d12;"><b>${escapeHtml(n.title)}</b><br>${escapeHtml(n.message)}<br><small>Deadline: ${escapeHtml(n.deadline)}</small></div>`).join('')}
+    </div>` : '';
 
     container.innerHTML = `
+      ${paymentHtml}
       <div class="content-card">
         <h3 class="card-title" style="margin-bottom: 16px;">School Announcements &amp; Notices</h3>
         ${messages.length === 0 ? `
@@ -397,7 +417,7 @@ window.StudentPanel = (function () {
                   <strong style="color: var(--color-primary); font-size: 15px;">${escapeHtml(m.subject || 'Announcement')}</strong>
                   <span style="font-size: 12px; color: var(--color-text-muted);">${escapeHtml(m.sentAt || '')}</span>
                 </div>
-                <div style="font-size: 13.5px; color: var(--color-text); line-height: 1.5;">${escapeHtml(m.body || '')}</div>
+                <div style="font-size: 13.5px; color: var(--color-text); line-height: 1.5;">${escapeHtml(m.body || '')}</div>${m.attachmentUrl?`<div style="margin-top:8px;"><a class="btn btn-light btn-sm" href="${escapeHtml(m.attachmentUrl)}" target="_blank">View Attachment</a></div>`:''}
                 <div style="margin-top: 8px; font-size: 12px; color: var(--color-text-dim);">From: ${escapeHtml(m.senderName || 'School Administration')}</div>
               </div>
             `).join('')}
@@ -425,18 +445,18 @@ window.StudentPanel = (function () {
             <label class="form-label">Student ID</label>
             <input type="text" class="input-field" value="${escapeHtml(currentStudent.id)}" disabled>
           </div>
+          <div class="form-group"><label class="form-label">Portal Login Password</label><input type="text" class="input-field" value="${escapeHtml(currentStudent.password || 'Not available')}" disabled></div>
+          <div style="padding:10px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:7px;font-size:12.5px;color:#334155;">These are the exact Student ID and password credentials registered by the school for this portal account.</div>
 
-          <div class="form-group">
-            <label class="form-label">Parent / Guardian Contact Phone</label>
-            <input type="text" id="settingPhone" class="input-field" value="${escapeHtml(currentStudent.phone || '')}" placeholder="+231-...">
-          </div>
+           <div style="margin-top:14px;padding:12px;background:#f8fafc;border:1px solid var(--color-border);border-radius:8px;">
+             <h4 style="margin:0 0 6px;color:var(--color-primary);font-size:14px;">Assigned Subjects</h4>
+             <div style="font-size:12px;color:#64748b;margin-bottom:8px;">These are the subjects assigned specifically to your student record and used on your report card.</div>
+             <div>${Array.isArray(currentStudent.curriculumSubjects) && currentStudent.curriculumSubjects.length
+               ? currentStudent.curriculumSubjects.map(x=>`<span class="badge badge-light" style="margin:2px;">${escapeHtml(x)}</span>`).join('')
+               : '<span style="color:#94a3b8;">No subjects have been assigned yet.</span>'}</div>
+           </div>
 
-          <div class="form-group">
-            <label class="form-label">Profile Photo (Upload / Take Photo)</label>
-            <input type="file" id="settingPhotoInput" class="input-field" accept="image/*">
-          </div>
-
-          <button type="button" class="btn btn-primary" id="saveContactBtn">Update Profile Details</button>
+          <div style="padding:12px;background:#f8fafc;border:1px solid var(--color-border);border-radius:8px;color:#64748b;font-size:13px;">Student name, guardian phone number, and profile picture are managed by the school administration and cannot be changed from the student dashboard.</div>
         </div>
 
         <div class="content-card" style="margin-bottom: 20px;">
@@ -475,28 +495,6 @@ window.StudentPanel = (function () {
         </div>
       </div>
     `;
-
-    document.getElementById('saveContactBtn').onclick = async () => {
-      const phone = document.getElementById('settingPhone').value.trim();
-      const photoFile = document.getElementById('settingPhotoInput').files[0];
-
-      let photoBase64 = currentStudent.photo || '';
-      if (photoFile) {
-        photoBase64 = await readFileAsDataUrl(photoFile);
-      }
-
-      const res = await API.callBackend('updateStudent', {
-        student: { id: currentStudent.id, phone: phone, photo: photoBase64 }
-      }, 'Saving profile...');
-
-      if (res && res.success) {
-        currentStudent.phone = phone;
-        if (photoBase64) currentStudent.photo = photoBase64;
-        API.toastSuccess();
-      } else {
-        API.toastNotification(res.message || 'Could not update profile.', true);
-      }
-    };
 
     document.getElementById('changePasswordBtn').onclick = async () => {
       const p1 = document.getElementById('studentNewPassword').value;
@@ -562,6 +560,7 @@ window.StudentPanel = (function () {
   }
 
   function buildReceiptCardHtml(s) {
+    const branding = (window.App && App.getSettings && App.getSettings()) || {};
     const f = s.finance || {};
     const currency = f.currency || 'USD';
     const installments = f.installments || [0, 0, 0, 0];
@@ -593,9 +592,9 @@ window.StudentPanel = (function () {
     return `
       <div class="receiptCard">
         <div class="receiptTopBrand">
-          <img class="receiptTopLogo" src="assets/images/school-logo.png" alt="Logo" onerror="this.style.display='none'">
-          <div class="receiptTopSchoolName">Sorina Daycare &amp; Primary School System</div>
-          <div class="receiptTopMotto">Excellence in Knowledge, Character &amp; Integrity</div>
+          <img class="receiptTopLogo" src="${escapeHtml(branding.logoUrl || 'assets/images/school-logo.png')}" alt="Logo" onerror="this.style.display='none'">
+          <div class="receiptTopSchoolName">${escapeHtml(branding.schoolName || 'Sorina Daycare & Primary School System')}</div>
+          <div class="receiptTopMotto">${escapeHtml(branding.schoolMotto || 'Excellence in Knowledge, Character & Integrity')}</div>
         </div>
         <div class="receiptHeaderRule"></div>
         <div class="receiptStudentPhotoRow">

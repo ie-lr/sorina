@@ -34,7 +34,7 @@ const Auth = (function () {
           emailGroup.classList.remove('hidden');
           mfaGroup.classList.remove('hidden');
         } else if (activeRole === 'teacher') {
-          userLabel.textContent = 'Teacher ID or Name';
+          userLabel.textContent = 'Teacher ID';
           userInput.placeholder = 'e.g. SPST001';
           heading.textContent = 'Teacher Portal Sign In';
           subtitle.textContent = 'Access your assigned classes, enter grades, and submit lesson plans.';
@@ -190,7 +190,7 @@ const Auth = (function () {
 
     container.innerHTML = `
       <div class="user-badge" style="display: flex; align-items: center; gap: 6px;">
-        <img src="assets/icons/circle-user-round.png" style="width: 16px; height: 16px;" alt="">
+        ${user.photo ? `<img src="${escapeHtml(user.photo)}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;border:1px solid rgba(255,255,255,.55);" alt="Profile">` : `<img src="assets/icons/circle-user-round.png" style="width: 16px; height: 16px;" alt="">`}
         <b>${escapeHtml(user.name || user.username)}</b>
         <span style="opacity: 0.8; font-size: 11px;">(${escapeHtml(user.role)})</span>
       </div>

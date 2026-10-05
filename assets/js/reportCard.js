@@ -37,7 +37,6 @@ const ReportCard = (function () {
       if (upper === 'D' || upper === 'F') return `<span class="gradeRed">${escapeHtml(str)}</span>`;
       return escapeHtml(str);
     }
-    if (num >= 91) return `<span class="gradeGreen">${num}</span>`;
     if (num >= 70) return `<span class="gradeBlue">${num}</span>`;
     return `<span class="gradeRed">${num}</span>`;
   }
@@ -54,11 +53,8 @@ const ReportCard = (function () {
     const school = rcData.school || {};
     const student = rcData.student || {};
     const summary = rcData.summary || {};
-    const rows = Array.isArray(rcData.rows) && rcData.rows.length > 0 ? rcData.rows : DEFAULT_SUBJECTS.map(s => ({
-      subject: s,
-      p1: '-', p2: '-', p3: '-', exam1: '-', sem1Avg: '-',
-      p4: '-', p5: '-', p6: '-', exam2: '-', sem2Avg: '-', yearlyAvg: '-'
-    }));
+    // Only render subjects returned for this student. Do not inject default/catalog subjects.
+    const rows = Array.isArray(rcData.rows) ? rcData.rows : [];
 
     const schoolName = 'Sorina Daycare & Primary School System';
     const schoolMotto = school.motto || 'Excellence in Knowledge, Character & Integrity';
@@ -186,9 +182,9 @@ const ReportCard = (function () {
           <div class="rcGradeKey">
             <b>Method of Grading</b>
             <div class="rcGradeKeyGrid">
-              <span class="gradeGreen">91 &amp; above — Excellent</span>
-              <span class="gradeBlue">70 – 90 — Passing</span>
-              <span class="gradeRed">Below 70 — Failing</span>
+              <span class="gradeGreen">70 – 100 — Passing</span>
+              <span class="gradeBlue">60 – 69 — Needs Improvement</span>
+              <span class="gradeRed">Below 60 — Below Passing</span>
             </div>
           </div>
         </div>

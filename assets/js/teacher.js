@@ -26,7 +26,8 @@ window.TeacherPanel = (function () {
 
   async function mount(container, user) {
     currentTeacher = user;
-    currentAssignments = user.assignments || [];
+    currentAssignments = (user.assignments || []).filter(a => !a.academicYear || String(a.academicYear) === String(user.academicYear || '2026-2027'));
+    currentTeacher.academicYear = user.academicYear || '2026-2027';
     currentTab = 'grades';
 
     if (currentAssignments.length > 0) {
@@ -107,7 +108,7 @@ window.TeacherPanel = (function () {
                     ${escapeHtml(currentTeacher.name)}
                   </h2>
                   <div style="font-size: 13px; color: var(--color-text-muted); margin-top: 2px;">
-                    Teacher ID: <b>[${escapeHtml(currentTeacher.id)}]</b> &bull; ${escapeHtml(currentTeacher.title || 'Teacher')}
+                    Teacher ID: <b>[${escapeHtml(currentTeacher.id)}]</b> &bull; ${escapeHtml(currentTeacher.title || 'Teacher')} &bull; Academic Year: <b>${escapeHtml(String(currentTeacher.academicYear).replace('-', '–'))}</b>
                   </div>
                 </div>
               </div>
@@ -295,7 +296,7 @@ window.TeacherPanel = (function () {
 
     tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 25px;">Loading students in ' + escapeHtml(selectedClass) + '...</td></tr>';
 
-    const res = await API.callBackend('getStudentsByClass', { className: selectedClass }, 'Fetching class roster...');
+    const res = await API.callBackend('getStudentsByClass', { className: selectedClass, teacherId: currentTeacher.id, academicYear: currentTeacher.academicYear }, 'Fetching class roster...');
     currentRoster = (res && res.success && Array.isArray(res.students)) ? res.students : [];
 
     if (currentRoster.length === 0) {
@@ -306,7 +307,7 @@ window.TeacherPanel = (function () {
     const isNursery = isNurserySection(selectedClass);
 
     tbody.innerHTML = currentRoster.map(s => {
-      const year = s.academicYear || '2026-2027';
+      const year = currentTeacher.academicYear || s.academicYear || '2026-2027';
       const scores = (s.years && s.years[year]) || [];
       const subScore = scores.find(sc => String(sc.subject || '').trim().toLowerCase() === selectedSubject.toLowerCase()) || {};
 
@@ -388,7 +389,7 @@ window.TeacherPanel = (function () {
       teacherId: currentTeacher.id,
       className: selectedClass,
       subject: selectedSubject,
-      academicYear: '2026-2027',
+      academicYear: currentTeacher.academicYear || '2026-2027',
       grades: gradesPayload
     }, 'Saving grade values...');
 
@@ -479,7 +480,9 @@ window.TeacherPanel = (function () {
             </div>
             <div class="form-group">
               <label class="form-label" for="lpSubject">Subject *</label>
-              <input type="text" id="lpSubject" class="input-field" value="${escapeHtml(selectedSubject || 'General Science')}">
+              <select id="lpSubject" class="select-field">
+                ${(currentAssignments.find(a => a.class === clsForLesson())?.subjects || [selectedSubject]).filter(Boolean).map(s => `<option value="${escapeHtml(s)}" ${s === selectedSubject ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
+              </select>
             </div>
           </div>
           <div class="form-group">
@@ -505,6 +508,10 @@ window.TeacherPanel = (function () {
           API.toastNotification('Title and lesson details are required.', true);
           return;
         }
+        if (!isAssignedClassAndSubject(cls, sub)) {
+          API.toastNotification('You can only submit a lesson plan for your assigned class and subject.', true);
+          return;
+        }
 
         let fileDataUrl = '';
         let fileName = '';
@@ -522,7 +529,8 @@ window.TeacherPanel = (function () {
             attachmentUrl: fileDataUrl,
             attachmentName: fileName,
             teacherId: currentTeacher.id,
-            teacherName: currentTeacher.name
+            teacherName: currentTeacher.name,
+            academicYear: currentTeacher.academicYear || '2026-2027'
           }
         }, 'Submitting lesson plan...');
 
@@ -623,7 +631,9 @@ window.TeacherPanel = (function () {
             </div>
             <div class="form-group">
               <label class="form-label" for="testSubject">Subject *</label>
-              <input type="text" id="testSubject" class="input-field" value="${escapeHtml(selectedSubject || 'Mathematics')}">
+              <select id="testSubject" class="select-field">
+                ${(currentAssignments.find(a => a.class === selectedClass)?.subjects || [selectedSubject]).filter(Boolean).map(s => `<option value="${escapeHtml(s)}" ${s === selectedSubject ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
+              </select>
             </div>
           </div>
           <div class="form-group">
@@ -663,6 +673,10 @@ window.TeacherPanel = (function () {
           API.toastNotification('Test title and question paper file are required.', true);
           return;
         }
+        if (!isAssignedClassAndSubject(cls, sub)) {
+          API.toastNotification('You can only submit a test for your assigned class and subject.', true);
+          return;
+        }
 
         const fileDataUrl = await readFileAsDataUrl(file);
 
@@ -692,7 +706,7 @@ window.TeacherPanel = (function () {
   // 4. MESSAGES TAB
   // =========================================================================
   async function renderMessagesTab(container) {
-    const res = await API.callBackend('getMessages', {}, 'Fetching notices...');
+    const res = await API.callBackend('getMessages', {teacherId: currentTeacher.id, role:'teacher'}, 'Fetching notices...');
     const messages = (res && res.success && Array.isArray(res.messages)) ? res.messages : [];
 
     container.innerHTML = `
@@ -710,7 +724,7 @@ window.TeacherPanel = (function () {
                   <strong style="color: var(--color-primary); font-size: 15px;">${escapeHtml(m.subject || 'Staff Notice')}</strong>
                   <span style="font-size: 12px; color: var(--color-text-muted);">${escapeHtml(m.sentAt || '')}</span>
                 </div>
-                <div style="font-size: 13.5px; color: var(--color-text); line-height: 1.5;">${escapeHtml(m.body || '')}</div>
+                <div style="font-size: 13.5px; color: var(--color-text); line-height: 1.5;">${escapeHtml(m.body || '')}</div>${m.recipientId?`<div style="font-size:12px;margin-top:5px;color:#475569;">Direct to ID: <b>${escapeHtml(m.recipientId)}</b></div>`:''}${m.attachmentUrl?`<div style="margin-top:8px;"><a class="btn btn-light btn-sm" href="${escapeHtml(m.attachmentUrl)}" target="_blank">View Attachment</a></div>`:''}
                 <div style="margin-top: 8px; font-size: 12px; color: var(--color-text-dim);">From: ${escapeHtml(m.senderName || 'School Administration')}</div>
               </div>
             `).join('')}
@@ -727,158 +741,75 @@ window.TeacherPanel = (function () {
     container.innerHTML = `
       <div style="max-width: 600px;">
         <div class="content-card" style="margin-bottom: 20px;">
-          <h3 class="card-title" style="margin-bottom: 16px;">Teacher Profile &amp; Contact</h3>
-          
-          <div class="form-group">
-            <label class="form-label">Full Name</label>
-            <input type="text" id="teacherSettingName" class="input-field" value="${escapeHtml(currentTeacher.name)}">
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Teacher ID</label>
-            <input type="text" class="input-field" value="[${escapeHtml(currentTeacher.id)}]" disabled>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Contact Phone</label>
-            <input type="text" id="teacherSettingPhone" class="input-field" value="${escapeHtml(currentTeacher.phone || '')}" placeholder="+231-...">
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Profile Photo (Upload / Camera)</label>
-            <input type="file" id="teacherPhotoInput" class="input-field" accept="image/*">
-          </div>
-
-          <button type="button" class="btn btn-primary" id="saveTeacherProfileBtn">Save Profile Details</button>
+          <h3 class="card-title" style="margin-bottom: 16px;">Teacher Account Information</h3>
+          <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="input-field" value="${escapeHtml(currentTeacher.name)}" disabled></div>
+          <div class="form-group"><label class="form-label">Teacher ID</label><input type="text" class="input-field" value="[${escapeHtml(currentTeacher.id)}]" disabled></div>
+          <div class="form-group"><label class="form-label">Position</label><input type="text" class="input-field" value="${escapeHtml(currentTeacher.title || 'Teacher')}" disabled></div>
+          <div style="padding:12px;background:#f8fafc;border:1px solid var(--color-border);border-radius:8px;color:#64748b;font-size:13px;">Your name, phone number, and profile picture are managed by the school administration and cannot be changed from the teacher dashboard.</div>
         </div>
 
         <div class="content-card" style="margin-bottom: 20px;">
           <h3 class="card-title" style="margin-bottom: 16px;">Security &amp; Password</h3>
-          <div class="form-group">
-            <label class="form-label">New Password</label>
-            <input type="password" id="tNewPassword" class="input-field" placeholder="Enter new password (min. 4 characters)">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Confirm Password</label>
-            <input type="password" id="tConfirmPassword" class="input-field" placeholder="Confirm new password">
-          </div>
+          <div class="form-group"><label class="form-label">New Password</label><input type="password" id="tNewPassword" class="input-field" placeholder="Enter new password (min. 4 characters)"></div>
+          <div class="form-group"><label class="form-label">Confirm Password</label><input type="password" id="tConfirmPassword" class="input-field" placeholder="Confirm password"></div>
           <button type="button" class="btn btn-primary" id="saveTeacherPassBtn">Update Password</button>
         </div>
 
         <div class="content-card">
-          <h3 class="card-title" style="margin-bottom: 12px;">Mobile Application (PWA)</h3>
-          <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 14px;">
-            Install the app directly on your smartphone for offline grade sheets and attendance.
-          </p>
-          <button type="button" class="btn btn-light" id="teacherPwaBtn" style="display: flex; align-items: center; gap: 8px;">
-            <img src="assets/icons/download (2).png" style="width: 16px; height: 16px;" alt="">
-            Install App to Device
-          </button>
-        </div>
-
-        <div class="content-card" style="margin-top: 20px;">
           <h3 class="card-title" style="margin-bottom: 12px;">Account Session</h3>
-          <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 14px;">
-            Sign out of your teacher portal session on this device.
-          </p>
-          <button type="button" class="btn btn-danger" id="teacherSettingsSignOutBtn" data-action="logout" style="display: flex; align-items: center; gap: 8px;">
-            <img src="assets/icons/log-out.png" style="width: 16px; height: 16px; filter: brightness(0) invert(1);" alt="">
-            Sign Out
-          </button>
+          <button type="button" class="btn btn-danger" id="teacherSettingsSignOutBtn" data-action="logout">Sign Out</button>
         </div>
-      </div>
-    `;
-
-    document.getElementById('saveTeacherProfileBtn').onclick = async () => {
-      const name = document.getElementById('teacherSettingName').value.trim();
-      const phone = document.getElementById('teacherSettingPhone').value.trim();
-      const photoFile = document.getElementById('teacherPhotoInput').files[0];
-
-      let photoBase64 = currentTeacher.photo || '';
-      if (photoFile) {
-        photoBase64 = await readFileAsDataUrl(photoFile);
-      }
-
-      const res = await API.callBackend('saveTeacher', {
-        teacher: {
-          id: currentTeacher.id,
-          name: name,
-          phone: phone,
-          photo: photoBase64,
-          assignments: currentAssignments
-        }
-      }, 'Saving profile...');
-
-      if (res && res.success) {
-        currentTeacher.name = name;
-        currentTeacher.phone = phone;
-        if (photoBase64) currentTeacher.photo = photoBase64;
-        API.toastSuccess();
-      } else {
-        API.toastNotification(res.message || 'Error updating profile.', true);
-      }
-    };
+      </div>`;
 
     document.getElementById('saveTeacherPassBtn').onclick = async () => {
       const p1 = document.getElementById('tNewPassword').value;
       const p2 = document.getElementById('tConfirmPassword').value;
-
-      if (!p1 || p1.length < 4) {
-        API.toastNotification('Password must be at least 4 characters.', true);
-        return;
-      }
-      if (p1 !== p2) {
-        API.toastNotification('Passwords do not match.', true);
-        return;
-      }
-
-      const res = await API.callBackend('saveTeacher', {
-        teacher: { id: currentTeacher.id, password: p1, name: currentTeacher.name }
-      }, 'Changing password...');
-
-      if (res && res.success) {
-        API.toastSuccess();
-        document.getElementById('tNewPassword').value = '';
-        document.getElementById('tConfirmPassword').value = '';
-      } else {
-        API.toastNotification(res.message || 'Error updating password.', true);
-      }
+      if (!p1 || p1.length < 4) { API.toastNotification('Password must be at least 4 characters.', true); return; }
+      if (p1 !== p2) { API.toastNotification('Passwords do not match.', true); return; }
+      const res = await API.callBackend('saveTeacher', { teacher: { id: currentTeacher.id, password: p1, name: currentTeacher.name } }, 'Changing password...');
+      if (res && res.success) { API.toastSuccess(); document.getElementById('tNewPassword').value=''; document.getElementById('tConfirmPassword').value=''; }
+      else API.toastNotification(res.message || 'Error updating password.', true);
     };
-
-    document.getElementById('teacherPwaBtn').onclick = () => {
-      const btn = document.getElementById('installAppBtn');
-      if (btn) btn.click();
-      else API.toastNotification('App install ready via browser menu (Add to Home Screen).');
-    };
-
-    const signOutBtn = document.getElementById('teacherSettingsSignOutBtn');
-    if (signOutBtn) {
-      signOutBtn.onclick = () => {
-        if (window.Auth) window.Auth.logout();
-      };
-    }
   }
 
   async function viewStudentReport(studentId) {
-    const res = await API.callBackend('getReportCard', { studentId: studentId }, 'Loading student report...');
-    if (res && res.success && res.reportCard) {
-      App.showModal({
-        title: 'Student Cumulative Report Card',
-        content: '<div id="teacherRcMount"></div>',
-        confirmText: 'Done',
-        cancelText: 'Close'
-      });
-      ReportCard.render(res.reportCard, '#teacherRcMount');
-    } else {
-      API.toastNotification(res.message || 'Unable to load report card.', true);
+    const student = currentRoster.find(s => String(s.id) === String(studentId));
+    if (!student) {
+      API.toastNotification('Student record is no longer available in your assigned class.', true);
+      return;
     }
+
+    const res = await API.callBackend('getReportCard', { studentId: studentId }, 'Loading student report...');
+    if (!(res && res.success && res.reportCard)) {
+      API.toastNotification((res && res.message) || 'Unable to load this student report.', true);
+      return;
+    }
+
+    App.showModal({
+      title: `Student Report — ${student.name}`,
+      content: '<div id="teacherStudentReportMount" style="max-height:70vh;overflow:auto;"></div>',
+      confirmText: 'Close',
+      onConfirm: () => {}
+    });
+
+    setTimeout(() => {
+      const mount = document.getElementById('teacherStudentReportMount');
+      if (mount && window.ReportCard && typeof ReportCard.render === 'function') {
+        ReportCard.render(res.reportCard, mount);
+      }
+    }, 50);
   }
 
-  function isNurserySection(className) {
-    if (!className) return false;
-    const str = String(className).toLowerCase();
-    return ['nursery', 'k-1', 'k-2', 'kg-1', 'kg-2', 'kindergarten', 'pre-k'].some(k => str.includes(k));
+  function clsForLesson() {
+    return selectedClass || (currentAssignments[0] && currentAssignments[0].class) || '';
   }
+
+  function isAssignedClassAndSubject(className, subject) {
+    const a = currentAssignments.find(x => String(x.class).trim() === String(className).trim());
+    return !!a && Array.isArray(a.subjects) && a.subjects.some(x => String(x).trim().toLowerCase() === String(subject).trim().toLowerCase());
+  }
+
+  function isNurserySection(className) { return ['daycare','nursery','abc'].includes(String(className||'').trim().toLowerCase()); }
 
   function readFileAsDataUrl(file) {
     return new Promise((resolve) => {
