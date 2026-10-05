@@ -3861,25 +3861,6 @@ window.AdminPanel = (function () {
             <button type="button" class="btn btn-primary" id="saveAdminPassBtn">Change Password</button>
           </div>
 
-          <!-- Google Sheets Database Connection -->
-          <div class="content-card" style="margin-bottom: 20px;">
-            <h3 class="card-title" style="margin-bottom: 8px;">Google Sheets Database Connection</h3>
-            <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 12px;">
-              Connect this portal directly to your Google Sheets database via your deployed Google Apps Script Web App URL.
-            </p>
-            <div class="form-group">
-              <label class="form-label" for="adminBackendUrlInput">Apps Script Web App URL (ends in /exec):</label>
-              <input type="url" id="adminBackendUrlInput" class="input-field" placeholder="https://script.google.com/macros/s/.../exec" value="${escapeHtml(API.getBackendUrl())}">
-              <div class="form-hint" id="backendConnStatusHint">
-                ${API.getBackendUrl() ? '<span style="color:#059669;font-weight:600;">Endpoint configured. Click Test Connection to verify live response.</span>' : '<span style="color:#d97706;font-weight:600;">Operating in Local Demo Mode. Real Google Sheets database is not connected.</span>'}
-              </div>
-            </div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button type="button" class="btn btn-primary" id="saveBackendUrlBtn">Save &amp; Connect</button>
-              <button type="button" class="btn btn-light" id="testBackendConnBtn">Test Live Connection</button>
-            </div>
-          </div>
-
           <div class="content-card">
             <h3 class="card-title" style="margin-bottom: 12px;">Mobile Application (PWA)</h3>
             <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 14px;">
@@ -3959,43 +3940,6 @@ window.AdminPanel = (function () {
       if (btn) btn.click();
       else API.toastNotification('App install ready via browser menu (Add to Home Screen).');
     };
-
-    const saveBackendUrlBtn = document.getElementById('saveBackendUrlBtn');
-    const testBackendConnBtn = document.getElementById('testBackendConnBtn');
-    const backendInput = document.getElementById('adminBackendUrlInput');
-    const statusHint = document.getElementById('backendConnStatusHint');
-
-    if (saveBackendUrlBtn && backendInput) {
-      saveBackendUrlBtn.onclick = () => {
-        const val = backendInput.value.trim();
-        API.setBackendUrl(val);
-        API.toastSuccess('Backend URL updated.');
-        if (statusHint) {
-          statusHint.innerHTML = val
-            ? '<span style="color:#059669;font-weight:600;">Endpoint saved. Click Test Connection to verify live response.</span>'
-            : '<span style="color:#d97706;font-weight:600;">Operating in Local Demo Mode.</span>';
-        }
-      };
-    }
-
-    if (testBackendConnBtn && backendInput) {
-      testBackendConnBtn.onclick = async () => {
-        const val = backendInput.value.trim();
-        if (!val) {
-          API.toastNotification('Please enter an Apps Script Web App URL to test.', true);
-          return;
-        }
-        API.setBackendUrl(val);
-        const res = await API.callBackend('ping', {}, 'Testing database connection...');
-        if (res && res.success) {
-          API.toastSuccess('Database connection verified!');
-          if (statusHint) statusHint.innerHTML = '<span style="color:#059669;font-weight:700;">🟢 Live Google Sheets Database Connected &amp; Responding!</span>';
-        } else {
-          API.toastNotification(res.message || 'Connection failed. Verify deployment is set to "Anyone".', true);
-          if (statusHint) statusHint.innerHTML = `<span style="color:#dc2626;font-weight:700;">🔴 Connection Failed: ${escapeHtml(res.message || 'Check URL and access settings')}</span>`;
-        }
-      };
-    }
 
     const signOutBtn = document.getElementById('adminSettingsLogoutBtn');
     if (signOutBtn) {

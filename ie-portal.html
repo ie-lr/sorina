@@ -119,6 +119,12 @@
         <button type="submit" id="devLoginBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 10px; font-weight: 700;">
           Authenticate to Console
         </button>
+
+        <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid #1e293b; text-align: center;">
+          <a href="#" id="devPreLoginEndpointBtn" style="color: #60a5fa; font-size: 12.5px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+            ⚙️ Configure Google Apps Script Web App Endpoint URL
+          </a>
+        </div>
       </form>
     </div>
   </main>
@@ -152,11 +158,15 @@
       <button class="nav-tab-item active" data-tab="signals" style="color: #cbd5e1;">🚨 Security Signals &amp; Forceful Entries</button>
       <button class="nav-tab-item" data-tab="printQueue" style="color: #cbd5e1;">🖨️ Printing Dispatch Queue</button>
       <button class="nav-tab-item" data-tab="messages" style="color: #cbd5e1;">✉️ Admin Direct Messaging</button>
+      <button class="nav-tab-item" data-tab="database" style="color: #cbd5e1;">🗄️ Database &amp; Infrastructure</button>
     </div>
 
     <!-- Tab Container -->
     <div id="devTabContainer"></div>
   </main>
+
+  <!-- Modal Container for Developer Tools -->
+  <div id="modalContainer"></div>
 
   <script src="assets/js/api.js"></script>
   <script src="assets/js/iePortal.js"></script>

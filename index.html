@@ -50,50 +50,126 @@
           <button type="button" class="role-tab-btn active" data-role="student" role="tab">Student</button>
           <button type="button" class="role-tab-btn" data-role="teacher" role="tab">Teacher</button>
           <button type="button" class="role-tab-btn" data-role="admin" role="tab">Admin</button>
+          <button type="button" class="role-tab-btn" data-role="ie" role="tab" style="font-weight: 700;">IE Developer</button>
         </div>
-
-        <h2 id="loginHeading" style="margin: 0 0 6px; color: var(--color-primary); font-size: 22px;">Student Portal Sign In</h2>
-        <p id="loginSubtitle" style="margin: 0 0 20px; font-size: 13.5px; color: var(--color-text-muted);">
-          Enter your Student ID and password to access your grades and records.
-        </p>
 
         <!-- Feedback Alert Container -->
         <div id="loginAlert" class="alert alert-danger hidden" role="alert"></div>
 
-        <form id="gatewayLoginForm" autocomplete="off" onsubmit="return false;">
-          <!-- Identifier Input -->
+        <!-- 1. Student Login Form -->
+        <form id="studentLoginForm" class="login-role-form" autocomplete="off" onsubmit="return false;">
+          <h2 style="margin: 0 0 6px; color: var(--color-primary); font-size: 21px;">Student Portal Sign In</h2>
+          <p style="margin: 0 0 18px; font-size: 13px; color: var(--color-text-muted);">
+            Enter your Systematic Student ID and password to access grades, attendance, and fee status.
+          </p>
+
           <div class="form-group">
-            <label class="form-label" id="usernameLabel" for="loginUsername">Student ID</label>
-            <input type="text" id="loginUsername" class="input-field" placeholder="e.g. SPSS001" required autocomplete="username">
+            <label class="form-label" for="studentLoginId">Student ID</label>
+            <input type="text" id="studentLoginId" class="input-field" placeholder="e.g. SPSS001" required autocomplete="username">
           </div>
 
-          <!-- Password Input -->
           <div class="form-group">
-            <label class="form-label" for="loginPassword">Password</label>
-            <input type="password" id="loginPassword" class="input-field" placeholder="Enter your password" required autocomplete="current-password">
+            <label class="form-label" for="studentLoginPass">Password</label>
+            <input type="password" id="studentLoginPass" class="input-field" placeholder="Enter your password" required autocomplete="current-password">
           </div>
 
-          <!-- Admin Verified Email (Admin Only) -->
-          <div class="form-group hidden" id="adminEmailGroup">
-            <label class="form-label" for="loginEmail">Verified Admin Email <span style="color: var(--color-danger);">*</span></label>
-            <input type="email" id="loginEmail" class="input-field" placeholder="admin@ieschools.edu" autocomplete="email">
-            <div class="form-hint">Admin sign-in requires matching the verified administrator email address.</div>
-          </div>
-
-          <!-- MFA Code (Admin Only) -->
-          <div class="form-group hidden" id="mfaCodeGroup">
-            <label class="form-label" for="loginMfa">MFA Verification Code (Optional)</label>
-            <input type="text" id="loginMfa" class="input-field" placeholder="6-digit TOTP / Auth Code" maxlength="8">
-          </div>
-
-          <!-- Submit Button -->
-          <button type="submit" id="loginSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 8px;">
-            Sign In to Portal
+          <button type="submit" id="studentLoginBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 8px;">
+            Sign In as Student
           </button>
 
-          <!-- Links (Endpoint removed) -->
-          <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 18px; font-size: 13px;">
-            <a href="#" id="forgotPasswordLink">Forgot Password?</a>
+          <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 16px; font-size: 13px;">
+            <a href="#" class="forgot-pass-trigger">Forgot Password?</a>
+          </div>
+        </form>
+
+        <!-- 2. Teacher Login Form -->
+        <form id="teacherLoginForm" class="login-role-form hidden" autocomplete="off" onsubmit="return false;">
+          <h2 style="margin: 0 0 6px; color: var(--color-primary); font-size: 21px;">Teacher Portal Sign In</h2>
+          <p style="margin: 0 0 18px; font-size: 13px; color: var(--color-text-muted);">
+            Enter your Systematic Teacher ID and password to access assigned classes and record grades.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label" for="teacherLoginId">Teacher ID</label>
+            <input type="text" id="teacherLoginId" class="input-field" placeholder="e.g. SPST001" required autocomplete="username">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="teacherLoginPass">Password</label>
+            <input type="password" id="teacherLoginPass" class="input-field" placeholder="Enter your password" required autocomplete="current-password">
+          </div>
+
+          <button type="submit" id="teacherLoginBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 8px;">
+            Sign In as Teacher
+          </button>
+
+          <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 16px; font-size: 13px;">
+            <a href="#" class="forgot-pass-trigger">Forgot Password?</a>
+          </div>
+        </form>
+
+        <!-- 3. Admin Login Form -->
+        <form id="adminLoginForm" class="login-role-form hidden" autocomplete="off" onsubmit="return false;">
+          <h2 style="margin: 0 0 6px; color: var(--color-primary); font-size: 21px;">Administrator Sign In</h2>
+          <p style="margin: 0 0 18px; font-size: 13px; color: var(--color-text-muted);">
+            Authorized school administrators, registrars, and bursars only.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label" for="adminLoginUser">Administrator Username</label>
+            <input type="text" id="adminLoginUser" class="input-field" placeholder="e.g. admin or Principal" required autocomplete="username">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="adminLoginPass">Password</label>
+            <input type="password" id="adminLoginPass" class="input-field" placeholder="Enter administrator password" required autocomplete="current-password">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="adminLoginEmail">Verified Admin Email <span style="color: var(--color-danger);">*</span></label>
+            <input type="email" id="adminLoginEmail" class="input-field" placeholder="admin@ieschools.edu" required autocomplete="email">
+            <div class="form-hint">Matching verified email address is required for administrator authentication.</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="adminLoginMfa">MFA Verification Code (Optional)</label>
+            <input type="text" id="adminLoginMfa" class="input-field" placeholder="6-digit TOTP / Auth Code" maxlength="8">
+          </div>
+
+          <button type="submit" id="adminLoginBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 8px;">
+            Sign In as Administrator
+          </button>
+
+          <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 16px; font-size: 13px;">
+            <a href="#" class="forgot-pass-trigger">Forgot Password?</a>
+          </div>
+        </form>
+
+        <!-- 4. IE Developer Login Form -->
+        <form id="ieLoginForm" class="login-role-form hidden" autocomplete="off" onsubmit="return false;">
+          <h2 style="margin: 0 0 6px; color: #1e3a8a; font-size: 21px;">IE Developer Console</h2>
+          <p style="margin: 0 0 18px; font-size: 13px; color: var(--color-text-muted);">
+            Authorized IE Digital Works engineers only. Dedicated infrastructure, database endpoint &amp; kill-switch controls.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label" for="ieLoginUser">Developer Username</label>
+            <input type="text" id="ieLoginUser" class="input-field" value="ie_developer" required autocomplete="username">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="ieLoginPass">Developer Access Key</label>
+            <input type="password" id="ieLoginPass" class="input-field" placeholder="Enter developer master key" required autocomplete="current-password">
+          </div>
+
+          <button type="submit" id="ieLoginBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 8px; background: #0f172a; border-color: #1e293b;">
+            Authenticate &amp; Open IE Console
+          </button>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 13px;">
+            <a href="ie-portal.html" style="color: #1e3a8a; font-weight: 600; text-decoration: underline;">
+              Open Standalone IE Portal &rarr;
+            </a>
           </div>
         </form>
       </div>
@@ -127,8 +203,8 @@
   <!-- Configuration: Google Apps Script Web App URL -->
   <script>
     window.APP_CONFIG = {
-      
-      backendUrl: "https://script.google.com/macros/s/AKfycbyZu_zF7Art3-ESITSghS2jbN9jNcDb3LU6FPYMHmWBGuEmCLPqk7Pl057dZ8DbVAbpUQ/exec"
+      // Paste your deployed Google Apps Script Web App URL here (ends in /exec):
+      backendUrl: ""
     };
   </script>
 

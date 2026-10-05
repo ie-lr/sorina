@@ -11,12 +11,12 @@ const Auth = (function () {
 
   function initLoginForm() {
     const tabs = document.querySelectorAll('.role-tab-btn');
-    const emailGroup = document.getElementById('adminEmailGroup');
-    const mfaGroup = document.getElementById('mfaCodeGroup');
-    const userLabel = document.getElementById('usernameLabel');
-    const userInput = document.getElementById('loginUsername');
-    const heading = document.getElementById('loginHeading');
-    const subtitle = document.getElementById('loginSubtitle');
+    const forms = {
+      student: document.getElementById('studentLoginForm'),
+      teacher: document.getElementById('teacherLoginForm'),
+      admin: document.getElementById('adminLoginForm'),
+      ie: document.getElementById('ieLoginForm')
+    };
 
     tabs.forEach(tab => {
       tab.addEventListener('click', () => {
@@ -26,92 +26,129 @@ const Auth = (function () {
 
         hideAlert();
 
-        if (activeRole === 'admin') {
-          userLabel.textContent = 'Administrator Username';
-          userInput.placeholder = 'e.g. admin or Principal';
-          heading.textContent = 'Administrator Sign In';
-          subtitle.textContent = 'Authorized school administrators and staff only.';
-          emailGroup.classList.remove('hidden');
-          mfaGroup.classList.remove('hidden');
-        } else if (activeRole === 'teacher') {
-          userLabel.textContent = 'Teacher ID';
-          userInput.placeholder = 'e.g. SPST001';
-          heading.textContent = 'Teacher Portal Sign In';
-          subtitle.textContent = 'Access your assigned classes, enter grades, and submit lesson plans.';
-          emailGroup.classList.add('hidden');
-          mfaGroup.classList.add('hidden');
-        } else {
-          // Student
-          userLabel.textContent = 'Student ID';
-          userInput.placeholder = 'e.g. SPSS001';
-          heading.textContent = 'Student Portal Sign In';
-          subtitle.textContent = 'Enter your Student ID and password to access your grades and records.';
-          emailGroup.classList.add('hidden');
-          mfaGroup.classList.add('hidden');
-        }
+        // Switch to selected role form
+        Object.keys(forms).forEach(r => {
+          if (forms[r]) forms[r].classList.toggle('hidden', r !== activeRole);
+        });
       });
     });
 
-    // Form submit
-    const form = document.getElementById('gatewayLoginForm');
-    if (form) {
-      form.addEventListener('submit', handleFormSubmit);
+    // 1. Student Login Form Submit
+    if (forms.student) {
+      forms.student.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideAlert();
+        const id = document.getElementById('studentLoginId')?.value.trim();
+        const pass = document.getElementById('studentLoginPass')?.value.trim();
+        const btn = document.getElementById('studentLoginBtn');
+        if (!id || !pass) {
+          showAlert('Please enter both your Student ID and password.');
+          return;
+        }
+        await executeLogin({ username: id, password: pass, userType: 'student' }, btn, 'Sign In as Student');
+      });
     }
 
-    // Forgot password
-    const forgotLink = document.getElementById('forgotPasswordLink');
-    if (forgotLink) {
-      forgotLink.addEventListener('click', (e) => {
+    // 2. Teacher Login Form Submit
+    if (forms.teacher) {
+      forms.teacher.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideAlert();
+        const id = document.getElementById('teacherLoginId')?.value.trim();
+        const pass = document.getElementById('teacherLoginPass')?.value.trim();
+        const btn = document.getElementById('teacherLoginBtn');
+        if (!id || !pass) {
+          showAlert('Please enter both your Teacher ID and password.');
+          return;
+        }
+        await executeLogin({ username: id, password: pass, userType: 'teacher' }, btn, 'Sign In as Teacher');
+      });
+    }
+
+    // 3. Admin Login Form Submit
+    if (forms.admin) {
+      forms.admin.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideAlert();
+        const user = document.getElementById('adminLoginUser')?.value.trim();
+        const pass = document.getElementById('adminLoginPass')?.value.trim();
+        const email = document.getElementById('adminLoginEmail')?.value.trim();
+        const mfa = document.getElementById('adminLoginMfa')?.value.trim();
+        const btn = document.getElementById('adminLoginBtn');
+        if (!user || !pass) {
+          showAlert('Please enter both your administrator username and password.');
+          return;
+        }
+        if (!email) {
+          showAlert('Admin sign-in requires your matching verified email address.');
+          return;
+        }
+        await executeLogin({ username: user, password: pass, userType: 'admin', email: email, mfaCode: mfa }, btn, 'Sign In as Administrator');
+      });
+    }
+
+    // 4. IE Developer Login Form Submit
+    if (forms.ie) {
+      forms.ie.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideAlert();
+        const user = document.getElementById('ieLoginUser')?.value.trim();
+        const pass = document.getElementById('ieLoginPass')?.value.trim();
+        const btn = document.getElementById('ieLoginBtn');
+        if (!user || !pass) {
+          showAlert('Developer credentials required.');
+          return;
+        }
+
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = 'Authenticating to IE Console...';
+        }
+
+        try {
+          const res = await API.callBackend('ieLogin', { username: user, password: pass }, 'Verifying developer access key...');
+          if (res && res.success && res.token) {
+            sessionStorage.setItem('ie_dev_token', res.token);
+            App.showToast('Developer authentication verified. Opening Operations Console...', 'success');
+            setTimeout(() => {
+              window.location.href = 'ie-portal.html';
+            }, 600);
+          } else {
+            showAlert(res.message || 'Invalid developer credentials.');
+          }
+        } catch (err) {
+          showAlert('Network error connecting to developer backend.');
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Authenticate & Open IE Console';
+          }
+        }
+      });
+    }
+
+    // Forgot password triggers
+    document.querySelectorAll('.forgot-pass-trigger').forEach(trigger => {
+      trigger.addEventListener('click', (e) => {
         e.preventDefault();
         showForgotPasswordModal();
       });
-    }
+    });
   }
 
-  async function handleFormSubmit(e) {
-    if (e) e.preventDefault();
-    hideAlert();
-
-    const usernameInput = document.getElementById('loginUsername');
-    const passwordInput = document.getElementById('loginPassword');
-    const emailInput = document.getElementById('loginEmail');
-    const mfaInput = document.getElementById('loginMfa');
-    const submitBtn = document.getElementById('loginSubmitBtn');
-
-    const username = usernameInput ? usernameInput.value.trim() : '';
-    const password = passwordInput ? passwordInput.value.trim() : '';
-    const email = emailInput ? emailInput.value.trim() : '';
-    const mfaCode = mfaInput ? mfaInput.value.trim() : '';
-
-    if (!username || !password) {
-      showAlert('Please enter both your identifier/username and password.');
-      return;
+  async function executeLogin(payload, submitBtn, defaultBtnText) {
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Verifying credentials...';
     }
-
-    if (activeRole === 'admin' && !email) {
-      showAlert('Admin sign-in requires your verified administrator email address.');
-      return;
-    }
-
-    // Button loading state
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Verifying credentials...';
 
     try {
-      const payload = {
-        username: username,
-        password: password,
-        userType: activeRole,
-        email: email,
-        mfaCode: mfaCode
-      };
-
       const res = await API.callBackend('login', payload);
 
       if (res && res.success && res.sessionToken) {
         // Save session
         sessionStorage.setItem('sorina_session_token', res.sessionToken);
-        sessionStorage.setItem('sorina_user_role', res.user.role || activeRole);
+        sessionStorage.setItem('sorina_user_role', res.user.role || payload.userType);
         sessionStorage.setItem('sorina_user_data', JSON.stringify(res.user));
 
         App.showToast(`Welcome back, ${res.user.name || res.user.username}!`, 'success');
@@ -126,8 +163,10 @@ const Auth = (function () {
     } catch (err) {
       showAlert('Network error occurred during login. Please try again.');
     } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Sign In to Portal';
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = defaultBtnText;
+      }
     }
   }
 
