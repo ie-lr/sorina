@@ -201,7 +201,7 @@ const API = (function () {
   }
 
   /**
-   * Sends an action to backend with global loader and offline fallback.
+   * Sends an action to backend with global loader and truthful status reporting.
    * @param {string} action
    * @param {Object} [payload={}]
    * @param {string} [loaderText='Processing...']
@@ -211,17 +211,23 @@ const API = (function () {
     showLoader(loaderText);
 
     const isWriteAction = [
-      'addStudent', 'updateStudent', 'submitGrades', 'recordPayment', 'saveTeacher', 'saveExpense', 'teacherSubmitGrades', 'saveCurriculumSubjects', 'changePassword',
-      'saveClassFee', 'saveTeacher', 'savePayrollRecord', 'saveLessonPlan', 'reviewLessonPlan',
-      'submitTeacherTest', 'sendMessage', 'createAdmin', 'updateAdminProfile', 'updateAdminPermissions', 'removeAdmin', 'sendIdCardsToPrinting', 'sendTestToPrinting',
-      'addSubject', 'updateSubject', 'deleteSubject', 'updateSettings', 'saveAnnouncement', 'deleteAnnouncement'
+      'addStudent', 'updateStudent', 'deleteStudent', 'dropStudent', 'undropStudent', 'setGradeLock',
+      'saveTeacher', 'deleteTeacher', 'submitGrades', 'teacherSubmitGrades',
+      'recordPayment', 'saveFinance', 'clearFinance', 'saveClassFee', 'saveFeeItem', 'deleteFeeItem',
+      'savePayrollRecord', 'saveExpense', 'deleteExpense',
+      'saveLessonPlan', 'reviewLessonPlan', 'submitTeacherTest',
+      'sendMessage', 'adminSendIeMessage', 'markMessagesRead',
+      'createAdmin', 'updateAdminProfile', 'updateAdminPermissions', 'removeAdmin',
+      'sendIdCardsToPrinting', 'sendTestToPrinting',
+      'addSubject', 'updateSubject', 'deleteSubject', 'saveSubjects', 'savePermissions',
+      'updateSettings', 'saveAnnouncement', 'deleteAnnouncement', 'changePassword'
     ].includes(action);
 
-    // If completely offline and this is a write action, queue it immediately
+    // If completely offline and this is a write action, queue it and inform caller
     if (!navigator.onLine && isWriteAction) {
       queueOfflineAction(action, payload);
       hideLoader();
-      return { success: true, offline: true, message: '{Success}' };
+      return { success: false, offline: true, message: 'You are currently offline. Changes queued to sync when internet reconnects.' };
     }
 
     const url = getBackendUrl();
@@ -230,6 +236,10 @@ const API = (function () {
     if (!url) {
       const mockRes = await handleLocalMock(action, bodyData);
       hideLoader();
+      if (isWriteAction) {
+        console.warn(`[API:LocalDemoMode] Backend URL not configured. Action "${action}" saved to local cache only.`);
+        toastNotification('Demo Mode: Changes saved to local browser cache only (Backend URL not configured).', false);
+      }
       return mockRes;
     }
 
@@ -243,8 +253,12 @@ const API = (function () {
       hideLoader();
 
       if (!res.ok) {
-        console.warn(`[API:HTTPError] Backend responded with status ${res.status}. Falling back to local offline mode.`);
-        return handleLocalMock(action, bodyData);
+        console.error(`[API:HTTPError] Backend responded with HTTP ${res.status} for action "${action}".`);
+        const msg = res.status === 404
+          ? 'Backend endpoint returned 404 Not Found. Ensure your Google Apps Script Web App is deployed with "Who has access" set to "Anyone".'
+          : `Backend server error (${res.status}). Database could not process this request.`;
+        toastNotification(msg, true);
+        return { success: false, message: msg };
       }
 
       const json = await res.json();
@@ -258,22 +272,28 @@ const API = (function () {
 
     } catch (err) {
       hideLoader();
-      console.warn('[API:NetworkError]', err);
+      console.error('[API:NetworkError]', err);
 
-      // If network fails on a write action, queue offline
+      // If network fails on a write action, alert the user and do NOT claim success
       if (isWriteAction) {
-        queueOfflineAction(action, payload);
-        return { success: true, offline: true, message: '{Success}' };
+        const errorMsg = 'Failed to reach database: ' + (err.message || 'Network error') + '. Check your internet connection or Google Apps Script deployment URL.';
+        toastNotification(errorMsg, true);
+        return {
+          success: false,
+          offline: true,
+          message: errorMsg
+        };
       }
 
       // Read fallback
-      if (window.location.protocol === 'file:' || err.message.includes('Failed to fetch')) {
+      if (window.location.protocol === 'file:' || (err.message && err.message.includes('Failed to fetch'))) {
+        console.warn(`[API:ReadFallback] Falling back to local cache for read action "${action}".`);
         return handleLocalMock(action, bodyData);
       }
 
       return {
         success: false,
-        message: 'Network connection unavailable. Changes will sync automatically when connected.'
+        message: 'Network connection unavailable. Unable to reach backend database.'
       };
     }
   }
