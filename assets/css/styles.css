@@ -609,6 +609,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   padding: var(--space-lg);
 }
 
+.modal-dialog.modal-wide,
+.modal-overlay.modal-wide .modal-dialog {
+  max-width: 1000px;
+}
+
+.modal-dialog.modal-preview,
+.modal-overlay.modal-preview .modal-dialog {
+  max-width: 1160px;
+  max-height: 94vh;
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -820,6 +831,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   display: flex;
   min-height: calc(100vh - 64px);
   width: 100%;
+  position: relative;
 }
 
 .portal-sidebar {
@@ -829,7 +841,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   display: flex;
   flex-direction: column;
   transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
+  position: sticky;
+  top: 64px;
+  height: calc(100vh - 64px);
+  max-height: calc(100vh - 64px);
+  overflow-y: hidden;
   z-index: 90;
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.18);
   flex-shrink: 0;
@@ -888,6 +904,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   padding: 10px 8px;
   flex: 1;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.45);
 }
 
 .nav-section-title {
