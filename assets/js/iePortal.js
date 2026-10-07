@@ -48,6 +48,103 @@
     };
   }
 
+  // Pre-login endpoint setup
+  const preLoginEndpointBtn = document.getElementById('devPreLoginEndpointBtn');
+  if (preLoginEndpointBtn) {
+    preLoginEndpointBtn.onclick = (e) => {
+      e.preventDefault();
+      showEndpointConfigModal();
+    };
+  }
+
+  function showEndpointConfigModal() {
+    const modalContainer = document.getElementById('modalContainer') || document.body;
+    const currentUrl = API.getBackendUrl() || '';
+
+    modalContainer.innerHTML = `
+      <div id="devEndpointModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(4px);">
+        <div style="background: #0f172a; border: 1px solid #334155; border-radius: 12px; max-width: 580px; width: 100%; padding: 26px; box-shadow: 0 25px 50px rgba(0,0,0,0.7); color: #f8fafc;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <div style="font-weight: 800; font-size: 16px; color: #60a5fa; display: flex; align-items: center; gap: 8px;">
+              <span>⚙️</span> Google Apps Script Web App Endpoint
+            </div>
+            <button type="button" id="closeEndpointModalBtn" style="background: transparent; border: none; color: #94a3b8; font-size: 20px; cursor: pointer;">&times;</button>
+          </div>
+          <p style="font-size: 12.5px; color: #94a3b8; margin: 0 0 16px; line-height: 1.5;">
+            Configure the deployed Google Apps Script Webhook URL (ending in <code>/exec</code>). This setting establishes the master link to the Google Sheets database and is managed exclusively by IE Digital Works Developers.
+          </p>
+
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Web App Execution URL</label>
+            <input type="url" id="modalEndpointUrlInput" value="${escapeHtml(currentUrl)}" placeholder="https://script.google.com/macros/s/.../exec" style="width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 13px; font-family: monospace; background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 6px;">
+          </div>
+
+          <div id="modalEndpointPingResult" style="margin-bottom: 16px; font-size: 12.5px; display: none;"></div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 20px;">
+            <button type="button" id="modalTestEndpointBtn" class="btn btn-light btn-sm" style="padding: 8px 14px; background: #334155; color: #f8fafc; border: 1px solid #475569;">
+              Test Latency &amp; Ping
+            </button>
+            <div style="display: flex; gap: 10px;">
+              <button type="button" id="modalCancelEndpointBtn" class="btn btn-secondary btn-sm" style="padding: 8px 14px;">Close</button>
+              <button type="button" id="modalSaveEndpointBtn" class="btn btn-primary btn-sm" style="padding: 8px 18px; font-weight: 700;">Save Endpoint</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const closeBtn = document.getElementById('closeEndpointModalBtn');
+    const cancelBtn = document.getElementById('modalCancelEndpointBtn');
+    const saveBtn = document.getElementById('modalSaveEndpointBtn');
+    const testBtn = document.getElementById('modalTestEndpointBtn');
+    const inputEl = document.getElementById('modalEndpointUrlInput');
+    const resultEl = document.getElementById('modalEndpointPingResult');
+
+    const closeModal = () => {
+      const modal = document.getElementById('devEndpointModal');
+      if (modal) modal.remove();
+    };
+
+    if (closeBtn) closeBtn.onclick = closeModal;
+    if (cancelBtn) cancelBtn.onclick = closeModal;
+
+    if (testBtn) {
+      testBtn.onclick = async () => {
+        const val = (inputEl.value || '').trim();
+        if (!val) {
+          resultEl.style.display = 'block';
+          resultEl.innerHTML = '<span style="color: #ef4444;">Please enter a URL before testing.</span>';
+          return;
+        }
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = '<span style="color: #60a5fa;">Pinging endpoint...</span>';
+        
+        const originalUrl = API.getBackendUrl();
+        API.setBackendUrl(val);
+        const startTime = performance.now();
+        const res = await API.callBackend('ping', {}, 'Pinging endpoint...');
+        const elapsed = Math.round(performance.now() - startTime);
+
+        if (res && res.success) {
+          resultEl.innerHTML = `<span style="color: #10b981; font-weight: 600;">Connected successfully! Latency: ${elapsed}ms (${escapeHtml(res.message || 'Sorina Backend online')})</span>`;
+        } else {
+          if (originalUrl) API.setBackendUrl(originalUrl);
+          resultEl.innerHTML = `<span style="color: #ef4444; font-weight: 600;">Connection failed (${elapsed}ms): ${escapeHtml(res && res.message ? res.message : 'No response from server. Check script deployment and web app access settings.')}</span>`;
+        }
+      };
+    }
+
+    if (saveBtn) {
+      saveBtn.onclick = () => {
+        const val = (inputEl.value || '').trim();
+        API.setBackendUrl(val);
+        API.toastSuccess('Endpoint Saved');
+        closeModal();
+      };
+    }
+  }
+
   async function showDashboard() {
     loginView.classList.add('hidden');
     dashView.classList.remove('hidden');
@@ -353,6 +450,8 @@
   // 4. DATABASE & INFRASTRUCTURE CONTROLLER
   // =========================================================================
   async function renderDatabaseTab() {
+    const currentUrl = API.getBackendUrl() || '';
+
     const tables = [
       { name: 'Students', scope: 'Operational', cols: 16, key: 'Student ID', desc: 'Profiles, classes, enrollment status, parent contact info, credentials.' },
       { name: 'Scores', scope: 'Operational', cols: 17, key: 'Student ID + Subject', desc: 'Six period grades, 1st & 2nd semester exams, yearly averages, remarks.' },
@@ -375,6 +474,33 @@
 
     devTabContainer.innerHTML = `
       <div style="display: flex; flex-direction: column; gap: 20px;">
+
+        <!-- Active Endpoint Configuration -->
+        <div class="dev-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <div>
+              <h3 style="margin: 0; color: #ffffff; font-size: 17px;">Google Apps Script Web App Endpoint</h3>
+              <div style="font-size: 12.5px; color: #94a3b8;">
+                Master connection URL to the Google Sheets backend. Removed from School Admin to ensure centralized developer control.
+              </div>
+            </div>
+            <span class="dev-badge" id="endpointStatusBadge" style="background: ${currentUrl ? '#065f46; color: #34d399;' : '#7f1d1d; color: #f87171;'}">
+              ${currentUrl ? 'CONFIGURED' : 'UNCONFIGURED'}
+            </span>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+            <input type="url" id="devEndpointInput" value="${escapeHtml(currentUrl)}" placeholder="https://script.google.com/macros/s/.../exec" style="flex: 1; min-width: 320px; padding: 10px 14px; font-size: 13px; font-family: monospace; background: #1e293b; color: #fff; border: 1px solid #334155; border-radius: 6px;">
+            <button type="button" class="btn btn-light btn-sm" id="devTestPingBtn" style="padding: 10px 16px; background: #334155; color: #f8fafc; border: 1px solid #475569;">
+              Test Latency &amp; Ping
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" id="devSaveEndpointBtn" style="padding: 10px 20px; font-weight: 700;">
+              Save &amp; Apply Endpoint
+            </button>
+          </div>
+
+          <div id="devPingFeedback" style="display: none; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-top: 10px;"></div>
+        </div>
 
         <!-- Database Initialization & Schema Provisioning -->
         <div class="dev-card" style="border-left: 4px solid #3b82f6;">
@@ -442,8 +568,62 @@
       </div>
     `;
 
+    // Bind Ping Test
+    const pingBtn = document.getElementById('devTestPingBtn');
+    const endpointInput = document.getElementById('devEndpointInput');
+    const pingFeedback = document.getElementById('devPingFeedback');
+    const saveEndpointBtn = document.getElementById('devSaveEndpointBtn');
     const initDbBtn = document.getElementById('devInitDatabaseBtn');
     const initResult = document.getElementById('devInitResult');
+
+    if (pingBtn) {
+      pingBtn.onclick = async () => {
+        const val = (endpointInput.value || '').trim();
+        if (!val) {
+          pingFeedback.style.display = 'block';
+          pingFeedback.style.background = 'rgba(239, 68, 68, 0.15)';
+          pingFeedback.style.border = '1px solid #ef4444';
+          pingFeedback.style.color = '#ef4444';
+          pingFeedback.textContent = 'Please enter an endpoint URL before testing.';
+          return;
+        }
+
+        pingFeedback.style.display = 'block';
+        pingFeedback.style.background = 'rgba(59, 130, 246, 0.15)';
+        pingFeedback.style.border = '1px solid #3b82f6';
+        pingFeedback.style.color = '#60a5fa';
+        pingFeedback.textContent = 'Pinging Google Apps Script endpoint...';
+
+        const originalUrl = API.getBackendUrl();
+        API.setBackendUrl(val);
+
+        const startTime = performance.now();
+        const res = await API.callBackend('ping', {}, 'Pinging endpoint...');
+        const elapsed = Math.round(performance.now() - startTime);
+
+        if (res && res.success) {
+          pingFeedback.style.background = 'rgba(16, 185, 129, 0.15)';
+          pingFeedback.style.border = '1px solid #10b981';
+          pingFeedback.style.color = '#34d399';
+          pingFeedback.innerHTML = `🟢 <b>Connected (200 OK)</b> &bull; Latency: <b>${elapsed}ms</b> &bull; Server message: <i>${escapeHtml(res.message || 'Sorina Backend online')}</i> (Timestamp: ${escapeHtml(res.timestamp || new Date().toLocaleTimeString())})`;
+        } else {
+          if (originalUrl) API.setBackendUrl(originalUrl);
+          pingFeedback.style.background = 'rgba(239, 68, 68, 0.15)';
+          pingFeedback.style.border = '1px solid #ef4444';
+          pingFeedback.style.color = '#ef4444';
+          pingFeedback.innerHTML = `🔴 <b>Connection Failed</b> &bull; Response time: ${elapsed}ms &bull; ${escapeHtml(res && res.message ? res.message : 'Server returned 404/500 or is unreachable. Ensure the web app is deployed with access set to Anyone.')}`;
+        }
+      };
+    }
+
+    if (saveEndpointBtn) {
+      saveEndpointBtn.onclick = () => {
+        const val = (endpointInput.value || '').trim();
+        API.setBackendUrl(val);
+        API.toastSuccess('Endpoint URL Saved & Applied');
+        renderDatabaseTab();
+      };
+    }
 
     if (initDbBtn) {
       initDbBtn.onclick = async () => {

@@ -2,9 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="robots" content="noindex, nofollow">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Student Portal Sign In - Sorina Daycare & Primary School System</title>
+  <title>Sorina Daycare & Primary School System</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#003366">
   <link rel="apple-touch-icon" href="assets/images/school-logo.png">
@@ -17,10 +16,10 @@
   <!-- Offline Status Bar -->
   <div id="offlineIndicator" class="offline-bar hidden">You are currently offline. Changes are saved locally and will auto-sync when connected.</div>
 
-  <!-- Global Loader Overlay -->
+  <!-- Global Loader Overlay for Every Action -->
   <div id="globalLoader" class="global-loader-overlay hidden">
     <div class="loader-spinner"></div>
-    <div class="loader-text">Communicating with Core System...</div>
+    <div class="loader-text">Processing...</div>
   </div>
 
   <!-- Subtle {Success} Toast -->
@@ -40,25 +39,39 @@
     </div>
   </header>
 
-  <!-- Dedicated Student Login Screen -->
+  <!-- Gateway Login Screen (Public) -->
   <main id="loginScreen" class="gateway-container">
     <div class="gateway-card">
       
-      <!-- Left: Student Login Form -->
+      <!-- Left: Login Form -->
       <div class="gateway-form-pane">
-        
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
-          <span class="badge badge-primary" style="font-size: 11.5px; letter-spacing: 0.5px; padding: 4px 10px;">STUDENT &amp; PARENT GATEWAY</span>
+        <!-- Dedicated Portals Directory -->
+        <div style="margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--color-border); font-size: 12px; color: var(--color-text-muted);">
+          <div style="font-weight: 700; margin-bottom: 6px; color: var(--color-text-main);">Direct Login Pages:</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <a href="student-login.html" class="btn btn-light btn-sm" style="font-size: 11.5px; padding: 4px 8px;">🎓 Student Login</a>
+            <a href="teacher-login.html" class="btn btn-light btn-sm" style="font-size: 11.5px; padding: 4px 8px;">👨‍🏫 Teacher Login</a>
+            <a href="admin-login.html" class="btn btn-light btn-sm" style="font-size: 11.5px; padding: 4px 8px;">🔐 Admin Login</a>
+            <a href="ie-portal.html" class="btn btn-light btn-sm" style="font-size: 11.5px; padding: 4px 8px; font-weight: 700;">🛠️ IE Portal</a>
+          </div>
+        </div>
+
+        <!-- Role Switcher -->
+        <div class="role-tabs" role="tablist">
+          <button type="button" class="role-tab-btn active" data-role="student" role="tab">Student</button>
+          <button type="button" class="role-tab-btn" data-role="teacher" role="tab">Teacher</button>
+          <button type="button" class="role-tab-btn" data-role="admin" role="tab">Admin</button>
+          <button type="button" class="role-tab-btn" data-role="ie" role="tab" style="font-weight: 700;">IE Developer</button>
         </div>
 
         <!-- Feedback Alert Container -->
         <div id="loginAlert" class="alert alert-danger hidden" role="alert"></div>
 
-        <!-- Student Form -->
+        <!-- 1. Student Login Form -->
         <form id="studentLoginForm" class="login-role-form" autocomplete="off" onsubmit="return false;">
           <h2 style="margin: 0 0 6px; color: var(--color-primary); font-size: 21px;">Student Portal Sign In</h2>
           <p style="margin: 0 0 18px; font-size: 13px; color: var(--color-text-muted);">
-            Enter your Systematic Student ID and password to access your academic grades, term evaluations, and fee statement.
+            Enter your Systematic Student ID and password to access grades, attendance, and fee status.
           </p>
 
           <div class="form-group">
@@ -75,8 +88,102 @@
             Sign In as Student
           </button>
 
-          <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 14px; font-size: 13px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 13px;">
+            <a href="student-login.html" style="color: var(--color-primary); font-weight: 600;">Open Dedicated Student Page &rarr;</a>
             <a href="#" class="forgot-pass-trigger">Forgot Password?</a>
+          </div>
+        </form>
+
+        <!-- 2. Teacher Login Form -->
+        <form id="teacherLoginForm" class="login-role-form hidden" autocomplete="off" onsubmit="return false;">
+          <h2 style="margin: 0 0 6px; color: var(--color-primary); font-size: 21px;">Teacher Portal Sign In</h2>
+          <p style="margin: 0 0 18px; font-size: 13px; color: var(--color-text-muted);">
+            Enter your Systematic Teacher ID and password to access assigned classes and record grades.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label" for="teacherLoginId">Teacher ID</label>
+            <input type="text" id="teacherLoginId" class="input-field" placeholder="e.g. SPST001" required autocomplete="username">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="teacherLoginPass">Password</label>
+            <input type="password" id="teacherLoginPass" class="input-field" placeholder="Enter your password" required autocomplete="current-password">
+          </div>
+
+          <button type="submit" id="teacherLoginBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 8px;">
+            Sign In as Teacher
+          </button>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 13px;">
+            <a href="teacher-login.html" style="color: var(--color-primary); font-weight: 600;">Open Dedicated Teacher Page &rarr;</a>
+            <a href="#" class="forgot-pass-trigger">Forgot Password?</a>
+          </div>
+        </form>
+
+        <!-- 3. Admin Login Form -->
+        <form id="adminLoginForm" class="login-role-form hidden" autocomplete="off" onsubmit="return false;">
+          <h2 style="margin: 0 0 6px; color: var(--color-primary); font-size: 21px;">Administrator Sign In</h2>
+          <p style="margin: 0 0 18px; font-size: 13px; color: var(--color-text-muted);">
+            Authorized school administrators, registrars, and bursars only.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label" for="adminLoginUser">Administrator Username</label>
+            <input type="text" id="adminLoginUser" class="input-field" placeholder="e.g. admin or Principal" required autocomplete="username">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="adminLoginPass">Password</label>
+            <input type="password" id="adminLoginPass" class="input-field" placeholder="Enter administrator password" required autocomplete="current-password">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="adminLoginEmail">Verified Admin Email <span style="color: var(--color-danger);">*</span></label>
+            <input type="email" id="adminLoginEmail" class="input-field" placeholder="admin@ieschools.edu" required autocomplete="email">
+            <div class="form-hint">Matching verified email address is required for administrator authentication.</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="adminLoginMfa">MFA Verification Code (Optional)</label>
+            <input type="text" id="adminLoginMfa" class="input-field" placeholder="6-digit TOTP / Auth Code" maxlength="8">
+          </div>
+
+          <button type="submit" id="adminLoginBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 8px;">
+            Sign In as Administrator
+          </button>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 13px;">
+            <a href="admin-login.html" style="color: var(--color-primary); font-weight: 600;">Open Dedicated Admin Page &rarr;</a>
+            <a href="#" class="forgot-pass-trigger">Forgot Password?</a>
+          </div>
+        </form>
+
+        <!-- 4. IE Developer Login Form -->
+        <form id="ieLoginForm" class="login-role-form hidden" autocomplete="off" onsubmit="return false;">
+          <h2 style="margin: 0 0 6px; color: #1e3a8a; font-size: 21px;">IE Developer Console</h2>
+          <p style="margin: 0 0 18px; font-size: 13px; color: var(--color-text-muted);">
+            Authorized IE Digital Works engineers only. Dedicated infrastructure, database endpoint &amp; kill-switch controls.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label" for="ieLoginUser">Developer Username</label>
+            <input type="text" id="ieLoginUser" class="input-field" value="ie_developer" required autocomplete="username">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="ieLoginPass">Developer Access Key</label>
+            <input type="password" id="ieLoginPass" class="input-field" placeholder="Enter developer master key" required autocomplete="current-password">
+          </div>
+
+          <button type="submit" id="ieLoginBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 8px; background: #0f172a; border-color: #1e293b;">
+            Authenticate &amp; Open IE Console
+          </button>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 13px;">
+            <a href="ie-portal.html" style="color: #1e3a8a; font-weight: 600; text-decoration: underline;">
+              Open Dedicated IE Operations Console &rarr;
+            </a>
           </div>
         </form>
       </div>
@@ -86,9 +193,9 @@
         <img id="paneLogo" src="assets/images/school-logo.png" alt="School Crest" class="pane-logo">
         <div class="pane-title" id="paneSchoolName">Sorina Daycare & Primary School System</div>
         <div class="pane-motto" id="paneMotto">Excellence in Knowledge, Character &amp; Integrity</div>
-        <div class="pane-badge">Student &amp; Parent Access</div>
+        <div class="pane-badge">Academic Year 2026–2027</div>
         <div style="margin-top: 25px; font-size: 12.5px; opacity: 0.9; z-index: 1; font-weight: 600;">
-          Academic Year 2026–2027
+          (IE School Management System)
         </div>
       </div>
 
@@ -107,13 +214,20 @@
   <!-- Modal Container -->
   <div id="modalContainer"></div>
 
+  <!-- Configuration: Google Apps Script Web App URL -->
+  <script>
+    window.APP_CONFIG = {
+      // Paste your deployed Google Apps Script Web App URL here (ends in /exec):
+      backendUrl: ""
+    };
+  </script>
+
   <!-- Scripts -->
-  <script src="assets/js/config.js?v=2.2"></script>
-  <script src="assets/js/api.js?v=2.2"></script>
-  <script src="assets/js/reportCard.js?v=2.2"></script>
-  <script src="assets/js/auth.js?v=2.2"></script>
-  <script src="assets/js/pwaInstall.js?v=2.2"></script>
-  <script src="assets/js/app.js?v=2.2"></script>
+  <script src="assets/js/api.js?v=2.1"></script>
+  <script src="assets/js/reportCard.js?v=2.1"></script>
+  <script src="assets/js/auth.js?v=2.1"></script>
+  <script src="assets/js/pwaInstall.js?v=2.1"></script>
+  <script src="assets/js/app.js?v=2.1"></script>
 
 </body>
 </html>

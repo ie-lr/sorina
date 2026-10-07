@@ -14,7 +14,8 @@ const Auth = (function () {
     const forms = {
       student: document.getElementById('studentLoginForm'),
       teacher: document.getElementById('teacherLoginForm'),
-      admin: document.getElementById('adminLoginForm')
+      admin: document.getElementById('adminLoginForm'),
+      ie: document.getElementById('ieLoginForm')
     };
 
     tabs.forEach(tab => {
@@ -91,6 +92,46 @@ const Auth = (function () {
           return;
         }
         await executeLogin({ username: user, password: pass, userType: 'admin', email: email, mfaCode: mfa }, btn, 'Sign In as Administrator');
+      });
+    }
+
+    // 4. IE Developer Login Form Submit
+    if (forms.ie) {
+      forms.ie.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideAlert();
+        const user = document.getElementById('ieLoginUser')?.value.trim();
+        const pass = document.getElementById('ieLoginPass')?.value.trim();
+        const btn = document.getElementById('ieLoginBtn');
+        if (!user || !pass) {
+          showAlert('Developer credentials required.');
+          return;
+        }
+
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = 'Authenticating to IE Console...';
+        }
+
+        try {
+          const res = await API.callBackend('ieLogin', { username: user, password: pass }, 'Verifying developer access key...');
+          if (res && res.success && res.token) {
+            sessionStorage.setItem('ie_dev_token', res.token);
+            App.showToast('Developer authentication verified. Opening Operations Console...', 'success');
+            setTimeout(() => {
+              window.location.href = 'ie-portal.html';
+            }, 600);
+          } else {
+            showAlert(res.message || 'Invalid developer credentials.');
+          }
+        } catch (err) {
+          showAlert('Network error connecting to developer backend.');
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Authenticate & Open IE Console';
+          }
+        }
       });
     }
 
