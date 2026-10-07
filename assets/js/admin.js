@@ -11,7 +11,6 @@
  * - Teachers Tab: systematic ID [SPST001], multi-class / multi-subject assignments.
  * - Finance & Tuition: class fee schedules (New vs Old), student fee records.
  * - Payroll Tab: staff monthly salary, deductions, tax, net salary, doc upload, paid flag.
- * - Printing Services Tab: ID cards generation/preview & submit to IE; teacher tests dispatch.
  * - Subjects Tab: add, edit, delete subjects.
  * - Grading Controls: open/close evaluation periods.
  * - IE Developer Channel: direct messaging with developer team.
@@ -27,12 +26,11 @@ window.AdminPanel = (function () {
   let cachedTeachers = [];
   let cachedAdmins = [];
   let cachedPayroll = [];
-  let cachedExpenses = JSON.parse(localStorage.getItem('sorina_expenses') || '[]');
+  let cachedExpenses = [];
   let cachedAnnouncements = JSON.parse(localStorage.getItem('sorina_announcements') || '[]');
   let cachedCustomStaff = JSON.parse(localStorage.getItem('sorina_custom_staff') || '[]');
   let cachedSubjects = [];
   let isSidebarCollapsed = false;
-  let selectedStudentIdsForPrint = new Set();
 
   function hasPerm(permKey) {
     if (!currentUser) return true;
@@ -203,8 +201,8 @@ window.AdminPanel = (function () {
     const canFinance = isSuperAdmin || perms['finance:view'] || perms['finance:edit'] || perms['finance:delete'];
     const canPayroll = isSuperAdmin || perms['payroll:view'] || perms['payroll:edit'] || perms['payroll:delete'];
     const canSubjects = isSuperAdmin || perms['subjects:view'] || perms['subjects:edit'] || perms['subjects:delete'];
-    const canScores = isSuperAdmin || currentUser?.role === 'admin' || perms['scores:view'] || perms['scores:edit'];
-    const canLessonPlans = isSuperAdmin || currentUser?.role === 'admin' || perms['lesson_plans:view'];
+    const canScores = isSuperAdmin || perms['scores:view'] === true || perms['scores:edit'] === true;
+    const canLessonPlans = isSuperAdmin || perms['lesson_plans:view'] === true;
     const canSettings = isSuperAdmin || perms['settings:edit'];
     const canAudit = isSuperAdmin || perms['audit:view'];
     const canExport = isSuperAdmin || perms['export:view'] || perms['export:data'];
@@ -220,11 +218,16 @@ window.AdminPanel = (function () {
             </button>
           </div>
 
-          <!-- Academic Year Selector -->
+          <!-- Academic Year & Currency Selectors -->
           <div class="sidebar-year-box" style="padding: 10px 14px; background: rgba(255,255,255,0.08); border-radius: 6px; margin: 10px 12px 14px;">
             <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; margin-bottom: 4px; color: #ffffff; font-weight: 600;">Academic Year</div>
-            <select id="adminGlobalYearSelect" class="select-field" style="width: 100%; background: #ffffff; color: var(--color-primary); font-weight: 700; font-size: 12.5px; padding: 5px 8px; border-radius: 4px; cursor: pointer;">
+            <select id="adminGlobalYearSelect" class="select-field" style="width: 100%; background: #ffffff; color: var(--color-primary); font-weight: 700; font-size: 12.5px; padding: 5px 8px; border-radius: 4px; cursor: pointer; margin-bottom: 8px;">
               ${ACADEMIC_YEARS.map(y => `<option value="${y}" ${selectedAcademicYear === y ? 'selected' : ''}>${y.replace('-', '–')}</option>`).join('')}
+            </select>
+            <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; margin-bottom: 4px; color: #ffffff; font-weight: 600;">Currency</div>
+            <select id="adminGlobalCurrency" class="select-field" style="width: 100%; background: #ffffff; color: var(--color-primary); font-weight: 700; font-size: 12px; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
+              <option value="USD" ${dashboardCurrency === 'USD' ? 'selected' : ''}>USD ($)</option>
+              <option value="LRD" ${dashboardCurrency === 'LRD' ? 'selected' : ''}>LRD ($)</option>
             </select>
           </div>
 
@@ -402,6 +405,17 @@ window.AdminPanel = (function () {
       });
     }
 
+    // Global Currency Select handler
+    const curSelect = document.getElementById('adminGlobalCurrency');
+    if (curSelect) {
+      curSelect.addEventListener('change', (e) => {
+        dashboardCurrency = e.target.value;
+        localStorage.setItem('sorina_dashboard_currency', dashboardCurrency);
+        App.showToast(`Active currency set to ${dashboardCurrency}`, 'info');
+        loadTab(currentTab);
+      });
+    }
+
     // Nav Item Click Handlers
     container.querySelectorAll('.sidebar-item[data-tab]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -446,9 +460,9 @@ window.AdminPanel = (function () {
       payroll: isSuper || perms['payroll:view'] || perms['payroll:edit'] || perms['payroll:delete'],
       announcements: isSuper || perms['messaging:view'] || perms['messaging:send'],
       subjects: isSuper || perms['subjects:view'] || perms['subjects:edit'] || perms['subjects:delete'],
-      gradeEntry: isSuper || currentUser?.role === 'admin' || perms['scores:view'] || perms['scores:edit'],
-      lessonPlans: isSuper || currentUser?.role === 'admin' || perms['lesson_plans:view'],
-      grading: isSuper || currentUser?.role === 'admin' || perms['scores:view'] || perms['scores:edit'],
+      gradeEntry: isSuper || perms['scores:view'] === true || perms['scores:edit'] === true,
+      lessonPlans: isSuper || perms['lesson_plans:view'] === true,
+      grading: isSuper || perms['scores:view'] === true || perms['scores:edit'] === true,
       developer: isSuper,
       admins: isSuper,
       settings: isSuper || perms['settings:edit'],
@@ -488,9 +502,6 @@ window.AdminPanel = (function () {
         break;
       case 'announcements':
         await renderAnnouncementsTab(container);
-        break;
-      case 'printing':
-        await renderPrintingTab(container);
         break;
       case 'subjects':
         await renderSubjectsTab(container);
@@ -612,7 +623,7 @@ window.AdminPanel = (function () {
           <div class="stat-value" style="color: var(--color-danger);">${currencySymbol(dashboardCurrency)} ${sum.totalExpenses.toLocaleString()}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Revenue Balance</div>
+          <div class="stat-label">Net Operating Balance</div>
           <div class="stat-value" style="color: ${sum.netBalance >= 0 ? 'var(--color-primary)' : 'var(--color-danger)'};">
             ${currencySymbol(dashboardCurrency)} ${sum.netBalance.toLocaleString()}
           </div>
@@ -672,7 +683,6 @@ window.AdminPanel = (function () {
   async function renderStudentsTab(container) {
     const res = await API.callBackend('getAllStudents', { academicYear: selectedAcademicYear }, 'Fetching students...');
     cachedStudents = (res && res.success && Array.isArray(res.students)) ? res.students : [];
-    selectedStudentIdsForPrint.clear();
 
     const canEdit = hasPerm('students:edit');
     const canDelete = hasPerm('students:delete');
@@ -697,10 +707,6 @@ window.AdminPanel = (function () {
               <button type="button" class="btn btn-secondary" id="regOldStudentBtn" style="display: flex; align-items: center; gap: 6px;">
                 <img src="assets/icons/users.png" style="width: 15px; height: 15px; filter: brightness(0) invert(1);" alt="">
                 Register Old Student
-              </button>
-              <button type="button" class="btn btn-light" id="batchPrintIdCardsBtn" style="display: flex; align-items: center; gap: 6px;">
-                <img src="assets/icons/file-text.png" style="width: 15px; height: 15px;" alt="">
-                Send IDs to IE Printing
               </button>
             </div>
           ` : ''}
@@ -745,7 +751,6 @@ window.AdminPanel = (function () {
             <thead>
               <tr>
                 <th style="width: 28px;"></th>
-                <th style="width: 38px;"><input type="checkbox" id="selectAllStudentsCheckbox"></th>
                 <th>Student ID</th>
                 <th>Student</th>
                 <th>Class</th>
@@ -774,20 +779,9 @@ window.AdminPanel = (function () {
     document.getElementById('studentClassFilter').onchange = filterStudents;
     document.getElementById('studentCategoryFilter').onchange = filterStudents;
 
-    document.getElementById('selectAllStudentsCheckbox').onchange = (e) => {
-      const checked = e.target.checked;
-      document.querySelectorAll('.student-checkbox').forEach(cb => {
-        cb.checked = checked;
-        const id = cb.dataset.id;
-        if (checked) selectedStudentIdsForPrint.add(id);
-        else selectedStudentIdsForPrint.delete(id);
-      });
-    };
-
     if (canEdit) {
       document.getElementById('regNewStudentBtn').onclick = () => openRegisterNewStudentModal();
       document.getElementById('regOldStudentBtn').onclick = () => openRegisterOldStudentModal();
-      document.getElementById('batchPrintIdCardsBtn').onclick = () => sendSelectedStudentsToPrinting();
     }
   }
 
@@ -810,7 +804,6 @@ window.AdminPanel = (function () {
           <td>
             <button type="button" class="expand-btn" data-id="${escapeHtml(s.id)}" onclick="window.AdminPanel.toggleStudentExpandRow('${escapeHtml(s.id)}', this)" title="Expand academic and finance details">+</button>
           </td>
-          <td><input type="checkbox" class="student-checkbox" data-id="${escapeHtml(s.id)}" ${selectedStudentIdsForPrint.has(s.id) ? 'checked' : ''}></td>
           <td><b>[${escapeHtml(s.id)}]</b></td>
           <td>
             <div style="display: flex; align-items: center; gap: 8px;">
@@ -844,9 +837,6 @@ window.AdminPanel = (function () {
               <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.viewStudentReport('${escapeHtml(s.id)}')" title="View Report Card">
                 <img src="assets/icons/file-text.png" style="width: 13px; height: 13px;" alt="">
               </button>
-              <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.previewStudentIdCard('${escapeHtml(s.id)}')" title="Preview ID Card">
-                <img src="assets/icons/circle-user-round.png" style="width: 13px; height: 13px;" alt="">
-              </button>
               ${canEdit ? `
                 <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.openEditStudentModal('${escapeHtml(s.id)}')" title="Edit Profile">
                   <img src="assets/icons/pencil.png" style="width: 13px; height: 13px;" alt="">
@@ -869,15 +859,6 @@ window.AdminPanel = (function () {
         </tr>
       `;
     }).join('');
-
-    // Attach individual checkbox listeners
-    tbody.querySelectorAll('.student-checkbox').forEach(cb => {
-      cb.onchange = (e) => {
-        const id = e.target.dataset.id;
-        if (e.target.checked) selectedStudentIdsForPrint.add(id);
-        else selectedStudentIdsForPrint.delete(id);
-      };
-    });
   }
 
   function filterStudents() {
@@ -1340,7 +1321,7 @@ window.AdminPanel = (function () {
               <span style="font-size: 32px; color: #94a3b8;">👤</span>
             </div>
             <input type="file" id="nsPhotoInput" accept="image/*" class="input-field" style="max-width: 250px; margin: 0 auto; font-size: 12px; padding: 4px;">
-            <div class="form-hint" style="margin-top: 4px;">Upload passport-style student photograph. Used globally in ID cards, receipts, and reports.</div>
+            <div class="form-hint" style="margin-top: 4px;">Upload passport-style student photograph. Used globally in receipts and reports.</div>
           </div>
 
           <!-- Identification & Personal Details -->
@@ -1920,30 +1901,6 @@ window.AdminPanel = (function () {
     }
   }
 
-  // --- Send Selected Students to IE Printing Queue ---
-  async function sendSelectedStudentsToPrinting() {
-    const ids = Array.from(selectedStudentIdsForPrint);
-    if (ids.length === 0) {
-      API.toastNotification('Please select at least one student checkbox.', true);
-      return;
-    }
-
-    if (!confirm(`Submit ${ids.length} student ID cards to IE Printing Services?`)) return;
-
-    const res = await API.callBackend('sendIdCardsToPrinting', {
-      type: 'student',
-      targetIds: ids,
-      notes: 'Standard Student PVC ID Card'
-    }, 'Submitting print job...');
-
-    if (res && res.success) {
-      API.toastSuccess();
-      selectedStudentIdsForPrint.clear();
-      renderStudentRows(cachedStudents);
-    } else {
-      API.toastNotification(res.message || 'Error submitting print order.', true);
-    }
-  }
 
   // =========================================================================
   // 3. TEACHING STAFF TAB — YEAR-SPECIFIC FACULTY DIRECTORY
@@ -1997,7 +1954,7 @@ window.AdminPanel = (function () {
       if(!body)return;
       body.innerHTML=rows.length?`<div class="table-responsive"><table class="data-table" style="min-width:950px;"><thead><tr><th>Staff</th><th>Academic Year</th><th>Systematic ID</th><th>Assigned Class / Subject</th><th>Contact</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows.map(t=>{
         const assignments=(t.assignments||[]).map(a=>`<div style="margin:2px 0;"><b>${escapeHtml(a.class)}</b><span style="color:#64748b;"> — ${Array.isArray(a.subjects)&&a.subjects.length?a.subjects.map(escapeHtml).join(', '):'All Subjects'}</span></div>`).join('');
-        return `<tr><td><div style="display:flex;align-items:center;gap:9px;min-width:185px;"><div style="width:42px;height:42px;border-radius:50%;overflow:hidden;background:#e2e8f0;display:flex;align-items:center;justify-content:center;border:1px solid #cbd5e1;flex-shrink:0;">${t.photo?`<img src="${escapeHtml(t.photo)}" style="width:100%;height:100%;object-fit:cover;">`:'<img src="assets/icons/user.png" style="width:23px;height:23px;opacity:.65;">'}</div><div><b>${escapeHtml(t.name)}</b><div style="font-size:11px;color:#64748b;">${escapeHtml(t.title||'Teacher')}</div></div></div></td><td><span class="badge badge-light">${escapeHtml(String(t.academicYear||'—').replace('-', '–'))}</span></td><td><b style="color:var(--color-primary);">${escapeHtml(t.id)}</b><div style="font-size:10px;color:#64748b;">Login ID</div></td><td style="max-width:360px;">${assignments||'<span style="color:#94a3b8;">Not assigned</span>'}</td><td>${escapeHtml(t.phone||'—')}<br><span style="font-size:11px;color:#64748b;">${escapeHtml(t.email||'')}</span></td><td><span class="badge ${t.status==='Active'?'badge-success':'badge-danger'}">${escapeHtml(t.status||'Active')}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap;"><button class="btn btn-light btn-sm" onclick="window.AdminPanel.previewTeacherIdCard('${escapeHtml(t.id)}')">ID Card</button><button class="btn btn-light btn-sm" onclick="window.AdminPanel.openEditTeacherModal('${escapeHtml(t.id)}')">Edit</button>${canDelete?`<button class="btn btn-danger btn-sm" onclick="window.AdminPanel.deleteTeacher('${escapeHtml(t.id)}')">Delete</button>`:''}</div></td></tr>`;
+        return `<tr><td><div style="display:flex;align-items:center;gap:9px;min-width:185px;"><div style="width:42px;height:42px;border-radius:50%;overflow:hidden;background:#e2e8f0;display:flex;align-items:center;justify-content:center;border:1px solid #cbd5e1;flex-shrink:0;">${t.photo?`<img src="${escapeHtml(t.photo)}" style="width:100%;height:100%;object-fit:cover;">`:'<img src="assets/icons/user.png" style="width:23px;height:23px;opacity:.65;">'}</div><div><b>${escapeHtml(t.name)}</b><div style="font-size:11px;color:#64748b;">${escapeHtml(t.title||'Teacher')}</div></div></div></td><td><span class="badge badge-light">${escapeHtml(String(t.academicYear||'—').replace('-', '–'))}</span></td><td><b style="color:var(--color-primary);">${escapeHtml(t.id)}</b><div style="font-size:10px;color:#64748b;">Login ID</div></td><td style="max-width:360px;">${assignments||'<span style="color:#94a3b8;">Not assigned</span>'}</td><td>${escapeHtml(t.phone||'—')}<br><span style="font-size:11px;color:#64748b;">${escapeHtml(t.email||'')}</span></td><td><span class="badge ${t.status==='Active'?'badge-success':'badge-danger'}">${escapeHtml(t.status||'Active')}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap;"><button class="btn btn-light btn-sm" onclick="window.AdminPanel.openEditTeacherModal('${escapeHtml(t.id)}')">Edit</button>${canDelete?`<button class="btn btn-danger btn-sm" onclick="window.AdminPanel.deleteTeacher('${escapeHtml(t.id)}')">Delete</button>`:''}</div></td></tr>`;
       }).join('')}</tbody></table></div>`:`<div style="padding:42px 20px;text-align:center;color:#64748b;border:1px dashed #cbd5e1;border-radius:10px;">No teaching staff found. Use <b>Add Teaching Staff</b> to create a year-specific teacher account.</div>`;
     };
     ['teacherSearch','teacherYearFilter','teacherStatusFilter'].forEach(id=>document.getElementById(id)?.addEventListener('input',renderRows));
@@ -2023,7 +1980,7 @@ window.AdminPanel = (function () {
           <div class="form-group"><label class="form-label">Password *</label><input id="ntPass" type="password" class="input-field" value="teacher123" required></div>
           <div class="form-group"><label class="form-label">Status</label><select id="ntStatus" class="select-field"><option>Active</option><option>Inactive</option></select></div>
         </div>
-        <div class="form-group"><label class="form-label">Staff Photo</label><input type="file" id="ntPhoto" class="input-field" accept="image/*"><div class="form-hint">Passport/profile photo used throughout the teacher portal and ID card.</div></div>
+        <div class="form-group"><label class="form-label">Staff Photo</label><input type="file" id="ntPhoto" class="input-field" accept="image/*"><div class="form-hint">Passport/profile photo used throughout the teacher portal and profiles.</div></div>
         <div style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin:12px 0;background:#f8fafc;"><label class="form-label" style="font-weight:700;">Assigned Classes</label><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:6px;font-size:12px;">${GRADE_LEVELS.map(g=>`<label><input type="checkbox" class="nt-class-check" value="${escapeHtml(g)}"> ${escapeHtml(g)}</label>`).join('')}</div></div>
         <div style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;background:#f8fafc;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><label class="form-label" style="font-weight:700;">Assigned Subjects</label><button type="button" class="btn btn-light btn-sm" id="ntToggleAllSubjectsBtn">Select All</button></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px;font-size:12px;">${getCatalogSubjects().map(sub=>`<label><input type="checkbox" class="nt-subject-check" value="${escapeHtml(sub)}"> ${escapeHtml(sub)}</label>`).join('')}</div></div>
       </div>`,confirmText:'Create Teacher Account',onConfirm:async()=>{
@@ -2846,10 +2803,8 @@ window.AdminPanel = (function () {
     const res = await API.callBackend('getExpenses', {}, 'Fetching expenses from database...');
     if (res && res.success && Array.isArray(res.expenses)) {
       cachedExpenses = res.expenses;
-      localStorage.setItem('sorina_expenses', JSON.stringify(cachedExpenses));
     } else {
-      const stored = JSON.parse(localStorage.getItem('sorina_expenses') || '[]');
-      cachedExpenses = Array.isArray(stored) ? stored : [];
+      cachedExpenses = [];
     }
 
     const total = cachedExpenses.reduce((sum, e) => sum + (Number(e.total) || 0), 0);
@@ -2922,8 +2877,6 @@ window.AdminPanel = (function () {
         const res = await API.callBackend('saveExpense', { expense: item }, 'Saving expense to database...');
         if (res && res.success) {
           if (index === null) cachedExpenses.push(item);
-          else cachedExpenses[index] = item;
-          localStorage.setItem('sorina_expenses', JSON.stringify(cachedExpenses));
           API.toastSuccess('Expense successfully recorded to database.');
           loadTab('payroll');
           return true;
@@ -2941,7 +2894,6 @@ window.AdminPanel = (function () {
     const res = await API.callBackend('deleteExpense', { number: item.number, id: item.number }, 'Deleting expense from database...');
     if (res && res.success) {
       cachedExpenses.splice(i,1);
-      localStorage.setItem('sorina_expenses', JSON.stringify(cachedExpenses));
       API.toastSuccess('Expense record deleted from database.');
       loadTab('payroll');
     } else {
@@ -3444,218 +3396,7 @@ window.AdminPanel = (function () {
     return String(val || '').replace(/"/g, '""');
   }
 
-  // =========================================================================
-  // 6. PRINTING SERVICES TAB (ID CARDS & TEACHER TESTS DISPATCH)
-  // =========================================================================
-  async function renderPrintingTab(container) {
-    const res = await API.callBackend('getTeacherTests', {}, 'Loading test submissions...');
-    const tests = (res && res.success && Array.isArray(res.tests)) ? res.tests : [];
 
-    container.innerHTML = `
-      <div style="display: grid; grid-template-columns: 1fr; gap: 24px;">
-        <!-- ID Cards Section -->
-        <div class="content-card">
-          <div class="card-header-row">
-            <div>
-              <h3 class="card-title">Student &amp; Staff ID Card Production</h3>
-              <div style="font-size: 13px; color: var(--color-text-muted);">
-                Generate ID card background previews and dispatch printing batches to IE Developer Printing Services.
-              </div>
-            </div>
-            <button type="button" class="btn btn-primary" onclick="window.AdminPanel.switchTab('students')">
-              Select Students in Directory
-            </button>
-          </div>
-          
-          <div style="margin-top: 14px; padding: 16px; background: #f8fafc; border-radius: 6px; border: 1px solid #cbd5e1; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
-            <div>
-              <div style="font-weight: 700; color: var(--color-primary); font-size: 14px;">Instant Single ID Card Preview:</div>
-              <div style="font-size: 12.5px; color: var(--color-text-muted);">Preview official front and reverse PVC badge with QR security before printing.</div>
-            </div>
-            <div style="display: flex; gap: 8px;">
-              <select id="quickIdPreviewSelect" class="select-field" style="width: 200px;">
-                ${cachedStudents.slice(0, 10).map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)} [${escapeHtml(s.id)}]</option>`).join('')}
-              </select>
-              <button type="button" class="btn btn-light" id="previewQuickIdBtn">Preview Card</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Teacher Tests Printing Dispatch Section -->
-        <div class="content-card">
-          <div class="card-header-row">
-            <div>
-              <h3 class="card-title">Teacher Examination Question Papers</h3>
-              <div style="font-size: 13px; color: var(--color-text-muted);">
-                Review examination test drafts submitted by teaching faculty and dispatch to IE for bulk printing.
-              </div>
-            </div>
-          </div>
-
-          <div class="table-responsive" style="margin-top: 14px;">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Test Title</th>
-                  <th>Faculty</th>
-                  <th>Class &amp; Subject</th>
-                  <th>Period</th>
-                  <th>File Attachment</th>
-                  <th>Status</th>
-                  <th>Dispatch to IE Printing</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${tests.length === 0 ? `
-                  <tr><td colspan="7" style="text-align: center; padding: 25px; color: var(--color-text-muted);">No faculty tests submitted yet.</td></tr>
-                ` : tests.map(t => `
-                  <tr>
-                    <td><b>${escapeHtml(t.title)}</b></td>
-                    <td>${escapeHtml(t.teacherName)}</td>
-                    <td>${escapeHtml(t.className)} &bull; ${escapeHtml(t.subject)}</td>
-                    <td>${escapeHtml(t.period)}</td>
-                    <td>
-                      ${t.attachmentUrl ? `
-                        <a href="${t.attachmentUrl}" target="_blank" class="btn btn-light btn-sm">View Paper</a>
-                      ` : '<span style="color:#94a3b8;">No File</span>'}
-                    </td>
-                    <td><span class="badge ${t.status === 'Printed' ? 'badge-success' : 'badge-info'}">${escapeHtml(t.status || 'Submitted')}</span></td>
-                    <td>
-                      <button type="button" class="btn btn-primary btn-sm" onclick="window.AdminPanel.openDispatchTestModal('${escapeHtml(t.testId)}')">
-                        Dispatch to IE
-                      </button>
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    `;
-
-    document.getElementById('previewQuickIdBtn').onclick = () => {
-      const sId = document.getElementById('quickIdPreviewSelect').value;
-      if (sId) previewStudentIdCard(sId);
-    };
-  }
-
-  function previewStudentIdCard(studentId) {
-    const student = cachedStudents.find(s => s.id === studentId) || { id: studentId, name: 'Student Preview', className: 'Grade 1' };
-
-    App.showModal({
-      title: `Student ID Card Preview [${student.id}]`,
-      content: `
-        <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; padding: 10px;">
-          <!-- Front Side -->
-          <div style="width: 250px; height: 380px; background: linear-gradient(135deg, #052652 0%, #001f44 100%); color: #fff; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: 0 6px 18px rgba(0,0,0,0.25); position: relative; overflow: hidden;">
-            <div style="font-size: 10px; font-weight: 800; letter-spacing: 0.5px; opacity: 0.9;">IE SCHOOL MANAGEMENT SYSTEM</div>
-            <div style="font-size: 12px; font-weight: 900; margin-top: 2px;">STUDENT IDENTIFICATION</div>
-            
-            <div style="width: 90px; height: 90px; border-radius: 50%; background: #ffffff; border: 3px solid #ffd000; margin: 16px 0 10px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-              ${student.photo ? `<img src="${student.photo}" style="width:100%; height:100%; object-fit:cover;">` : `<img src="assets/icons/circle-user-round.png" style="width:50px; height:50px;">`}
-            </div>
-
-            <div style="font-size: 16px; font-weight: 800; line-height: 1.2;">${escapeHtml(student.name)}</div>
-            <div style="font-size: 13px; font-weight: 700; color: #ffd000; margin-top: 4px;">ID: [${escapeHtml(student.id)}]</div>
-            <div style="font-size: 12px; margin-top: 4px; opacity: 0.9;">Grade: ${escapeHtml(student.className || student.grade)}</div>
-            <div style="font-size: 11px; margin-top: 2px; opacity: 0.8;">Academic Year: ${escapeHtml(String(teacher.academicYear || '—').replace('-', '–'))}</div>
-
-            <div style="margin-top: auto; font-size: 9.5px; opacity: 0.7;">Official Student Credential</div>
-          </div>
-
-          <!-- Back Side -->
-          <div style="width: 250px; height: 380px; background: #ffffff; color: #052652; border: 2px solid #052652; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 6px 18px rgba(0,0,0,0.15); font-size: 11.5px;">
-            <div style="text-align: center; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">
-              <b style="font-size: 12px;">TERMS OF ISSUANCE</b>
-            </div>
-
-            <div style="font-size: 10.5px; color: #475569; line-height: 1.4;">
-              &bull; This card certifies enrollment in the IE School Management System.<br>
-              &bull; Non-transferable and must be presented for campus entry and exam halls.<br>
-              &bull; If found, return to School Registrar's Office.
-            </div>
-
-            <div style="background: #f1f5f9; padding: 8px; border-radius: 4px; text-align: center; font-size: 10px;">
-              Emergency Contact: <b>${escapeHtml(student.phone || '+231-770-123456')}</b>
-            </div>
-
-            <div style="text-align: center; border-top: 1px solid #000; padding-top: 4px; font-size: 10px; font-weight: 700;">
-              Principal's Authorized Signature
-            </div>
-          </div>
-        </div>
-      `,
-      confirmText: 'Done',
-      cancelText: 'Close'
-    });
-  }
-
-  function previewTeacherIdCard(teacherId) {
-    const teacher = cachedTeachers.find(t => t.id === teacherId) || { id: teacherId, name: 'Teacher', title: 'Faculty' };
-
-    App.showModal({
-      title: `Teacher Faculty ID Badge [${teacher.id}]`,
-      content: `
-        <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; padding: 10px;">
-          <div style="width: 250px; height: 380px; background: linear-gradient(135deg, #0f2d59 0%, #001f44 100%); color: #fff; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: 0 6px 18px rgba(0,0,0,0.25);">
-            <div style="font-size: 10px; font-weight: 800; letter-spacing: 0.5px; opacity: 0.9;">IE SCHOOL MANAGEMENT SYSTEM</div>
-            <div style="font-size: 12px; font-weight: 900; margin-top: 2px;">FACULTY STAFF IDENTIFICATION</div>
-            
-            <div style="width: 90px; height: 90px; border-radius: 50%; background: #ffffff; border: 3px solid #10b981; margin: 16px 0 10px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-              ${teacher.photo ? `<img src="${teacher.photo}" style="width:100%; height:100%; object-fit:cover;">` : `<img src="assets/icons/user.png" style="width:50px; height:50px;">`}
-            </div>
-
-            <div style="font-size: 16px; font-weight: 800; line-height: 1.2;">${escapeHtml(teacher.name)}</div>
-            <div style="font-size: 13px; font-weight: 700; color: #10b981; margin-top: 4px;">ID: [${escapeHtml(teacher.id)}]</div>
-            <div style="font-size: 12px; margin-top: 4px; opacity: 0.9;">Title: ${escapeHtml(teacher.title || 'Teacher')}</div>
-            <div style="font-size: 11px; margin-top: 2px; opacity: 0.8;">Academic Year: ${escapeHtml(String(teacher.academicYear || '—').replace('-', '–'))}</div>
-
-            <div style="margin-top: auto; font-size: 9.5px; opacity: 0.7;">Official School Faculty Staff</div>
-          </div>
-        </div>
-      `,
-      confirmText: 'Done',
-      cancelText: 'Close'
-    });
-  }
-
-  function openDispatchTestModal(testId) {
-    App.showModal({
-      title: 'Dispatch Test to IE Printing Queue',
-      content: `
-        <div style="font-size: 13.5px;">
-          <div class="form-group">
-            <label class="form-label" for="ptCopies">Copies Required *</label>
-            <input type="number" id="ptCopies" class="input-field" value="50" min="1" required>
-            <div class="form-hint">Number of student examination papers needed.</div>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="ptInstructions">Special Printing Instructions</label>
-            <textarea id="ptInstructions" class="textarea-field" rows="2" placeholder="e.g. Double-sided, stapled at top left..."></textarea>
-          </div>
-        </div>
-      `,
-      confirmText: 'Dispatch Order to IE',
-      onConfirm: async () => {
-        const copies = Number(document.getElementById('ptCopies').value) || 50;
-        const inst = document.getElementById('ptInstructions').value.trim();
-
-        const res = await API.callBackend('sendTestToPrinting', {
-          testId: testId,
-          copies: copies,
-          instructions: inst
-        }, 'Submitting print order...');
-
-        if (res && res.success) {
-          API.toastSuccess();
-          loadTab('printing');
-        } else {
-          API.toastNotification(res.message || 'Error submitting test order.', true);
-        }
-      }
-    });
-  }
 
   // =========================================================================
   // 7. SUBJECTS MANAGEMENT & CURRICULUM CATALOG
@@ -4230,9 +3971,6 @@ window.AdminPanel = (function () {
     { key: 'scores:view', label: 'Grading Controls (View)', desc: 'View student grade sheets, periodic marks & report cards', group: 'Academics' },
     { key: 'scores:edit', label: 'Grading Controls (Manage/Edit)', desc: 'Lock/unlock grading periods and override periodic scores', group: 'Academics' },
 
-    // Printing Module
-    { key: 'printing:view', label: 'Printing Services (Preview)', desc: 'Generate & preview student/staff ID cards & tests', group: 'Printing' },
-    { key: 'printing:send', label: 'Printing Services (Submit to IE)', desc: 'Submit ID cards and teacher tests to IE for physical printing', group: 'Printing' },
 
     // System Operations
     { key: 'summary:view', label: 'Executive Summary (View)', desc: 'Access administrative KPIs, enrollment charts & revenue metrics', group: 'System' },
@@ -4248,7 +3986,7 @@ window.AdminPanel = (function () {
     'custom': { name: 'Other Staff — Manually Selected Responsibilities', perms: [] },
     'registrar': {
       name: 'School Registrar',
-      perms: ['summary:view', 'students:view', 'students:edit', 'students:delete', 'finance:view', 'finance:edit', 'finance:delete', 'payroll:view', 'payroll:edit', 'payroll:delete', 'messaging:view', 'messaging:send', 'settings:edit', 'printing:view', 'printing:send', 'export:view']
+      perms: ['summary:view', 'students:view', 'students:edit', 'students:delete', 'finance:view', 'finance:edit', 'finance:delete', 'payroll:view', 'payroll:edit', 'payroll:delete', 'messaging:view', 'messaging:send', 'settings:edit', 'export:view']
     },
     'vpi': {
       name: 'Vice Principal for Instruction (VPI)',
@@ -4864,9 +4602,6 @@ window.AdminPanel = (function () {
     switchTab: switchTab,
     toggleGradeLock: toggleGradeLock,
     viewStudentReport: viewStudentReport,
-    previewStudentIdCard: previewStudentIdCard,
-    previewTeacherIdCard: previewTeacherIdCard,
-    openDispatchTestModal: openDispatchTestModal,
     markPayrollPaid: markPayrollPaid,
     openEditSubjectModal: openEditSubjectModal,
     deleteSubject: deleteSubject,
