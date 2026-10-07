@@ -612,7 +612,7 @@ window.AdminPanel = (function () {
           <div class="stat-value" style="color: var(--color-danger);">${currencySymbol(dashboardCurrency)} ${sum.totalExpenses.toLocaleString()}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Net Operating Balance</div>
+          <div class="stat-label">Revenue Balance</div>
           <div class="stat-value" style="color: ${sum.netBalance >= 0 ? 'var(--color-primary)' : 'var(--color-danger)'};">
             ${currencySymbol(dashboardCurrency)} ${sum.netBalance.toLocaleString()}
           </div>
