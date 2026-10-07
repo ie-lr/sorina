@@ -465,7 +465,6 @@
       { name: 'Settings', scope: 'Operational', cols: 2, key: 'Key', desc: 'Global configurations: school name, current academic year, grading scale.' },
       { name: 'AuditLog', scope: 'Security / Admin', cols: 6, key: 'Timestamp', desc: 'Tamper-evident security ledger logging administrative events & exports.' },
       { name: 'BackupLog', scope: 'Security / Admin', cols: 7, key: 'Backup ID', desc: 'Snapshot history, record counts, Drive storage URLs, SHA-256 hashes.' },
-      { name: 'Payroll', scope: 'Operational', cols: 13, key: 'Staff ID + Month', desc: 'Faculty payroll registers, base salaries, deductions, net salary.' },
       { name: 'Tests', scope: 'Operational', cols: 13, key: 'Test ID', desc: 'Teacher examination and test uploads, review queues, attachment URLs.' },
       { name: 'PrintQueue', scope: 'Operational', cols: 9, key: 'Job ID', desc: 'PVC ID Card and Examination Question sheet dispatch requests.' },
       { name: 'DeveloperMessages', scope: 'Operational', cols: 7, key: 'Message ID', desc: 'Private direct messaging between School Admin and IE Developers.' },

@@ -189,7 +189,7 @@ const API = (function () {
     const bodyData = withSession(Object.assign({ action: action }, payload));
 
     if (!url) {
-      return handleLocalMock(action, bodyData);
+      return { success: false, message: 'Backend URL is not configured. No data can be read or saved.' };
     }
 
     const res = await fetch(url, {
@@ -214,12 +214,12 @@ const API = (function () {
       'addStudent', 'updateStudent', 'deleteStudent', 'dropStudent', 'undropStudent', 'setGradeLock',
       'saveTeacher', 'deleteTeacher', 'submitGrades', 'teacherSubmitGrades',
       'recordPayment', 'saveFinance', 'clearFinance', 'saveClassFee', 'saveFeeItem', 'deleteFeeItem',
-      'savePayrollRecord', 'saveExpense', 'deleteExpense',
+      'saveExpense', 'deleteExpense',
       'saveLessonPlan', 'reviewLessonPlan', 'submitTeacherTest',
       'sendMessage', 'adminSendIeMessage', 'markMessagesRead',
       'createAdmin', 'updateAdminProfile', 'updateAdminPermissions', 'removeAdmin',
       'sendIdCardsToPrinting', 'sendTestToPrinting',
-      'addSubject', 'updateSubject', 'deleteSubject', 'saveSubjects', 'savePermissions',
+      'addSubject', 'updateSubject', 'deleteSubject', 'saveSubjects', 'saveCurriculumSubjects', 'savePermissions',
       'updateSettings', 'saveAnnouncement', 'deleteAnnouncement', 'changePassword'
     ].includes(action);
 
@@ -234,13 +234,10 @@ const API = (function () {
     const bodyData = withSession(Object.assign({ action: action }, payload));
 
     if (!url) {
-      const mockRes = await handleLocalMock(action, bodyData);
       hideLoader();
-      if (isWriteAction) {
-        console.warn(`[API:LocalDemoMode] Backend URL not configured. Action "${action}" saved to local cache only.`);
-        toastNotification('Demo Mode: Changes saved to local browser cache only (Backend URL not configured).', false);
-      }
-      return mockRes;
+      const msg = 'Backend URL is not configured, so nothing was ' + (isWriteAction ? 'saved' : 'loaded') + '. Set the Apps Script Web App URL first.';
+      toastNotification(msg, true);
+      return { success: false, message: msg };
     }
 
     try {
@@ -285,15 +282,10 @@ const API = (function () {
         };
       }
 
-      // Read fallback
-      if (window.location.protocol === 'file:' || (err.message && err.message.includes('Failed to fetch'))) {
-        console.warn(`[API:ReadFallback] Falling back to local cache for read action "${action}".`);
-        return handleLocalMock(action, bodyData);
-      }
-
+      // No local fallback: only real database results are ever shown.
       return {
         success: false,
-        message: 'Network connection unavailable. Unable to reach backend database.'
+        message: 'Could not reach the database: ' + (err.message || 'network error') + '.'
       };
     }
   }
@@ -502,7 +494,7 @@ const API = (function () {
   }
   function saveMockSettings(settings){ localStorage.setItem('_sorina_school_settings', JSON.stringify(settings||{})); }
   function adminPermissionMap(){
-    return { 'summary:view':true,'students:view':true,'students:edit':true,'students:delete':true,'teachers:view':true,'teachers:edit':true,'teachers:delete':true,'finance:view':true,'finance:edit':true,'finance:delete':true,'payroll:view':true,'payroll:edit':true,'payroll:delete':true,'subjects:view':true,'subjects:edit':true,'subjects:delete':true,'scores:view':true,'scores:edit':true,'printing:view':true,'printing:send':true,'messaging:view':true,'messaging:send':true,'lesson_plans:view':true,'export:view':true,'settings:edit':true,'audit:view':true };
+    return { 'summary:view':true,'students:view':true,'students:edit':true,'students:delete':true,'teachers:view':true,'teachers:edit':true,'teachers:delete':true,'finance:view':true,'finance:edit':true,'finance:delete':true,'expenses:view':true,'expenses:edit':true,'expenses:delete':true,'subjects:view':true,'subjects:edit':true,'subjects:delete':true,'scores:view':true,'scores:edit':true,'printing:view':true,'printing:send':true,'messaging:view':true,'messaging:send':true,'lesson_plans:view':true,'export:view':true,'settings:edit':true,'audit:view':true };
   }
     return new Promise(resolve => {
       setTimeout(() => {
@@ -568,7 +560,7 @@ const API = (function () {
                     'students:view': true, 'students:edit': true, 'students:delete': true,
                     'teachers:view': true, 'teachers:edit': true, 'teachers:delete': true,
                     'finance:view': true, 'finance:edit': true, 'finance:delete': true,
-                    'payroll:view': true, 'payroll:edit': true, 'payroll:delete': true,
+                    'expenses:view': true, 'expenses:edit': true, 'expenses:delete': true,
                     'printing:view': true, 'printing:send': true,
                     'subjects:view': true, 'subjects:edit': true, 'subjects:delete': true,
                     'scores:view': true, 'scores:edit': true,
