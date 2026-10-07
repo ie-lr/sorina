@@ -7,7 +7,6 @@
  * - Collapsible royal blue left sidebar navigation matching official design.
  * - Class & Subject grade entry scoped to teacher assignments.
  * - Lesson Plan submission with file upload (PDF, Word, Image).
- * - Test Submission tab for submitting exam tests to Admin.
  * - Messages & Announcements.
  * - Comprehensive Settings tab (photo, contact, password, PWA).
  * - Standard PNG icons from assets/icons/ throughout.
@@ -21,6 +20,7 @@ window.TeacherPanel = (function () {
   let selectedSubject = '';
   let currentRoster = [];
   let gradingPermissions = {};
+  let curriculumMap = {};
   let currentTab = 'grades';
   let isSidebarCollapsed = false;
 
@@ -38,6 +38,8 @@ window.TeacherPanel = (function () {
     // Fetch open period permissions
     const pRes = await API.callBackend('getPermissions', {}, 'Loading permissions...');
     gradingPermissions = (pRes && pRes.success) ? pRes.permissions : {};
+    const cRes = await API.callBackend('getCurriculumSubjects', {}, 'Loading class subjects...');
+    curriculumMap = (cRes && cRes.success && cRes.curriculum) ? cRes.curriculum : {};
 
     renderPortalLayout(container);
     await loadTab(currentTab);
@@ -66,11 +68,6 @@ window.TeacherPanel = (function () {
             <a class="sidebar-item ${currentTab === 'lessonPlans' ? 'active' : ''}" data-tab="lessonPlans">
               <img src="assets/icons/folders.png" class="sidebar-icon" alt="">
               <span class="sidebar-item-label">Lesson Plans</span>
-            </a>
-
-            <a class="sidebar-item ${currentTab === 'tests' ? 'active' : ''}" data-tab="tests">
-              <img src="assets/icons/file-text.png" class="sidebar-icon" alt="">
-              <span class="sidebar-item-label">Test Submissions</span>
             </a>
 
             <div class="nav-section-title">Communication</div>
@@ -177,9 +174,6 @@ window.TeacherPanel = (function () {
       case 'lessonPlans':
         await renderLessonPlansTab(container);
         break;
-      case 'tests':
-        await renderTestsTab(container);
-        break;
       case 'messages':
         await renderMessagesTab(container);
         break;
@@ -260,22 +254,32 @@ window.TeacherPanel = (function () {
     await loadRosterAndGrades();
   }
 
+  // Subjects this teacher may handle in a class: the ones assigned to them.
+  // Legacy accounts with no subject list fall back to that class's curriculum, never to a generic list.
+  function subjectsForClass(cls) {
+    const a = currentAssignments.find(x => String(x.class).trim() === String(cls).trim());
+    if (!a) return [];
+    if (Array.isArray(a.subjects) && a.subjects.length > 0) return a.subjects;
+    const cur = curriculumMap[cls];
+    return Array.isArray(cur) ? cur : [];
+  }
+
   function updateSubjectDropdown() {
     const subSelect = document.getElementById('teacherSubjectSelect');
     if (!subSelect) return;
 
-    const assignment = currentAssignments.find(a => a.class === selectedClass);
-    const subjects = (assignment && Array.isArray(assignment.subjects) && assignment.subjects.length > 0)
-      ? assignment.subjects
-      : ['General Mathematics', 'Reading', 'General Science', 'Social Studies'];
+    const subjects = subjectsForClass(selectedClass);
 
-    subSelect.innerHTML = subjects.map(s => `
+    subSelect.innerHTML = subjects.length
+      ? subjects.map(s => `
       <option value="${escapeHtml(s)}" ${s === selectedSubject ? 'selected' : ''}>${escapeHtml(s)}</option>
-    `).join('');
+    `).join('')
+      : '<option value="">No subjects assigned</option>';
 
-    if (!subjects.includes(selectedSubject) && subjects.length > 0) {
-      selectedSubject = subjects[0];
+    if (!subjects.includes(selectedSubject)) {
+      selectedSubject = subjects[0] || '';
     }
+    subSelect.value = selectedSubject;
   }
 
   async function onClassChange(newClass) {
@@ -295,6 +299,11 @@ window.TeacherPanel = (function () {
     if (!tbody) return;
 
     tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 25px;">Loading students in ' + escapeHtml(selectedClass) + '...</td></tr>';
+
+    if (!selectedSubject) {
+      tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 30px; color: var(--color-text-muted);">No subject is assigned to you for ' + escapeHtml(selectedClass) + '. Please contact the administrator.</td></tr>';
+      return;
+    }
 
     const res = await API.callBackend('getStudentsByClass', { className: selectedClass, teacherId: currentTeacher.id, academicYear: currentTeacher.academicYear }, 'Fetching class roster...');
     currentRoster = (res && res.success && Array.isArray(res.students)) ? res.students : [];
@@ -334,13 +343,13 @@ window.TeacherPanel = (function () {
   }
 
   function renderScoreInput(periodKey, val, isNursery) {
-    const isOpen = gradingPermissions[periodKey] !== false;
+    const isOpen = gradingPermissions[periodKey] === true;
     const cleanVal = (val !== null && val !== undefined && val !== '') ? String(val) : '';
 
     if (isNursery) {
       return `
         <td style="text-align:center;">
-          <select class="select-field score-input" data-period="${periodKey}" ${!isOpen ? 'disabled' : ''} style="width: 58px; padding: 4px; text-align:center; font-weight:700;">
+          <select class="select-field score-input ${!isOpen ? 'period-locked' : ''}" data-period="${periodKey}" ${!isOpen ? 'disabled title="Period locked - view only"' : ''} style="width: 58px; padding: 4px; text-align:center; font-weight:700;">
             <option value="">—</option>
             <option value="A" ${cleanVal === 'A' ? 'selected' : ''}>A</option>
             <option value="B" ${cleanVal === 'B' ? 'selected' : ''}>B</option>
@@ -353,7 +362,7 @@ window.TeacherPanel = (function () {
 
     return `
       <td style="text-align:center;">
-        <input type="number" min="0" max="100" class="input-field score-input" data-period="${periodKey}" value="${cleanVal}" ${!isOpen ? 'disabled' : ''} style="width: 62px; padding: 5px; text-align: center; font-weight: 600;" placeholder="—">
+        <input type="number" min="0" max="100" class="input-field score-input ${!isOpen ? 'period-locked' : ''}" data-period="${periodKey}" value="${cleanVal}" ${!isOpen ? 'disabled title="Period locked - view only"' : ''} style="width: 62px; padding: 5px; text-align: center; font-weight: 600;" placeholder="—">
       </td>
     `;
   }
@@ -365,7 +374,7 @@ window.TeacherPanel = (function () {
       { k: 'p1', label: '1st P' }, { k: 'p2', label: '2nd P' }, { k: 'p3', label: '3rd P' }, { k: 'exam1', label: 'Exam 1' },
       { k: 'p4', label: '4th P' }, { k: 'p5', label: '5th P' }, { k: 'p6', label: '6th P' }, { k: 'exam2', label: 'Exam 2' }
     ];
-    const open = periods.filter(p => gradingPermissions[p.k] !== false).map(p => p.label);
+    const open = periods.filter(p => gradingPermissions[p.k] === true).map(p => p.label);
     textEl.textContent = open.length > 0 ? open.join(', ') : 'All periods currently closed by administration.';
   }
 
@@ -545,165 +554,7 @@ window.TeacherPanel = (function () {
   }
 
   // =========================================================================
-  // 3. TEST SUBMISSIONS (EXAMS & TESTS TO ADMIN)
-  // =========================================================================
-  async function renderTestsTab(container) {
-    const res = await API.callBackend('getTeacherTests', {}, 'Loading test submissions...');
-    const tests = (res && res.success && Array.isArray(res.tests)) ? res.tests : [];
-
-    container.innerHTML = `
-      <div class="content-card">
-        <div class="card-header-row">
-          <div>
-            <h3 class="card-title">Exam &amp; Test Submissions to Administration</h3>
-            <div style="font-size: 13px; color: var(--color-text-muted);">
-              Submit periodic and semester test drafts for administrative review and print clearance.
-            </div>
-          </div>
-          <button type="button" class="btn btn-primary" id="openNewTestBtn" style="display: flex; align-items: center; gap: 6px;">
-            <img src="assets/icons/cloud-upload.png" style="width: 15px; height: 15px; filter: brightness(0) invert(1);" alt="">
-            Submit New Test Draft
-          </button>
-        </div>
-
-        <div class="table-responsive" style="margin-top: 14px;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Test Title</th>
-                <th>Class</th>
-                <th>Subject</th>
-                <th>Period</th>
-                <th>Document File</th>
-                <th>Admin Status</th>
-                <th>Date Submitted</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${tests.length === 0 ? `
-                <tr><td colspan="7" style="text-align: center; padding: 25px; color: var(--color-text-muted);">No tests submitted for administrative review yet.</td></tr>
-              ` : tests.map(t => `
-                <tr>
-                  <td><b>${escapeHtml(t.title)}</b></td>
-                  <td>${escapeHtml(t.className)}</td>
-                  <td>${escapeHtml(t.subject)}</td>
-                  <td>${escapeHtml(t.period)}</td>
-                  <td>
-                    ${t.attachmentUrl ? `
-                      <a href="${t.attachmentUrl}" target="_blank" class="btn btn-light btn-sm" style="display: inline-flex; align-items: center; gap: 4px;">
-                        <img src="assets/icons/file-text.png" style="width: 12px; height: 12px;" alt="">
-                        View Paper
-                      </a>
-                    ` : '<span style="color:#94a3b8;">No File Attached</span>'}
-                  </td>
-                  <td>
-                    <span class="badge ${t.status === 'Approved' ? 'badge-success' : t.status === 'Printed' ? 'badge-info' : 'badge-warning'}">
-                      ${escapeHtml(t.status || 'Submitted')}
-                    </span>
-                  </td>
-                  <td>${escapeHtml(t.submittedAt || '')}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-
-    document.getElementById('openNewTestBtn').onclick = () => openTestSubmitModal();
-  }
-
-  function openTestSubmitModal() {
-    App.showModal({
-      title: 'Submit Examination / Test Draft to Admin',
-      content: `
-        <div style="font-size: 13.5px;">
-          <div class="form-group">
-            <label class="form-label" for="testTitle">Test Title *</label>
-            <input type="text" id="testTitle" class="input-field" placeholder="e.g. 1st Period Mathematics Evaluation" required>
-          </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div class="form-group">
-              <label class="form-label" for="testClass">Class *</label>
-              <select id="testClass" class="select-field">
-                ${currentAssignments.map(a => `<option value="${escapeHtml(a.class)}">${escapeHtml(a.class)}</option>`).join('')}
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="testSubject">Subject *</label>
-              <select id="testSubject" class="select-field">
-                ${(currentAssignments.find(a => a.class === selectedClass)?.subjects || [selectedSubject]).filter(Boolean).map(s => `<option value="${escapeHtml(s)}" ${s === selectedSubject ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
-              </select>
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="testPeriod">Evaluation Period *</label>
-            <select id="testPeriod" class="select-field">
-              <option value="1st Period">1st Period</option>
-              <option value="2nd Period">2nd Period</option>
-              <option value="3rd Period">3rd Period</option>
-              <option value="1st Semester Exam">1st Semester Exam</option>
-              <option value="4th Period">4th Period</option>
-              <option value="5th Period">5th Period</option>
-              <option value="6th Period">6th Period</option>
-              <option value="2nd Semester Exam">2nd Semester Exam</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="testDetails">Instructions &amp; Teacher Notes</label>
-            <textarea id="testDetails" class="textarea-field" rows="2" placeholder="e.g. Total Marks: 50, Time Allowed: 1 Hour..."></textarea>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="testFile">Upload Test Question Paper (PDF, Word, Image) *</label>
-            <input type="file" id="testFile" class="input-field" accept=".pdf,.doc,.docx,image/*" required>
-            <div class="form-hint">Upload the actual question sheet for administrative review and print clearance.</div>
-          </div>
-        </div>
-      `,
-      confirmText: 'Submit Test Paper',
-      onConfirm: async () => {
-        const title = document.getElementById('testTitle').value.trim();
-        const cls = document.getElementById('testClass').value;
-        const sub = document.getElementById('testSubject').value.trim();
-        const period = document.getElementById('testPeriod').value;
-        const details = document.getElementById('testDetails').value.trim();
-        const file = document.getElementById('testFile').files[0];
-
-        if (!title || !file) {
-          API.toastNotification('Test title and question paper file are required.', true);
-          return;
-        }
-        if (!isAssignedClassAndSubject(cls, sub)) {
-          API.toastNotification('You can only submit a test for your assigned class and subject.', true);
-          return;
-        }
-
-        const fileDataUrl = await readFileAsDataUrl(file);
-
-        const res = await API.callBackend('submitTeacherTest', {
-          test: {
-            title: title,
-            className: cls,
-            subject: sub,
-            period: period,
-            details: details,
-            attachmentUrl: fileDataUrl,
-            attachmentName: file.name
-          }
-        }, 'Submitting test to admin...');
-
-        if (res && res.success) {
-          API.toastSuccess();
-          if (currentTab === 'tests') loadTab('tests');
-        } else {
-          API.toastNotification(res.message || 'Error submitting test.', true);
-        }
-      }
-    });
-  }
-
-  // =========================================================================
-  // 4. MESSAGES TAB
+  // 3. MESSAGES TAB
   // =========================================================================
   async function renderMessagesTab(container) {
     const res = await API.callBackend('getMessages', {teacherId: currentTeacher.id, role:'teacher'}, 'Fetching notices...');
@@ -735,7 +586,7 @@ window.TeacherPanel = (function () {
   }
 
   // =========================================================================
-  // 5. SETTINGS TAB
+  // 4. SETTINGS TAB
   // =========================================================================
   function renderSettingsTab(container) {
     container.innerHTML = `

@@ -52,7 +52,6 @@
             <a href="student-login.html" class="btn btn-light btn-sm" style="font-size: 11.5px; padding: 4px 8px;">🎓 Student Login</a>
             <a href="teacher-login.html" class="btn btn-light btn-sm" style="font-size: 11.5px; padding: 4px 8px;">👨‍🏫 Teacher Login</a>
             <a href="admin-login.html" class="btn btn-light btn-sm" style="font-size: 11.5px; padding: 4px 8px;">🔐 Admin Login</a>
-            <a href="ie-portal.html" class="btn btn-light btn-sm" style="font-size: 11.5px; padding: 4px 8px; font-weight: 700;">🛠️ IE Portal</a>
           </div>
         </div>
 
@@ -61,7 +60,6 @@
           <button type="button" class="role-tab-btn active" data-role="student" role="tab">Student</button>
           <button type="button" class="role-tab-btn" data-role="teacher" role="tab">Teacher</button>
           <button type="button" class="role-tab-btn" data-role="admin" role="tab">Admin</button>
-          <button type="button" class="role-tab-btn" data-role="ie" role="tab" style="font-weight: 700;">IE Developer</button>
         </div>
 
         <!-- Feedback Alert Container -->
@@ -76,7 +74,11 @@
 
           <div class="form-group">
             <label class="form-label" for="studentLoginId">Student ID</label>
-            <input type="text" id="studentLoginId" class="input-field" placeholder="e.g. SPSS001" required autocomplete="username">
+            <div class="id-prefix-group">
+              <span class="id-prefix" aria-hidden="true">SJSH-</span>
+              <input type="text" id="studentLoginId" class="input-field id-index-input" placeholder="001" inputmode="numeric" maxlength="6" required autocomplete="username" aria-label="Student ID index (after SJSH-)">
+            </div>
+            <div class="form-hint">Prefix <b>SJSH-</b> is automatic. Enter only your index, e.g. 001.</div>
           </div>
 
           <div class="form-group">
@@ -90,6 +92,7 @@
 
           <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 13px;">
             <a href="student-login.html" style="color: var(--color-primary); font-weight: 600;">Open Dedicated Student Page &rarr;</a>
+            <a href="#" class="recovery-code-trigger" style="margin-right:auto;">🔓 Unlock with recovery code</a>
             <a href="#" class="forgot-pass-trigger">Forgot Password?</a>
           </div>
         </form>
@@ -117,6 +120,7 @@
 
           <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 13px;">
             <a href="teacher-login.html" style="color: var(--color-primary); font-weight: 600;">Open Dedicated Teacher Page &rarr;</a>
+            <a href="#" class="recovery-code-trigger" style="margin-right:auto;">🔓 Unlock with recovery code</a>
             <a href="#" class="forgot-pass-trigger">Forgot Password?</a>
           </div>
         </form>
@@ -155,37 +159,16 @@
 
           <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 13px;">
             <a href="admin-login.html" style="color: var(--color-primary); font-weight: 600;">Open Dedicated Admin Page &rarr;</a>
+            <a href="#" class="recovery-code-trigger" style="margin-right:auto;">🔓 Unlock with recovery code</a>
             <a href="#" class="forgot-pass-trigger">Forgot Password?</a>
           </div>
         </form>
 
-        <!-- 4. IE Developer Login Form -->
-        <form id="ieLoginForm" class="login-role-form hidden" autocomplete="off" onsubmit="return false;">
-          <h2 style="margin: 0 0 6px; color: #1e3a8a; font-size: 21px;">IE Developer Console</h2>
-          <p style="margin: 0 0 18px; font-size: 13px; color: var(--color-text-muted);">
-            Authorized IE Digital Works engineers only. Dedicated infrastructure, database endpoint &amp; kill-switch controls.
-          </p>
-
-          <div class="form-group">
-            <label class="form-label" for="ieLoginUser">Developer Username</label>
-            <input type="text" id="ieLoginUser" class="input-field" value="ie_developer" required autocomplete="username">
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="ieLoginPass">Developer Access Key</label>
-            <input type="password" id="ieLoginPass" class="input-field" placeholder="Enter developer master key" required autocomplete="current-password">
-          </div>
-
-          <button type="submit" id="ieLoginBtn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 8px; background: #0f172a; border-color: #1e293b;">
-            Authenticate &amp; Open IE Console
-          </button>
-
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 13px;">
-            <a href="ie-portal.html" style="color: #1e3a8a; font-weight: 600; text-decoration: underline;">
-              Open Dedicated IE Operations Console &rarr;
-            </a>
-          </div>
-        </form>
+        <!-- IE Account (separate from school users) -->
+        <div class="ie-account-link" style="margin-top: 18px; padding: 10px 12px; border: 1px dashed #94a3b8; border-radius: 8px; background: #f1f5f9; font-size: 12.5px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+          <span style="color: var(--color-text-muted);"><b style="color:#0f172a;">IE Account</b> &middot; IE Digital Works team only</span>
+          <a href="https://ie-lr.github.io/sorina/i-e.com/" target="_blank" rel="noopener noreferrer" style="color: #1e3a8a; font-weight: 700;">🛠️ Open IE Account &rarr;</a>
+        </div>
       </div>
 
       <!-- Right: Branded School Panel -->
@@ -225,7 +208,7 @@
   <!-- Scripts -->
   <script src="assets/js/api.js?v=2.1"></script>
   <script src="assets/js/reportCard.js?v=2.1"></script>
-  <script src="assets/js/auth.js?v=2.1"></script>
+  <script src="assets/js/auth.js?v=2.2"></script>
   <script src="assets/js/pwaInstall.js?v=2.1"></script>
   <script src="assets/js/app.js?v=2.1"></script>
 

@@ -8,6 +8,7 @@
 
 const Auth = (function () {
   let activeRole = 'student';
+  let lastAttempt = null; // { username, userType } of the most recent sign-in try
 
   function initLoginForm() {
     const tabs = document.querySelectorAll('.role-tab-btn');
@@ -46,13 +47,16 @@ const Auth = (function () {
       forms.student.addEventListener('submit', async (e) => {
         e.preventDefault();
         hideAlert();
-        const id = document.getElementById('studentLoginId')?.value.trim();
+        const rawIndex = (document.getElementById('studentLoginId')?.value || '').trim();
+        // Prefix SJSH- is fixed; strip it if pasted, keep digits only, pad to 3 (e.g. 1 -> 001)
+        const index = rawIndex.replace(/^SJSH-?/i, '').replace(/\D/g, '');
         const pass = document.getElementById('studentLoginPass')?.value.trim();
         const btn = document.getElementById('studentLoginBtn');
-        if (!id || !pass) {
-          showAlert('Please enter both your Student ID and password.');
+        if (!index || !pass) {
+          showAlert('Please enter your Student ID index (e.g. 001) and password.');
           return;
         }
+        const id = 'SJSH' + index.padStart(3, '0');
         await executeLogin({ username: id, password: pass, userType: 'student' }, btn, 'Sign In as Student');
       });
     }
@@ -135,6 +139,14 @@ const Auth = (function () {
       });
     }
 
+    // Account recovery (unlock with IE-issued code) triggers
+    document.querySelectorAll('.recovery-code-trigger').forEach(trigger => {
+      trigger.addEventListener('click', (e) => {
+        e.preventDefault();
+        showRecoveryModal(lastAttempt);
+      });
+    });
+
     // Forgot password triggers
     document.querySelectorAll('.forgot-pass-trigger').forEach(trigger => {
       trigger.addEventListener('click', (e) => {
@@ -145,6 +157,7 @@ const Auth = (function () {
   }
 
   async function executeLogin(payload, submitBtn, defaultBtnText) {
+    lastAttempt = { username: payload.username, userType: payload.userType };
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.textContent = 'Verifying credentials...';
@@ -165,6 +178,9 @@ const Auth = (function () {
         document.getElementById('loginScreen').classList.add('hidden');
         renderHeaderUser(res.user);
         await routeToRolePanel(res.user.role, res.user);
+      } else if (res && res.locked) {
+        showLockedAlert(res.message);
+        showRecoveryModal(lastAttempt);
       } else {
         showAlert(res.message || 'Login failed. Please verify your credentials.');
       }
@@ -314,6 +330,86 @@ const Auth = (function () {
     });
   }
 
+  /**
+   * Shows the lock notice with a one-click shortcut to the recovery screen.
+   */
+  function showLockedAlert(msg) {
+    const el = document.getElementById('loginAlert');
+    if (!el) return;
+    el.textContent = msg || 'This account is locked.';
+    const a = document.createElement('a');
+    a.href = '#';
+    a.textContent = ' Unlock with recovery code';
+    a.style.cssText = 'font-weight:700;text-decoration:underline;margin-left:4px;';
+    a.addEventListener('click', (e) => { e.preventDefault(); showRecoveryModal(lastAttempt); });
+    el.appendChild(a);
+    el.classList.remove('hidden');
+  }
+
+  /** Guess which account type this page is for. */
+  function inferUserType() {
+    if (lastAttempt && lastAttempt.userType) return lastAttempt.userType === 'parent' ? 'student' : lastAttempt.userType;
+    const visible = ['student', 'teacher', 'admin'].filter(r => {
+      const f = document.getElementById(r + 'LoginForm');
+      return f && !f.classList.contains('hidden');
+    });
+    return visible[0] || activeRole || 'student';
+  }
+
+  /**
+   * Modal: user enters the one-time recovery code obtained from the IE team.
+   */
+  function showRecoveryModal(prefill) {
+    const type = (prefill && prefill.userType) ? (prefill.userType === 'parent' ? 'student' : prefill.userType) : inferUserType();
+    const idVal = (prefill && prefill.username) ? prefill.username : '';
+    const sel = t => (t === type ? 'selected' : '');
+    App.showModal({
+      title: 'Unlock Account',
+      content: `
+        <div style="font-size: 13.5px; line-height: 1.55;">
+          <p style="margin-top:0;">After 5 wrong password attempts an account is locked. A one-time <b>recovery code</b> was sent to the <b>IE team secured inbox</b>. Contact the IE team, verify your identity, then enter the code they give you.</p>
+          <div id="recoveryError" class="alert alert-danger hidden" style="margin-bottom:10px;"></div>
+          <div class="form-group">
+            <label class="form-label" for="recoveryType">Account type</label>
+            <select id="recoveryType" class="input-field">
+              <option value="student" ${sel('student')}>Student / Parent</option>
+              <option value="teacher" ${sel('teacher')}>Teacher</option>
+              <option value="admin" ${sel('admin')}>Administrator</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="recoveryId">Account ID / Username</label>
+            <input type="text" id="recoveryId" class="input-field" value="${escapeHtml(idVal)}" autocomplete="off" placeholder="e.g. SJSH001, SPST001 or admin username">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="recoveryCode">Recovery code</label>
+            <input type="text" id="recoveryCode" class="input-field" autocomplete="off" placeholder="XXXX-XXXX-XXXX" maxlength="14" style="letter-spacing:2px;text-transform:uppercase;font-family:monospace;">
+          </div>
+        </div>
+      `,
+      confirmText: 'Unlock Account',
+      onConfirm: async () => {
+        const errEl = document.getElementById('recoveryError');
+        const showErr = (m) => { if (errEl) { errEl.textContent = m; errEl.classList.remove('hidden'); } };
+        const userType = document.getElementById('recoveryType').value;
+        let username = document.getElementById('recoveryId').value.trim();
+        const code = document.getElementById('recoveryCode').value.trim();
+        if (!username || !code) { showErr('Enter your account ID and the recovery code.'); return false; }
+        if (userType === 'student' && /^(SJSH-?)?\d{1,6}$/i.test(username)) {
+          username = 'SJSH' + username.replace(/^SJSH-?/i, '').padStart(3, '0');
+        }
+        const res = await API.callBackend('recoverAccount', { username, userType, code }, 'Verifying recovery code...');
+        if (res && res.success) {
+          hideAlert();
+          App.showToast(res.message || 'Account unlocked.', 'success');
+          return true;
+        }
+        showErr((res && res.message) || 'Could not verify the recovery code.');
+        return false;
+      }
+    });
+  }
+
   function showAlert(msg) {
     const el = document.getElementById('loginAlert');
     if (el) {
@@ -355,7 +451,8 @@ const Auth = (function () {
     initLoginForm: initLoginForm,
     checkExistingSession: checkExistingSession,
     handleLogout: handleLogout,
-    logout: handleLogout
+    logout: handleLogout,
+    showRecoveryModal: showRecoveryModal
   };
 
   window.Auth = exportObj;

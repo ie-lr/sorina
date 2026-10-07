@@ -1601,3 +1601,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     break-after: page;
   }
 }
+
+
+/* Grade sheet: locked periods are view-only */
+.score-input.period-locked:disabled,
+.ag-score:disabled {
+  background: #f1f5f9;
+  color: #475569;
+  border-style: dashed;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+/* Student login: locked SJSH- prefix + editable index */
+.id-prefix-group { display: flex; align-items: stretch; width: 100%; }
+.id-prefix-group .id-prefix {
+  display: flex; align-items: center; padding: 0 12px;
+  background: var(--color-bg-muted, #e2e8f0); color: var(--color-primary);
+  font-weight: 800; letter-spacing: 0.5px; user-select: none; pointer-events: none;
+  border: 1px solid var(--color-border, #cbd5e1); border-right: 0;
+  border-radius: 8px 0 0 8px;
+}
+.id-prefix-group .id-index-input { border-radius: 0 8px 8px 0; flex: 1; min-width: 0; }

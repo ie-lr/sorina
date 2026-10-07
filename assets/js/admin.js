@@ -6,7 +6,7 @@
  * Features:
  * - Collapsible royal blue left sidebar navigation matching official theme.
  * - Summary Tab: enrolled by classes, teachers, revenue, expenses, net balance, target.
- * - Students Tab: systematic ID [SPSS001], New Student registration, Old Student
+ * - Students Tab: systematic ID [SJSH001], New Student registration, Old Student
  *   registration with previous class filter & auto-fill, grade lock, report cards.
  * - Teachers Tab: systematic ID [SPST001], multi-class / multi-subject assignments.
  * - Finance & Tuition: class fee schedules (New vs Old), student fee records.
@@ -69,11 +69,51 @@ window.AdminPanel = (function () {
   let cachedClassFees = [];
   let dashboardCurrency = localStorage.getItem('sorina_dashboard_currency') || 'USD';
   function currencySymbol(code){ return code === 'LRD' ? 'LRD' : 'USD'; }
+  // Base amounts are stored in USD. Viewing in LRD multiplies by the admin-entered exchange rate (LRD per 1 USD).
+  function getExchangeRate(){ const r = Number(localStorage.getItem('sorina_exchange_rate')); return r > 0 ? r : 0; }
+  function convertAmount(v, code=dashboardCurrency){
+    const n = Number(v); const base = isNaN(n) ? 0 : n;
+    if (code === 'USD') return base;
+    const rate = getExchangeRate();
+    return rate > 0 ? base * rate : base;
+  }
+  function syncCurrencySelects(){
+    ['adminGlobalCurrency','dashboardCurrencySelect'].forEach(id => { const el = document.getElementById(id); if (el) el.value = dashboardCurrency; });
+  }
+  // Switching away from USD requires a conversion rate (e.g. 1 USD = 200 LRD).
+  function requestCurrencyChange(newCode, tab){
+    if (newCode === dashboardCurrency) { syncCurrencySelects(); return; }
+    const apply = () => {
+      dashboardCurrency = newCode;
+      localStorage.setItem('sorina_dashboard_currency', dashboardCurrency);
+      syncCurrencySelects();
+      loadTab(tab || currentTab);
+    };
+    if (newCode === 'USD') { apply(); return; }
+    syncCurrencySelects(); // revert dropdown until a valid rate is confirmed
+    const existing = getExchangeRate();
+    App.showModal({
+      title: 'Currency Conversion Rate',
+      content: `<div style="font-size:13.5px;line-height:1.6;">
+        <p>Amounts are recorded in <b>USD</b>. To view them in <b>${newCode}</b>, enter the exchange rate.</p>
+        <div class="form-group"><label class="form-label" for="fxRateInput">1 USD = ? ${newCode}</label>
+        <input type="number" id="fxRateInput" class="input-field" min="0" step="any" placeholder="e.g. 200" value="${existing || ''}"></div>
+        <div class="form-hint">Example: rate 200 means USD 1 shows as ${newCode} 200.</div></div>`,
+      confirmText: 'Apply Rate',
+      onConfirm: () => {
+        const rate = Number(document.getElementById('fxRateInput').value);
+        if (!(rate > 0)) { App.showToast('Enter a conversion rate greater than 0.', 'error'); return false; }
+        localStorage.setItem('sorina_exchange_rate', String(rate));
+        apply();
+        App.showToast(`Currency set to ${newCode} at 1 USD = ${rate} ${newCode}`, 'success');
+      }
+    });
+  }
   function previousAcademicYear(year){
     const m=String(year||'').match(/^(\d{4})[-\/](\d{4})$/);
     return m ? `${Number(m[1])-1}-${Number(m[2])-1}` : '';
   }
-  function moneyLabel(v, code=dashboardCurrency){ return currencySymbol(code)+' '+toNum(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function moneyLabel(v, code=dashboardCurrency){ return currencySymbol(code)+' '+convertAmount(toNum(v), code).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
   // Subjects & curriculum come ONLY from the database (no local copies).
   let subjectRecords = [];
   let curriculumMapCache = {};
@@ -137,7 +177,7 @@ window.AdminPanel = (function () {
     else currentTab = 'settings';
 
     renderPortalLayout(container);
-    const gc=document.getElementById('adminGlobalCurrency'); if(gc) gc.onchange=()=>{dashboardCurrency=gc.value;localStorage.setItem('sorina_dashboard_currency',dashboardCurrency);loadTab(currentTab);};
+    const gc=document.getElementById('adminGlobalCurrency'); if(gc) gc.onchange=()=>requestCurrencyChange(gc.value,currentTab);
     loadTab(currentTab);
   }
 
@@ -177,7 +217,7 @@ window.AdminPanel = (function () {
             <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; margin-bottom: 4px; color: #ffffff; font-weight: 600;">Currency</div>
             <select id="adminGlobalCurrency" class="select-field" style="width: 100%; background: #ffffff; color: var(--color-primary); font-weight: 700; font-size: 12px; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
               <option value="USD" ${dashboardCurrency === 'USD' ? 'selected' : ''}>USD ($)</option>
-              <option value="LRD" ${dashboardCurrency === 'LRD' ? 'selected' : ''}>LRD ($)</option>
+              <option value="LRD" ${dashboardCurrency === 'LRD' ? 'selected' : ''}>LRD (L$)</option>
             </select>
           </div>
 
@@ -358,12 +398,8 @@ window.AdminPanel = (function () {
     // Global Currency Select handler
     const curSelect = document.getElementById('adminGlobalCurrency');
     if (curSelect) {
-      curSelect.addEventListener('change', (e) => {
-        dashboardCurrency = e.target.value;
-        localStorage.setItem('sorina_dashboard_currency', dashboardCurrency);
-        App.showToast(`Active currency set to ${dashboardCurrency}`, 'info');
-        loadTab(currentTab);
-      });
+      // change handled by requestCurrencyChange (rate prompt) via onchange above
+
     }
 
     // Nav Item Click Handlers
@@ -573,21 +609,21 @@ window.AdminPanel = (function () {
         </div>
         <div class="stat-card">
           <div class="stat-label">Revenue Collected</div>
-          <div class="stat-value" style="color: var(--color-success);">${currencySymbol(dashboardCurrency)} ${sum.totalRevenue.toLocaleString()}</div>
+          <div class="stat-value" style="color: var(--color-success);">${currencySymbol(dashboardCurrency)} ${convertAmount(sum.totalRevenue).toLocaleString()}</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Total Expenses</div>
-          <div class="stat-value" style="color: var(--color-danger);">${currencySymbol(dashboardCurrency)} ${sum.totalExpenses.toLocaleString()}</div>
+          <div class="stat-value" style="color: var(--color-danger);">${currencySymbol(dashboardCurrency)} ${convertAmount(sum.totalExpenses).toLocaleString()}</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Net Operating Balance</div>
           <div class="stat-value" style="color: ${sum.netBalance >= 0 ? 'var(--color-primary)' : 'var(--color-danger)'};">
-            ${currencySymbol(dashboardCurrency)} ${sum.netBalance.toLocaleString()}
+            ${currencySymbol(dashboardCurrency)} ${convertAmount(sum.netBalance).toLocaleString()}
           </div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Target Remaining (Receivable)</div>
-          <div class="stat-value" style="color: #d97706;">${currencySymbol(dashboardCurrency)} ${sum.targetRemaining.toLocaleString()}</div>
+          <div class="stat-value" style="color: #d97706;">${currencySymbol(dashboardCurrency)} ${convertAmount(sum.targetRemaining).toLocaleString()}</div>
         </div>
       </div>
 
@@ -630,7 +666,7 @@ window.AdminPanel = (function () {
         </div>
       </div>
     `;
-    const dc=document.getElementById('dashboardCurrencySelect'); if(dc) dc.onchange=()=>{dashboardCurrency=dc.value;localStorage.setItem('sorina_dashboard_currency',dashboardCurrency);loadTab('summary');};
+    const dc=document.getElementById('dashboardCurrencySelect'); if(dc) dc.onchange=()=>requestCurrencyChange(dc.value,'summary');
     const sy=document.getElementById('summaryAcademicYear'); if(sy) sy.onchange=()=>{ selectedAcademicYear=sy.value; localStorage.setItem('sorina_selected_academic_year',selectedAcademicYear); const global=document.getElementById('adminGlobalYearSelect'); if(global) global.value=selectedAcademicYear; App.showToast(`Executive Summary set to academic year ${selectedAcademicYear}`, 'info'); loadTab('summary'); };
   }
 
@@ -1121,17 +1157,17 @@ window.AdminPanel = (function () {
       </div>`;
   }
 
-  function studentBalance(s) {
+  // Billed = class fee package tied to the student's class (server applies the class fee schedule).
+  function studentBilled(s) {
     const f = s.finance || {};
-    const installments = f.installments || [0, 0, 0, 0];
-    const tuitionPaid = installments.reduce((a, b) => a + toNum(b), 0);
-    const tuitionBalance = Math.max(0, toNum(f.tuitionTotal) - tuitionPaid);
-    const regBalance = f.registrationPaid ? 0 : toNum(f.registrationFee);
-    const reqBalance = f.requirementsFeePaid ? 0 : toNum(f.requirementsFee);
-    const peBalance = f.peSuitFeePaid ? 0 : toNum(f.peSuitFee);
-    const portalBalance = f.portalFeePaid ? 0 : toNum(f.portalFee);
-    const entranceBalance = f.entranceFeePaid ? 0 : toNum(f.entranceFee);
-    return tuitionBalance + regBalance + reqBalance + peBalance + portalBalance + entranceBalance;
+    if (f.totalBilled !== undefined) return toNum(f.totalBilled);
+    return toNum(f.tuitionTotal) + toNum(f.registrationFee) + toNum(f.requirementsFee) + toNum(f.peSuitFee) +
+           toNum(f.portalFee) + toNum(f.entranceFee) + (f.extraFees || []).reduce((a, x) => a + toNum(x.amount), 0);
+  }
+
+  // Balance = class billed total minus everything the student has paid.
+  function studentBalance(s) {
+    return Math.max(0, studentBilled(s) - toNum((s.finance || {}).totalPaid));
   }
 
   function toNum(v) { const n = Number(v); return isNaN(n) ? 0 : n; }
@@ -1242,10 +1278,10 @@ window.AdminPanel = (function () {
     printReceiptCards([s]);
   }
 
-  // --- Register New Student Modal (Systematic ID: SPSS001, Photo, Subjects, Class Fee Schedule) ---
+  // --- Register New Student Modal (Systematic ID: SJSH001, Photo, Subjects, Class Fee Schedule) ---
   async function openRegisterNewStudentModal() {
     const idRes = await API.callBackend('getNextStudentId', {}, 'Fetching next ID...');
-    const nextId = (idRes && idRes.success) ? idRes.nextId : 'SPSS001';
+    const nextId = (idRes && idRes.success) ? idRes.nextId : 'SJSH001';
     let uploadedPhotoBase64 = '';
 
     const initialClass = GRADE_LEVELS[2] || 'ABC';
@@ -1270,7 +1306,7 @@ window.AdminPanel = (function () {
             <div class="form-group">
               <label class="form-label" for="nsId">Systematic Student ID *</label>
               <input type="text" id="nsId" class="input-field" value="${escapeHtml(nextId)}" required style="font-weight: 700; color: var(--color-primary);">
-              <div class="form-hint">Systematic format [SPSS001].</div>
+              <div class="form-hint">Systematic format [SJSH001].</div>
             </div>
             <div class="form-group">
               <label class="form-label" for="nsName">Student Full Name *</label>
@@ -1906,6 +1942,41 @@ window.AdminPanel = (function () {
 
   function teacherYearOptions(selected){ return TEACHER_YEARS.map(y=>`<option value="${y}" ${String(selected||'')===y?'selected':''}>${y.replace('-', '–')}</option>`).join(''); }
 
+  // ---- Teacher assignment: each class gets its own subjects (taken from that class's curriculum) ----
+  function teacherAssignPickerHtml(prefix, existing){
+    const map={}; (existing||[]).forEach(a=>{ if(a&&a.class) map[a.class]=new Set(a.subjects||[]); });
+    return `<div style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin:12px 0;background:#f8fafc;">
+      <label class="form-label" style="font-weight:700;">Assigned Classes &amp; Subjects</label>
+      <div class="form-hint" style="margin-bottom:8px;">Tick a class, then tick the subjects this teacher handles in that class. The teacher can only open and grade the classes and subjects selected here.</div>
+      ${GRADE_LEVELS.map(g=>{
+        const subs=selectedCurriculumForClass(g), on=map[g]!==undefined;
+        return `<div class="ta-block" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:6px;background:#fff;">
+          <label style="font-size:13px;"><input type="checkbox" class="${prefix}-class-check" value="${escapeHtml(g)}" ${on?'checked':''}> <b>${escapeHtml(g)}</b></label>
+          <div class="${prefix}-subject-panel" data-class="${escapeHtml(g)}" style="display:${on?'grid':'none'};grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:5px;font-size:12px;margin-top:7px;">
+            ${subs.length?subs.map(sub=>`<label><input type="checkbox" class="${prefix}-subject-check" data-class="${escapeHtml(g)}" value="${escapeHtml(sub)}" ${on&&map[g].has(sub)?'checked':''}> ${escapeHtml(sub)}</label>`).join(''):'<div style="color:#b45309;grid-column:1/-1;">No subjects are assigned to this class yet. Assign them in the Subjects tab first.</div>'}
+          </div></div>`;
+      }).join('')}
+    </div>`;
+  }
+  function bindTeacherAssignPicker(prefix){
+    document.querySelectorAll('.'+prefix+'-class-check').forEach(cb=>{
+      cb.addEventListener('change',()=>{
+        const panel=[...document.querySelectorAll('.'+prefix+'-subject-panel')].find(x=>x.dataset.class===cb.value);
+        if(panel) panel.style.display=cb.checked?'grid':'none';
+      });
+    });
+  }
+  function collectTeacherAssignments(prefix){
+    const assignments=[]; let missing='';
+    document.querySelectorAll('.'+prefix+'-class-check:checked').forEach(c=>{
+      const cls=c.value;
+      const subjects=[...document.querySelectorAll('.'+prefix+'-subject-check:checked')].filter(x=>x.dataset.class===cls).map(x=>x.value);
+      if(!subjects.length&&!missing) missing=cls;
+      assignments.push({class:cls,subjects});
+    });
+    return {assignments,missing};
+  }
+
   async function openAddTeacherModal() {
     const idRes=await API.callBackend('getNextTeacherId',{},'Fetching next teacher ID...');
     const nextId=idRes&&idRes.success?idRes.nextId:'SPST001';
@@ -1922,25 +1993,24 @@ window.AdminPanel = (function () {
           <div class="form-group"><label class="form-label">Status</label><select id="ntStatus" class="select-field"><option>Active</option><option>Inactive</option></select></div>
         </div>
         <div class="form-group"><label class="form-label">Staff Photo</label><input type="file" id="ntPhoto" class="input-field" accept="image/*"><div class="form-hint">Passport/profile photo used throughout the teacher portal and profiles.</div></div>
-        <div style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin:12px 0;background:#f8fafc;"><label class="form-label" style="font-weight:700;">Assigned Classes</label><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:6px;font-size:12px;">${GRADE_LEVELS.map(g=>`<label><input type="checkbox" class="nt-class-check" value="${escapeHtml(g)}"> ${escapeHtml(g)}</label>`).join('')}</div></div>
-        <div style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;background:#f8fafc;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><label class="form-label" style="font-weight:700;">Assigned Subjects</label><button type="button" class="btn btn-light btn-sm" id="ntToggleAllSubjectsBtn">Select All</button></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px;font-size:12px;">${getCatalogSubjects().map(sub=>`<label><input type="checkbox" class="nt-subject-check" value="${escapeHtml(sub)}"> ${escapeHtml(sub)}</label>`).join('')}</div></div>
+        ${teacherAssignPickerHtml('nt',[])}
       </div>`,confirmText:'Create Teacher Account',onConfirm:async()=>{
         const id=document.getElementById('ntId').value.trim(),name=document.getElementById('ntName').value.trim(),year=document.getElementById('ntYear').value,pass=document.getElementById('ntPass').value.trim();
         if(!id||!name||!pass){API.toastNotification('Academic year, Systematic ID, name and password are required.',true);return false;}
-        const classes=[...document.querySelectorAll('.nt-class-check:checked')].map(x=>x.value),subjects=[...document.querySelectorAll('.nt-subject-check:checked')].map(x=>x.value);
-        const assignments=classes.map(cls=>({class:cls,subjects:subjects}));
+        const picked=collectTeacherAssignments('nt');
+        if(picked.missing){API.toastNotification(`Select at least one subject for ${picked.missing}, or untick that class.`,true);return false;}
+        const assignments=picked.assignments;
         const file=document.getElementById('ntPhoto').files[0];
         const photo=file?await readFileAsDataUrl(file):'';
         const teacher={id,name,academicYear:year,title:document.getElementById('ntTitle').value.trim()||'Teacher',phone:document.getElementById('ntPhone').value.trim(),email:document.getElementById('ntEmail').value.trim(),password:pass,photo,status:document.getElementById('ntStatus').value,assignments,createdAt:new Date().toISOString()};
         const r=await API.callBackend('saveTeacher',{teacher},'Creating teacher account...');
         if(r&&r.success){API.toastSuccess(`${id} created for ${year}. Teacher can now sign in from the Teacher Portal.`);loadTab('teachers');return true;}else{API.toastNotification((r&&r.message)||'Could not create teacher.',true);return false;}
       }});
-    setTimeout(()=>{const b=document.getElementById('ntToggleAllSubjectsBtn');if(b)b.onclick=()=>{const c=[...document.querySelectorAll('.nt-subject-check')],all=c.length&&c.every(x=>x.checked);c.forEach(x=>x.checked=!all);b.textContent=all?'Select All':'Deselect All';};},50);
+    setTimeout(()=>bindTeacherAssignPicker('nt'),50);
   }
 
   function openEditTeacherModal(teacherId) {
     const t=cachedTeachers.find(x=>x.id===teacherId); if(!t)return;
-    const assignedClasses=(t.assignments||[]).map(a=>a.class), assignedSubjects=[...new Set((t.assignments||[]).flatMap(a=>a.subjects||[]))];
     App.showModal({title:`Edit Teaching Staff — ${escapeHtml(t.name)}`,content:`
       <div style="font-size:13.5px;max-height:78vh;overflow-y:auto;padding-right:5px;">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;">
@@ -1954,16 +2024,17 @@ window.AdminPanel = (function () {
           <div class="form-group"><label class="form-label">Reset Password</label><input id="etPass" type="password" class="input-field" placeholder="Leave blank to keep current"></div>
         </div>
         <div class="form-group"><label class="form-label">Replace Staff Photo</label><input type="file" id="etPhoto" class="input-field" accept="image/*"></div>
-        <div style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;background:#f8fafc;margin:12px 0;"><label class="form-label" style="font-weight:700;">Assigned Classes</label><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:6px;font-size:12px;">${GRADE_LEVELS.map(g=>`<label><input type="checkbox" class="et-class-check" value="${escapeHtml(g)}" ${assignedClasses.includes(g)?'checked':''}> ${escapeHtml(g)}</label>`).join('')}</div></div>
-        <div style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;background:#f8fafc;"><label class="form-label" style="font-weight:700;">Assigned Subjects</label><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px;font-size:12px;">${getCatalogSubjects().map(sub=>`<label><input type="checkbox" class="et-subject-check" value="${escapeHtml(sub)}" ${assignedSubjects.includes(sub)?'checked':''}> ${escapeHtml(sub)}</label>`).join('')}</div></div>
+        ${teacherAssignPickerHtml('et',t.assignments)}
       </div>`,confirmText:'Save Teacher Profile',onConfirm:async()=>{
         const name=document.getElementById('etName').value.trim(); if(!name){API.toastNotification('Teacher name is required.',true);return false;}
-        const classes=[...document.querySelectorAll('.et-class-check:checked')].map(x=>x.value),subjects=[...document.querySelectorAll('.et-subject-check:checked')].map(x=>x.value);
+        const picked=collectTeacherAssignments('et');
+        if(picked.missing){API.toastNotification(`Select at least one subject for ${picked.missing}, or untick that class.`,true);return false;}
         const file=document.getElementById('etPhoto').files[0];
-        const payload={id:t.id,originalId:t.id,name,academicYear:document.getElementById('etYear').value,title:document.getElementById('etTitle').value.trim(),phone:document.getElementById('etPhone').value.trim(),email:document.getElementById('etEmail').value.trim(),status:document.getElementById('etStatus').value,photo:file?await readFileAsDataUrl(file):(t.photo||''),assignments:classes.map(cls=>({class:cls,subjects}))};
+        const payload={id:t.id,originalId:t.id,name,academicYear:document.getElementById('etYear').value,title:document.getElementById('etTitle').value.trim(),phone:document.getElementById('etPhone').value.trim(),email:document.getElementById('etEmail').value.trim(),status:document.getElementById('etStatus').value,photo:file?await readFileAsDataUrl(file):(t.photo||''),assignments:picked.assignments};
         const pass=document.getElementById('etPass').value.trim();if(pass)payload.password=pass;
         const r=await API.callBackend('saveTeacher',{teacher:payload},'Saving teacher profile...');if(r&&r.success){API.toastSuccess('Teacher profile updated.');loadTab('teachers');return true;}else{API.toastNotification((r&&r.message)||'Could not update teacher.',true);return false;}
       }});
+    setTimeout(()=>bindTeacherAssignPicker('et'),50);
   }
 
   async function deleteTeacher(teacherId) {
@@ -2152,7 +2223,7 @@ window.AdminPanel = (function () {
         const matchCls = !cls || String(s.className || s.grade || '').toLowerCase() === cls;
         let matchStat = true;
         if (stat === 'overdue') matchStat = curBal > 0;
-        if (stat === 'cleared') matchStat = curBal <= 0 && toNum((s.finance || {}).tuitionTotal) > 0;
+        if (stat === 'cleared') matchStat = curBal <= 0 && studentBilled(s) > 0;
         return matchYear && matchQ && matchCls && matchStat;
       });
 
@@ -2165,7 +2236,7 @@ window.AdminPanel = (function () {
         const f = s.finance || {};
         const cur = f.currency || 'USD';
         const inst = f.installments || [0, 0, 0, 0];
-        const totBilled = toNum(f.tuitionTotal) + toNum(f.registrationFee) + toNum(f.requirementsFee) + toNum(f.peSuitFee) + toNum(f.portalFee) + toNum(f.entranceFee);
+        const totBilled = studentBilled(s);
         const totPaid = toNum(f.totalPaid);
         const bal = studentBalance(s);
 
@@ -2185,7 +2256,7 @@ window.AdminPanel = (function () {
             <td style="text-align: right; font-weight: 600;">${formatMoney(totBilled, cur)}</td>
             <td style="text-align: center;">${f.registrationPaid ? '<span class="badge badge-success" style="padding: 2px 6px; font-size: 10.5px;">Paid</span>' : '<span class="badge badge-warning" style="padding: 2px 6px; font-size: 10.5px;">Unpaid</span>'}</td>
             <td style="text-align: center; font-size: 11.5px; color: #475569;">
-              $${inst[0]} / $${inst[1]} / $${inst[2]} / $${inst[3]}
+              ${inst.slice(0, 4).map(v => toNum(v).toLocaleString()).join(' / ')} <span style="color:#94a3b8;">${escapeHtml(cur)}</span>
             </td>
             <td style="text-align: right;"><b style="color: var(--color-success);">${formatMoney(totPaid, cur)}</b></td>
             <td style="text-align: right;"><b class="${bal > 0 ? 'score-red' : 'score-green'}">${formatMoney(bal, cur)}</b></td>
@@ -2804,6 +2875,11 @@ window.AdminPanel = (function () {
     }
 
     const total = cachedExpenses.reduce((sum, e) => sum + (Number(e.total) || 0), 0);
+    // Revenue comes from student payments; expenses recorded here are deducted from it.
+    let revenueCollected = null;
+    const sumRes = await API.callBackend('getFinancialSummary', { academicYear: selectedAcademicYear }, 'Calculating balance...');
+    if (sumRes && sumRes.success && sumRes.summary) revenueCollected = toNum(sumRes.summary.totalRevenue);
+    const expCur = dashboardCurrency;
     const today = new Date().toISOString().slice(0, 10);
     container.innerHTML = `
       <div class="content-card">
@@ -2815,10 +2891,11 @@ window.AdminPanel = (function () {
           </div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px;">
-          <div class="stat-card"><div class="stat-label">Total Expenses</div><div class="stat-value" style="color:var(--color-danger);">$${total.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+          <div class="stat-card"><div class="stat-label">Total Expenses</div><div class="stat-value" style="color:var(--color-danger);">${moneyLabel(total, expCur)}</div></div>
+          ${revenueCollected !== null ? `<div class="stat-card"><div class="stat-label">Revenue Collected</div><div class="stat-value" style="color:var(--color-success);">${moneyLabel(revenueCollected, expCur)}</div></div>
+          <div class="stat-card"><div class="stat-label">Net Balance (Revenue − Expenses)</div><div class="stat-value" style="color:${revenueCollected - total >= 0 ? 'var(--color-primary)' : 'var(--color-danger)'};">${moneyLabel(revenueCollected - total, expCur)}</div></div>` : ''}
           <div class="stat-card"><div class="stat-label">Expense Entries</div><div class="stat-value">${cachedExpenses.length}</div></div>
-          <div class="stat-card"><div class="stat-label">Today</div><div class="stat-value" style="font-size:18px;">${today}</div></div>
-        </div>
+          <div class="stat-card">        </div>
         <div style="overflow:auto;">
           <table class="data-table">
             <thead><tr><th>Number</th><th>Description</th><th>Category</th><th>Quantity</th><th>Amount</th><th>Total</th><th>Date</th><th>Payment Method</th><th>Vendor / Payee</th><th>Reference</th><th>Notes</th><th>Actions</th></tr></thead>
@@ -2903,7 +2980,7 @@ window.AdminPanel = (function () {
     container.innerHTML=`<div class="content-card"><div class="card-header-row" style="margin-bottom:16px;"><div><h3 class="card-title">School Notice & Announcement</h3><div style="font-size:13px;color:var(--color-text-muted);">Publish notices directly to teachers, students, or everyone.</div></div><button class="btn btn-primary" id="newAnnouncementBtn">+ New Announcement</button></div><div>${cachedAnnouncements.length?cachedAnnouncements.map((m,i)=>`<div style="border:1px solid var(--color-border);border-radius:8px;padding:15px;margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:10px;"><div><b>${escapeHtml(m.subject||'School Announcement')}</b><span class="badge badge-light" style="margin-left:8px;">${escapeHtml(m.audience||'Both')}</span></div><span style="font-size:12px;color:#64748b;">${escapeHtml(m.sentAt||'')}</span></div><p style="margin:8px 0;line-height:1.5;">${escapeHtml(m.body||'')}</p>${m.recipientId?`<div style="font-size:12px;color:#475569;">Recipient ID: <b>${escapeHtml(m.recipientId)}</b></div>`:''}${m.attachmentUrl?`<div style="margin-top:8px;"><a class="btn btn-light btn-sm" href="${escapeHtml(m.attachmentUrl)}" target="_blank">View Attachment${m.attachmentName?' — '+escapeHtml(m.attachmentName):''}</a></div>`:''}<div style="font-size:12px;color:#64748b;">From: ${escapeHtml(m.senderName||'School Administration')} <button class="btn btn-danger btn-sm" style="float:right;" onclick="window.AdminPanel.deleteAnnouncement(${i})">Delete</button></div></div>`).join(''):'<div style="padding:30px;text-align:center;color:#64748b;">No announcements published yet.</div>'}</div></div>`;
     document.getElementById('newAnnouncementBtn').onclick=openAnnouncementModal;
   }
-  function openAnnouncementModal(){ App.showModal({title:'Create School Announcement',content:`<div class="form-group"><label class="form-label">Subject *</label><input id="annSubject" class="input-field" placeholder="e.g. Mid-Term Examination Notice"></div><div class="form-group"><label class="form-label">Send To *</label><select id="annAudience" class="select-field"><option value="Both">Teachers & Students</option><option value="Teachers">Teachers Only</option><option value="Students">Students Only</option><option value="Individual">Individual ID</option></select></div><div class="form-group" id="annRecipientWrap" style="display:none"><label class="form-label">Recipient Student/Teacher ID</label><input id="annRecipientId" class="input-field" placeholder="e.g. SPSS001 or SPST001"></div><div class="form-group"><label class="form-label">Announcement *</label><textarea id="annBody" class="input-field" rows="6" placeholder="Write the school notice here..."></textarea></div><div class="form-group"><label class="form-label">Attachment</label><input type="file" id="annAttachment" class="input-field" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"></div>`,confirmText:'Publish Announcement',onConfirm:async()=>{const subject=document.getElementById('annSubject').value.trim(),body=document.getElementById('annBody').value.trim(),audience=document.getElementById('annAudience').value,recipientId=document.getElementById('annRecipientId').value.trim();const file=document.getElementById('annAttachment').files[0];if(!subject||!body){API.toastNotification('Subject and announcement text are required.',true);return;}if(audience==='Individual'&&!recipientId){API.toastNotification('Enter the recipient ID.',true);return;}const attachmentUrl=file?await readFileAsDataUrl(file):'';const item={id:'ANN-'+Date.now(),subject,body,audience:audience==='Individual'?'Individual':audience,recipientId:audience==='Individual'?recipientId:'',attachmentUrl,attachmentName:file?file.name:'',senderName:currentUser.name||'School Administration',sentAt:new Date().toLocaleString()};const r=await API.callBackend('saveAnnouncement',{announcement:item},'Publishing announcement...');if(r&&r.success){cachedAnnouncements=r.announcements||[item,...cachedAnnouncements];API.toastSuccess('Announcement published.');loadTab('announcements')}else API.toastNotification(r.message||'Could not publish announcement.',true);}});setTimeout(()=>{const a=document.getElementById('annAudience');if(a)a.onchange=()=>{document.getElementById('annRecipientWrap').style.display=a.value==='Individual'?'block':'none';};},50); }
+  function openAnnouncementModal(){ App.showModal({title:'Create School Announcement',content:`<div class="form-group"><label class="form-label">Subject *</label><input id="annSubject" class="input-field" placeholder="e.g. Mid-Term Examination Notice"></div><div class="form-group"><label class="form-label">Send To *</label><select id="annAudience" class="select-field"><option value="Both">Teachers & Students</option><option value="Teachers">Teachers Only</option><option value="Students">Students Only</option><option value="Individual">Individual ID</option></select></div><div class="form-group" id="annRecipientWrap" style="display:none"><label class="form-label">Recipient Student/Teacher ID</label><input id="annRecipientId" class="input-field" placeholder="e.g. SJSH001 or SPST001"></div><div class="form-group"><label class="form-label">Announcement *</label><textarea id="annBody" class="input-field" rows="6" placeholder="Write the school notice here..."></textarea></div><div class="form-group"><label class="form-label">Attachment</label><input type="file" id="annAttachment" class="input-field" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"></div>`,confirmText:'Publish Announcement',onConfirm:async()=>{const subject=document.getElementById('annSubject').value.trim(),body=document.getElementById('annBody').value.trim(),audience=document.getElementById('annAudience').value,recipientId=document.getElementById('annRecipientId').value.trim();const file=document.getElementById('annAttachment').files[0];if(!subject||!body){API.toastNotification('Subject and announcement text are required.',true);return;}if(audience==='Individual'&&!recipientId){API.toastNotification('Enter the recipient ID.',true);return;}const attachmentUrl=file?await readFileAsDataUrl(file):'';const item={id:'ANN-'+Date.now(),subject,body,audience:audience==='Individual'?'Individual':audience,recipientId:audience==='Individual'?recipientId:'',attachmentUrl,attachmentName:file?file.name:'',senderName:currentUser.name||'School Administration',sentAt:new Date().toLocaleString()};const r=await API.callBackend('saveAnnouncement',{announcement:item},'Publishing announcement...');if(r&&r.success){cachedAnnouncements=r.announcements||[item,...cachedAnnouncements];API.toastSuccess('Announcement published.');loadTab('announcements')}else API.toastNotification(r.message||'Could not publish announcement.',true);}});setTimeout(()=>{const a=document.getElementById('annAudience');if(a)a.onchange=()=>{document.getElementById('annRecipientWrap').style.display=a.value==='Individual'?'block':'none';};},50); }
 
   async function deleteAnnouncement(i){const item=cachedAnnouncements[i];if(!item||!confirm('Delete this announcement?'))return;const r=await API.callBackend('deleteAnnouncement',{id:item.id},'Deleting announcement...');if(r&&r.success){cachedAnnouncements.splice(i,1);loadTab('announcements')}}
 
@@ -3093,7 +3170,7 @@ window.AdminPanel = (function () {
           <div style="display:flex;gap:7px;flex-wrap:wrap;"><button type="button" class="btn btn-light btn-sm" id="agReset">Reset Unsaved</button><button type="button" class="btn btn-light" id="agDraft">Save Draft</button><button type="button" class="btn btn-primary" id="agSubmit">Submit / Finalize Grades</button></div>
         </div>
         <div class="table-responsive" style="max-height:56vh;overflow:auto;">
-          <table class="data-table" style="min-width:1180px;"><thead style="position:sticky;top:0;z-index:2;background:#f8fafc;"><tr><th style="min-width:220px;">Student</th>${periods.map(p=>`<th style="min-width:105px;text-align:center;">${escapeHtml(p.label)}</th>`).join('')}<th>Status</th></tr></thead><tbody id="agBody"></tbody></table>
+          <table class="data-table" style="min-width:1180px;"><thead style="position:sticky;top:0;z-index:2;background:#f8fafc;"><tr><th style="min-width:220px;">Student</th>${periods.map(p=>`<th style="min-width:105px;text-align:center;">${escapeHtml(p.label)}<div style="font-size:10px;font-weight:700;color:${isPeriodLocked(p.key)?'#b45309':'#15803d'};">${isPeriodLocked(p.key)?'Locked &bull; view only':'Open &bull; editable'}</div></th>`).join('')}<th>Status</th></tr></thead><tbody id="agBody"></tbody></table>
         </div>
         <div style="padding:12px 22px;border-top:1px solid var(--color-border);background:#fff;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;"><div><b>Grade Activity Log</b><div style="font-size:12px;color:#64748b;">Recent admin and teacher grade submissions for ${escapeHtml(selectedAcademicYear)}.</div></div><button type="button" class="btn btn-light btn-sm" id="agLogRefresh">Refresh Log</button></div>
         <div id="agLog" style="padding:0 22px 16px;max-height:220px;overflow:auto;"></div>

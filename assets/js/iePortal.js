@@ -7,7 +7,7 @@
  * 1. Independent Developer Authentication (separate login & session token).
  * 2. System Kill-Switch: Remotely suspend or restore entire school operation.
  * 3. Security Signals Telemetry: Real-time detection of brute-force and forceful entries.
- * 4. Print Dispatch Queue: Inspect ID cards & tests submitted by Admin, update status.
+ * 4. Print Dispatch Queue: Inspect ID cards submitted by Admin, update status.
  * 5. Direct messaging with School Admin exclusively.
  * -----------------------------------------------------------------------
  */
@@ -16,6 +16,7 @@
   let devToken = sessionStorage.getItem('ie_dev_token') || '';
   let isSuspended = false;
   let currentTab = 'signals';
+  let inboxToken = '';
 
   const loginView = document.getElementById('devLoginView');
   const dashView = document.getElementById('devDashboardView');
@@ -251,6 +252,9 @@
       case 'messages':
         await renderMessagesTab();
         break;
+      case 'securedInbox':
+        await renderSecuredInboxTab();
+        break;
       case 'database':
         await renderDatabaseTab();
         break;
@@ -304,7 +308,7 @@
   }
 
   // =========================================================================
-  // 2. PRINTING DISPATCH QUEUE (ID CARDS & TEACHER TESTS)
+  // 2. PRINTING DISPATCH QUEUE (ID CARDS)
   // =========================================================================
   async function renderPrintQueueTab() {
     const res = await API.callBackend('ieGetPrintQueue', { token: devToken }, 'Loading print queue...');
@@ -339,7 +343,7 @@
               ` : jobs.map(j => `
                 <tr style="border-color: #1e293b;">
                   <td><b>${escapeHtml(j.jobId)}</b></td>
-                  <td><span class="badge ${j.jobType === 'EXAM_TEST' ? 'badge-info' : 'badge-primary'}">${escapeHtml(j.jobType)}</span></td>
+                  <td><span class="badge badge-primary">${escapeHtml(j.jobType)}</span></td>
                   <td><b>${j.count} unit(s)</b></td>
                   <td style="font-size: 12.5px; color: #cbd5e1;">${escapeHtml(j.details)}</td>
                   <td>${escapeHtml(j.requestedBy)}</td>
@@ -446,6 +450,167 @@
     }
   }
 
+
+  // =========================================================================
+  // 3b. SECURED INBOX (email only, separate one-line password)
+  // =========================================================================
+  function checkInboxPassword(pw) {
+    if (/\s/.test(pw)) return 'Password must be a single line with no spaces.';
+    if (pw.length < 10) return 'Password must be at least 10 characters long.';
+    if (!/[A-Za-z]/.test(pw)) return 'Password must contain at least one letter.';
+    if (!/[0-9]/.test(pw)) return 'Password must contain at least one number.';
+    if (!/[^A-Za-z0-9]/.test(pw)) return 'Password must contain at least one special character.';
+    return '';
+  }
+
+  async function renderSecuredInboxTab() {
+    if (inboxToken) {
+      await renderInboxMessages();
+      return;
+    }
+    const st = await API.callBackend('ieInboxStatus', { token: devToken }, 'Checking secured inbox...');
+    const configured = !!(st && st.success && st.configured);
+    renderInboxGate(configured);
+  }
+
+  function renderInboxGate(configured) {
+    devTabContainer.innerHTML = `
+      <div class="dev-card" style="max-width: 520px; margin: 0 auto;">
+        <h3 style="margin: 0 0 6px; color: #ffffff; font-size: 17px;">
+          🔐 ${configured ? 'Unlock Secured Inbox' : 'Create Secured Inbox Password'}
+        </h3>
+        <div style="font-size: 12.5px; color: #94a3b8; margin-bottom: 14px; line-height: 1.5;">
+          ${configured
+            ? 'Enter the secured inbox password to read emails.'
+            : 'This inbox holds emails only. Set a one-line password: at least 10 characters with letters, numbers and a special character (e.g. Sorina#2026ie).'}
+        </div>
+        <div id="inboxGateError" class="alert alert-danger hidden" style="margin-bottom: 12px;"></div>
+        <input type="password" id="inboxPassInput" class="input-field" autocomplete="off"
+               placeholder="${configured ? 'Secured inbox password' : 'New password (min 10, letters+numbers+special)'}"
+               style="background: #1e293b; color: #fff; border-color: #334155; width: 100%; box-sizing: border-box;">
+        ${configured ? '' : `
+        <input type="password" id="inboxPassConfirm" class="input-field" autocomplete="off"
+               placeholder="Confirm password"
+               style="background: #1e293b; color: #fff; border-color: #334155; width: 100%; box-sizing: border-box; margin-top: 10px;">
+        <div id="inboxPassHint" style="font-size: 12px; color: #64748b; margin-top: 8px;">10+ characters &bull; letter &bull; number &bull; special character</div>`}
+        <button type="button" id="inboxGateBtn" class="btn btn-primary" style="width: 100%; padding: 11px; margin-top: 14px; font-weight: 700;">
+          ${configured ? 'Unlock Inbox' : 'Create Password & Open Inbox'}
+        </button>
+      </div>
+    `;
+
+    const errEl = document.getElementById('inboxGateError');
+    const input = document.getElementById('inboxPassInput');
+    const confirmEl = document.getElementById('inboxPassConfirm');
+    const showErr = (m) => { errEl.textContent = m; errEl.classList.remove('hidden'); };
+
+    if (!configured) {
+      const hint = document.getElementById('inboxPassHint');
+      input.oninput = () => {
+        const msg = input.value ? checkInboxPassword(input.value) : '';
+        hint.style.color = input.value ? (msg ? '#f87171' : '#34d399') : '#64748b';
+        hint.textContent = input.value ? (msg || 'Password strength OK') : '10+ characters \u2022 letter \u2022 number \u2022 special character';
+      };
+    }
+
+    const submit = async () => {
+      errEl.classList.add('hidden');
+      const pw = input.value;
+      if (!configured) {
+        const msg = checkInboxPassword(pw);
+        if (msg) return showErr(msg);
+        if (pw !== confirmEl.value) return showErr('Passwords do not match.');
+      } else if (!pw) {
+        return showErr('Enter the password.');
+      }
+      const res = await API.callBackend(
+        configured ? 'ieInboxUnlock' : 'ieInboxSetup',
+        { token: devToken, password: pw },
+        configured ? 'Unlocking inbox...' : 'Creating secured inbox...'
+      );
+      if (res && res.success && res.inboxToken) {
+        inboxToken = res.inboxToken;
+        await renderInboxMessages();
+      } else {
+        showErr((res && res.message) || 'Could not open secured inbox.');
+        input.value = '';
+      }
+    };
+    document.getElementById('inboxGateBtn').onclick = submit;
+    input.onkeydown = (e) => { if (e.key === 'Enter' && configured) submit(); };
+  }
+
+  async function renderInboxMessages() {
+    const res = await API.callBackend('ieInboxList', { token: devToken, inboxToken: inboxToken }, 'Loading secured emails...');
+    if (!res || !res.success) {
+      if (res && res.locked) inboxToken = '';
+      return renderSecuredInboxTab();
+    }
+    const emails = res.emails || [];
+
+    devTabContainer.innerHTML = `
+      <div class="dev-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 style="margin: 0; color: #ffffff; font-size: 17px;">🔐 Secured Inbox <span class="badge badge-warning" style="margin-left: 6px;">${res.unread || 0} unread</span></h3>
+            <div style="font-size: 12.5px; color: #94a3b8;">Email-only inbox for the IE team. Session auto-locks after 30 minutes.</div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-light btn-sm" id="inboxRefreshBtn">Refresh</button>
+            <button type="button" class="btn btn-light btn-sm" id="inboxChangePwBtn">Change Password</button>
+            <button type="button" class="btn btn-danger btn-sm" id="inboxLockBtn">Lock Inbox</button>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          ${emails.length === 0 ? `
+            <div style="text-align: center; padding: 30px; color: #64748b;">No emails in the secured inbox yet.</div>
+          ` : emails.map(m => `
+            <div class="inbox-mail" data-id="${escapeHtml(m.id)}" data-read="${m.read ? '1' : '0'}"
+                 style="border: 1px solid #1e293b; border-left: 4px solid ${m.read ? '#334155' : '#3b82f6'}; border-radius: 8px; padding: 12px 16px; background: #0a192f; cursor: pointer;">
+              <div style="display: flex; justify-content: space-between; gap: 10px; align-items: center;">
+                <strong style="color: #ffffff; font-size: 14px; ${m.read ? 'font-weight: 500;' : ''}">${escapeHtml(m.subject)}</strong>
+                <span style="font-size: 12px; color: #64748b; white-space: nowrap;">${escapeHtml(m.timestamp)}</span>
+              </div>
+              <div style="font-size: 12px; color: #60a5fa; margin-top: 2px;">From: ${escapeHtml(m.from)} &bull; ${escapeHtml(m.category)}</div>
+              <div class="inbox-body hidden" style="font-size: 13.5px; color: #cbd5e1; line-height: 1.55; margin-top: 10px; white-space: pre-wrap; font-family: monospace;">${escapeHtml(m.body)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    document.getElementById('inboxRefreshBtn').onclick = renderInboxMessages;
+    document.getElementById('inboxLockBtn').onclick = async () => {
+      await API.callBackend('ieInboxLock', { token: devToken, inboxToken: inboxToken }, 'Locking inbox...');
+      inboxToken = '';
+      renderSecuredInboxTab();
+    };
+    document.getElementById('inboxChangePwBtn').onclick = changeInboxPassword;
+
+    devTabContainer.querySelectorAll('.inbox-mail').forEach(card => {
+      card.onclick = async () => {
+        card.querySelector('.inbox-body').classList.toggle('hidden');
+        if (card.dataset.read === '0') {
+          card.dataset.read = '1';
+          card.style.borderLeftColor = '#334155';
+          await API.callBackend('ieInboxMarkRead', { token: devToken, inboxToken: inboxToken, id: card.dataset.id }, 'Updating...');
+        }
+      };
+    });
+  }
+
+  async function changeInboxPassword() {
+    const cur = prompt('Current secured inbox password:');
+    if (!cur) return;
+    const next = prompt('New password (one line, 10+ characters, letters + numbers + special character):');
+    if (!next) return;
+    const msg = checkInboxPassword(next);
+    if (msg) { API.toastNotification(msg, true); return; }
+    const res = await API.callBackend('ieInboxChangePassword', { token: devToken, currentPassword: cur, newPassword: next }, 'Changing password...');
+    if (res && res.success) API.toastSuccess('Password changed');
+    else API.toastNotification((res && res.message) || 'Could not change password.', true);
+  }
+
   // =========================================================================
   // 4. DATABASE & INFRASTRUCTURE CONTROLLER
   // =========================================================================
@@ -465,7 +630,6 @@
       { name: 'Settings', scope: 'Operational', cols: 2, key: 'Key', desc: 'Global configurations: school name, current academic year, grading scale.' },
       { name: 'AuditLog', scope: 'Security / Admin', cols: 6, key: 'Timestamp', desc: 'Tamper-evident security ledger logging administrative events & exports.' },
       { name: 'BackupLog', scope: 'Security / Admin', cols: 7, key: 'Backup ID', desc: 'Snapshot history, record counts, Drive storage URLs, SHA-256 hashes.' },
-      { name: 'Tests', scope: 'Operational', cols: 13, key: 'Test ID', desc: 'Teacher examination and test uploads, review queues, attachment URLs.' },
       { name: 'PrintQueue', scope: 'Operational', cols: 9, key: 'Job ID', desc: 'PVC ID Card and Examination Question sheet dispatch requests.' },
       { name: 'DeveloperMessages', scope: 'Operational', cols: 7, key: 'Message ID', desc: 'Private direct messaging between School Admin and IE Developers.' },
       { name: 'SecuritySignals', scope: 'Operational', cols: 5, key: 'Signal ID', desc: 'Forceful entry alerts, suspicious IP activities, brute-force alarms.' }

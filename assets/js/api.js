@@ -215,10 +215,10 @@ const API = (function () {
       'saveTeacher', 'deleteTeacher', 'submitGrades', 'teacherSubmitGrades',
       'recordPayment', 'saveFinance', 'clearFinance', 'saveClassFee', 'saveFeeItem', 'deleteFeeItem',
       'saveExpense', 'deleteExpense',
-      'saveLessonPlan', 'reviewLessonPlan', 'submitTeacherTest',
+      'saveLessonPlan', 'reviewLessonPlan',
       'sendMessage', 'adminSendIeMessage', 'markMessagesRead',
       'createAdmin', 'updateAdminProfile', 'updateAdminPermissions', 'removeAdmin',
-      'sendIdCardsToPrinting', 'sendTestToPrinting',
+      'sendIdCardsToPrinting',
       'addSubject', 'updateSubject', 'deleteSubject', 'saveSubjects', 'saveCurriculumSubjects', 'savePermissions',
       'updateSettings', 'saveAnnouncement', 'deleteAnnouncement', 'changePassword'
     ].includes(action);
@@ -310,7 +310,7 @@ const API = (function () {
     }
     const initial = [
       {
-        id: 'SPSS001', name: 'Emmanuel Johnson', className: 'Grade 1', grade: 'Grade 1',
+        id: 'SJSH001', name: 'Emmanuel Johnson', className: 'Grade 1', grade: 'Grade 1',
         academicYear: '2026-2027', status: 'Active', studentCategory: 'new', gradeLocked: false,
         guardian: 'Mary Johnson', phone: '+231-886-000111', dob: '2018-05-12', photo: '',
         assignedSubjects: ['English / Reading', 'General Mathematics', 'General Science', 'Health Education'],
@@ -322,7 +322,7 @@ const API = (function () {
         }
       },
       {
-        id: 'SPSS002', name: 'Blessing Williams', className: 'Grade 1', grade: 'Grade 1',
+        id: 'SJSH002', name: 'Blessing Williams', className: 'Grade 1', grade: 'Grade 1',
         academicYear: '2026-2027', status: 'Active', studentCategory: 'old', gradeLocked: false,
         guardian: 'James Williams', phone: '+231-770-555444', dob: '2018-02-20', photo: '',
         assignedSubjects: ['English / Reading', 'General Mathematics', 'Social Studies'],
@@ -334,7 +334,7 @@ const API = (function () {
         }
       },
       {
-        id: 'SPSS003', name: 'Faith Toe', className: 'ABC', grade: 'ABC',
+        id: 'SJSH003', name: 'Faith Toe', className: 'ABC', grade: 'ABC',
         academicYear: '2026-2027', status: 'Active', studentCategory: 'new', gradeLocked: false,
         guardian: 'Sarah Toe', phone: '+231-886-333222', dob: '2021-08-14', photo: '',
         assignedSubjects: ['Phonics', 'Handwriting', 'Mental Math'],
@@ -346,7 +346,7 @@ const API = (function () {
         }
       },
       {
-        id: 'SPSS004', name: 'Prince Kollie', className: 'K1', grade: 'K1',
+        id: 'SJSH004', name: 'Prince Kollie', className: 'K1', grade: 'K1',
         academicYear: '2026-2027', status: 'Active', studentCategory: 'new', gradeLocked: false,
         guardian: 'David Kollie', phone: '+231-886-444555', dob: '2020-03-10', photo: '',
         assignedSubjects: ['English / Reading', 'Mental Math', 'Creative Arts / Music'],
@@ -358,7 +358,7 @@ const API = (function () {
         }
       },
       {
-        id: 'SPSS001', name: 'Emmanuel Johnson', className: 'K2', grade: 'K2',
+        id: 'SJSH001', name: 'Emmanuel Johnson', className: 'K2', grade: 'K2',
         academicYear: '2025-2026', status: 'Active', studentCategory: 'old', gradeLocked: false,
         guardian: 'Mary Johnson', phone: '+231-886-000111', dob: '2018-05-12', photo: '',
         assignedSubjects: ['English / Reading', 'General Mathematics'],
@@ -370,7 +370,7 @@ const API = (function () {
         }
       },
       {
-        id: 'SPSS005', name: 'Joseph Myers', className: 'Grade 2', grade: 'Grade 2',
+        id: 'SJSH005', name: 'Joseph Myers', className: 'Grade 2', grade: 'Grade 2',
         academicYear: '2025-2026', status: 'Active', studentCategory: 'old', gradeLocked: false,
         guardian: 'Helena Myers', phone: '+231-777-888999', dob: '2017-09-01', photo: '',
         assignedSubjects: ['General Mathematics', 'Social Studies', 'General Science'],
@@ -382,7 +382,7 @@ const API = (function () {
         }
       },
       {
-        id: 'SPSS006', name: 'Cecelia Flomo', className: 'Daycare', grade: 'Daycare',
+        id: 'SJSH006', name: 'Cecelia Flomo', className: 'Daycare', grade: 'Daycare',
         academicYear: '2027-2028', status: 'Active', studentCategory: 'new', gradeLocked: false,
         guardian: 'Moses Flomo', phone: '+231-888-222111', dob: '2023-01-15', photo: '',
         assignedSubjects: ['Phonics', 'Creative Arts / Music'],
@@ -699,14 +699,14 @@ const API = (function () {
             const allSt = getMockStudents();
             let maxNum = 0;
             allSt.forEach(s => {
-              const m = String(s.id).match(/SPSS(\d+)/i);
+              const m = String(s.id).match(/SJSH(\d+)/i);
               if (m) {
                 const num = parseInt(m[1], 10);
                 if (num > maxNum) maxNum = num;
               }
             });
             const nextNum = maxNum + 1;
-            resolve({ success: true, nextId: 'SPSS' + String(nextNum).padStart(3, '0') });
+            resolve({ success: true, nextId: 'SJSH' + String(nextNum).padStart(3, '0') });
             break;
           }
 
