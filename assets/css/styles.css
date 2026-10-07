@@ -1521,6 +1521,32 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .portal-sidebar, .site-header, .btn, .no-print, #offlineIndicator, #globalToast {
     display: none !important;
   }
+  /* Allow modal preview to print report cards and receipts when modal is active */
+  body:has(.modal-overlay) .portal-layout,
+  body:has(#modalContainer:not(:empty)) .portal-layout {
+    display: none !important;
+  }
+  .modal-overlay:has(#adminRcMount),
+  .modal-overlay:has(.receiptPrintGrid),
+  .modal-overlay:has(.reportCardContainer) {
+    display: block !important;
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+  .modal-dialog:has(#adminRcMount),
+  .modal-dialog:has(.receiptPrintGrid),
+  .modal-dialog:has(.reportCardContainer) {
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  .modal-header, .modal-footer {
+    display: none !important;
+  }
   .portal-layout {
     display: block !important;
   }
