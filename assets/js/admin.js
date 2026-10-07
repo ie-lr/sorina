@@ -40,10 +40,10 @@ window.AdminPanel = (function () {
     return Boolean(currentUser.permissions && currentUser.permissions[permKey]);
   }
 
-  const GRADE_LEVELS = [
+  const DEFAULT_GRADE_LEVELS = [
     'Daycare',
-    'Nursery',
-    'ABC',
+    'Nursery 1',
+    'Nursery 2',
     'K1',
     'K2',
     'Grade 1',
@@ -60,6 +60,16 @@ window.AdminPanel = (function () {
     'Grade 12'
   ];
 
+  function getStoredClasses() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('sorina_custom_classes') || 'null');
+      if (Array.isArray(saved) && saved.length > 0) return saved;
+    } catch (e) {}
+    return [...DEFAULT_GRADE_LEVELS];
+  }
+
+  let GRADE_LEVELS = getStoredClasses();
+
   let cachedClassFees = [];
   let dashboardCurrency = localStorage.getItem('sorina_dashboard_currency') || 'USD';
   function currencySymbol(code){ return code === 'LRD' ? 'LRD' : 'USD'; }
@@ -75,14 +85,15 @@ window.AdminPanel = (function () {
       new: { entranceFee: 20, registrationFee: 30, tuitionTotal: 150, requirementsFee: 25, peSuitFee: 20, portalFee: 15 },
       old: { entranceFee: 0, registrationFee: 25, tuitionTotal: 140, requirementsFee: 25, peSuitFee: 20, portalFee: 15 }
     },
-    'Nursery': {
+    'Nursery 1': {
       new: { entranceFee: 20, registrationFee: 30, tuitionTotal: 160, requirementsFee: 25, peSuitFee: 20, portalFee: 15 },
       old: { entranceFee: 0, registrationFee: 25, tuitionTotal: 150, requirementsFee: 25, peSuitFee: 20, portalFee: 15 }
     },
-    'ABC': {
-      new: { entranceFee: 20, registrationFee: 35, tuitionTotal: 180, requirementsFee: 30, peSuitFee: 20, portalFee: 15 },
-      old: { entranceFee: 0, registrationFee: 30, tuitionTotal: 170, requirementsFee: 30, peSuitFee: 20, portalFee: 15 }
+    'Nursery 2': {
+      new: { entranceFee: 20, registrationFee: 35, tuitionTotal: 170, requirementsFee: 30, peSuitFee: 20, portalFee: 15 },
+      old: { entranceFee: 0, registrationFee: 30, tuitionTotal: 160, requirementsFee: 30, peSuitFee: 20, portalFee: 15 }
     },
+
     'K1': {
       new: { entranceFee: 20, registrationFee: 35, tuitionTotal: 190, requirementsFee: 30, peSuitFee: 20, portalFee: 15 },
       old: { entranceFee: 0, registrationFee: 30, tuitionTotal: 180, requirementsFee: 30, peSuitFee: 20, portalFee: 15 }
@@ -170,7 +181,6 @@ window.AdminPanel = (function () {
     else if (perms['finance:view'] || perms['finance:edit'] || perms['finance:delete']) currentTab = 'finance';
     else if (perms['payroll:view'] || perms['payroll:edit'] || perms['payroll:delete']) currentTab = 'payroll';
     else if (perms['messaging:view'] || perms['messaging:send']) currentTab = 'announcements';
-    else if (perms['printing:view'] || perms['printing:send']) currentTab = 'printing';
     else if (perms['subjects:view'] || perms['subjects:edit'] || perms['subjects:delete']) currentTab = 'subjects';
     else if (isSuper || user.role === 'admin' || perms['scores:view'] || perms['scores:edit']) currentTab = 'gradeEntry';
     else if (perms['settings:edit']) currentTab = 'settings';
@@ -192,7 +202,6 @@ window.AdminPanel = (function () {
     const canTeachers = isSuperAdmin || perms['teachers:view'] || perms['teachers:edit'] || perms['teachers:delete'];
     const canFinance = isSuperAdmin || perms['finance:view'] || perms['finance:edit'] || perms['finance:delete'];
     const canPayroll = isSuperAdmin || perms['payroll:view'] || perms['payroll:edit'] || perms['payroll:delete'];
-    const canPrinting = isSuperAdmin || perms['printing:view'] || perms['printing:send'];
     const canSubjects = isSuperAdmin || perms['subjects:view'] || perms['subjects:edit'] || perms['subjects:delete'];
     const canScores = isSuperAdmin || currentUser?.role === 'admin' || perms['scores:view'] || perms['scores:edit'];
     const canLessonPlans = isSuperAdmin || currentUser?.role === 'admin' || perms['lesson_plans:view'];
@@ -258,13 +267,6 @@ window.AdminPanel = (function () {
             ` : ''}
 
             <div class="nav-section-title">Academics &amp; Services</div>
-
-            ${canPrinting ? `
-              <a class="sidebar-item ${currentTab === 'printing' ? 'active' : ''}" data-tab="printing">
-                <img src="assets/icons/file-text.png" class="sidebar-icon" alt="">
-                <span class="sidebar-item-label">Printing Services</span>
-              </a>
-            ` : ''}
 
             ${canSubjects ? `
               <a class="sidebar-item ${currentTab === 'subjects' ? 'active' : ''}" data-tab="subjects">
@@ -347,15 +349,47 @@ window.AdminPanel = (function () {
       </div>
     `;
 
-    // Sidebar Toggle
+    // Sidebar Toggle & Auto-hide
     const sidebar = document.getElementById('adminSidebar');
     const toggleBtn = document.getElementById('adminSidebarToggleBtn');
+    let sidebarTimer = null;
+
+    function resetSidebarTimer() {
+      if (sidebarTimer) clearTimeout(sidebarTimer);
+      // Auto-collapse after 60 seconds (1 minute) of inactivity
+      sidebarTimer = setTimeout(() => {
+        if (!isSidebarCollapsed && sidebar) {
+          isSidebarCollapsed = true;
+          sidebar.classList.add('collapsed');
+        }
+      }, 60000);
+    }
+
     if (toggleBtn && sidebar) {
-      toggleBtn.addEventListener('click', () => {
+      toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         isSidebarCollapsed = !isSidebarCollapsed;
         sidebar.classList.toggle('collapsed', isSidebarCollapsed);
+        if (!isSidebarCollapsed) resetSidebarTimer();
       });
     }
+
+    // Auto-collapse when user clicks or interacts with main screen of selected tab
+    const contentArea = document.getElementById('adminContentBody');
+    if (contentArea) {
+      contentArea.addEventListener('click', () => {
+        if (!isSidebarCollapsed && sidebar && window.innerWidth > 768) {
+          isSidebarCollapsed = true;
+          sidebar.classList.add('collapsed');
+        }
+      });
+    }
+
+    if (sidebar) {
+      sidebar.addEventListener('mouseenter', resetSidebarTimer);
+      sidebar.addEventListener('mousemove', resetSidebarTimer);
+    }
+    resetSidebarTimer();
 
     // Academic Year Select handler
     const yearSelect = document.getElementById('adminGlobalYearSelect');
@@ -374,6 +408,11 @@ window.AdminPanel = (function () {
         container.querySelectorAll('.sidebar-item[data-tab]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentTab = btn.dataset.tab;
+        // Auto-collapse sidebar after user selects a tab so main workspace is wide
+        if (!isSidebarCollapsed && sidebar) {
+          isSidebarCollapsed = true;
+          sidebar.classList.add('collapsed');
+        }
         loadTab(currentTab);
       });
     });
@@ -406,7 +445,6 @@ window.AdminPanel = (function () {
       finance: isSuper || perms['finance:view'] || perms['finance:edit'] || perms['finance:delete'],
       payroll: isSuper || perms['payroll:view'] || perms['payroll:edit'] || perms['payroll:delete'],
       announcements: isSuper || perms['messaging:view'] || perms['messaging:send'],
-      printing: isSuper || perms['printing:view'] || perms['printing:send'],
       subjects: isSuper || perms['subjects:view'] || perms['subjects:edit'] || perms['subjects:delete'],
       gradeEntry: isSuper || currentUser?.role === 'admin' || perms['scores:view'] || perms['scores:edit'],
       lessonPlans: isSuper || currentUser?.role === 'admin' || perms['lesson_plans:view'],
@@ -529,31 +567,11 @@ window.AdminPanel = (function () {
     paths += `<text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="11" font-weight="700" fill="#64748b">TOTAL</text>`;
     paths += `<text x="${cx}" y="${cy + 16}" text-anchor="middle" font-size="16" font-weight="800" fill="var(--color-primary)">${total}</text>`;
 
-    const legend = entries.map(([cls, count], idx) => {
-      const color = colors[idx % colors.length];
-      const pct = Math.round((count / total) * 100);
-      return `
-        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; padding: 4px 0; border-bottom: 1px dashed #f1f5f9;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: ${color}; flex-shrink: 0;"></span>
-            <b>${escapeHtml(cls)}</b>
-          </div>
-          <div style="color: var(--color-text-muted);"><b style="color: var(--color-text-main);">${count}</b> (${pct}%)</div>
-        </div>
-      `;
-    }).join('');
-
     return `
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; align-items: center; padding: 12px 0;">
-        <div style="display: flex; justify-content: center;">
-          <svg viewBox="0 0 260 260" width="220" height="220" style="max-width: 100%; height: auto;">
-            ${paths}
-          </svg>
-        </div>
-        <div style="max-height: 240px; overflow-y: auto; padding-right: 8px;">
-          <div style="font-weight: 700; font-size: 13px; color: var(--color-primary); margin-bottom: 8px;">Class Enrollment Distribution Legend</div>
-          ${legend}
-        </div>
+      <div style="display: flex; justify-content: center; align-items: center; padding: 16px 0;">
+        <svg viewBox="0 0 260 260" width="220" height="220" style="max-width: 100%; height: auto;">
+          ${paths}
+        </svg>
       </div>
     `;
   }
@@ -1233,20 +1251,56 @@ window.AdminPanel = (function () {
 
   function printReceiptCards(students) {
     const list = (students || []).filter(Boolean);
-    if (!list.length) { alert('No students to print receipts for.'); return; }
+    if (!list.length) { API.toastNotification('No students to print receipts for.', true); return; }
     const cardsHtml = list.map(s => buildReceiptCardHtml(s)).join('');
+
+    App.showModal({
+      title: `Payment Receipt Preview (${list.length} student${list.length > 1 ? 's' : ''})`,
+      content: `
+        <div class="no-print" style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; background: #e0f2fe; padding: 10px 14px; border-radius: 6px; border: 1px solid #7dd3fc;">
+          <span style="font-size: 13px; color: #0369a1; font-weight: 600;">Print preview loaded. Ready to print or save to PDF.</span>
+          <button type="button" class="btn btn-primary btn-sm" id="modalPrintReceiptBtn" style="display: flex; align-items: center; gap: 6px;">
+            <img src="assets/icons/printer.png" style="width: 14px; height: 14px; filter: brightness(0) invert(1);" alt="">
+            Print Receipt${list.length > 1 ? 's' : ''}
+          </button>
+        </div>
+        <div id="receiptPreviewContainer" style="max-height: 70vh; overflow-y: auto; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #cbd5e1;">
+          <div class="receiptPrintGrid" style="display: flex; flex-wrap: wrap; gap: 16px; justify-content: center;">
+            ${cardsHtml}
+          </div>
+        </div>
+      `,
+      confirmText: 'Print Now',
+      cancelText: 'Close',
+      onConfirm: () => {
+        executeReceiptPrint(cardsHtml);
+        return true;
+      }
+    });
+
+    setTimeout(() => {
+      const pBtn = document.getElementById('modalPrintReceiptBtn');
+      if (pBtn) pBtn.onclick = () => executeReceiptPrint(cardsHtml);
+    }, 50);
+  }
+
+  function executeReceiptPrint(cardsHtml) {
     const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map(el => el.outerHTML).join('');
     const printWin = window.open('', '_blank');
-    printWin.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Payment Receipts - Sorina Daycare & Primary School System</title>${styles}
-      <style>@page { size: A4 landscape; margin: 6mm; } body{background:#fff;margin:0;padding:4mm;}</style></head><body><div class="receiptPrintGrid">${cardsHtml}</div></body></html>`);
-    printWin.document.close();
-    printWin.focus();
-    setTimeout(() => { printWin.print(); }, 400);
+    if (printWin) {
+      printWin.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Payment Receipts - Sorina Daycare & Primary School System</title>${styles}
+        <style>@page { size: A4 landscape; margin: 6mm; } body{background:#fff;margin:0;padding:4mm;}</style></head><body><div class="receiptPrintGrid">${cardsHtml}</div></body></html>`);
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(() => { printWin.print(); }, 400);
+    } else {
+      window.print();
+    }
   }
 
   function printSingleReceipt(studentId) {
     const s = cachedStudents.find(x => x.id === studentId);
-    if (!s) { alert('Student record not found.'); return; }
+    if (!s) { API.toastNotification('Student record not found.', true); return; }
     printReceiptCards([s]);
   }
 
@@ -2049,6 +2103,9 @@ window.AdminPanel = (function () {
             </div>
           </div>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" class="btn btn-primary btn-sm" id="addClassBtn" style="display: flex; align-items: center; gap: 6px;">
+              <span>+</span> Add Class
+            </button>
             <div class="btn-group" style="display: flex; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden;">
               <button type="button" class="btn btn-sm ${financeCategoryView === 'new' ? 'btn-primary' : 'btn-light'}" id="feeViewNewBtn" style="border-radius: 0;">
                 New Students Rates
@@ -2073,7 +2130,7 @@ window.AdminPanel = (function () {
                 <th style="text-align: right;">PE Suit</th>
                 <th style="text-align: right;">Portal Fee</th>
                 <th style="text-align: right; background: #e2e8f0;">Total Package</th>
-                <th style="text-align: center;">Action</th>
+                <th style="text-align: center;">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -2097,9 +2154,15 @@ window.AdminPanel = (function () {
                     <td style="text-align: right;">${formatMoney(pe, cur)}</td>
                     <td style="text-align: right;">${formatMoney(port, cur)}</td>
                     <td style="text-align: right; font-weight: 800; color: var(--color-primary); background: #f8fafc;">${formatMoney(tot, cur)}</td>
-                    <td style="text-align: center;">
+                    <td style="text-align: center; white-space: nowrap;">
                       <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.openClassFeeModal('${escapeHtml(cls)}', '${financeCategoryView}')" title="Configure fee rates">
-                        Edit Schedule
+                        Edit Rates
+                      </button>
+                      <button type="button" class="btn btn-light btn-sm" onclick="window.AdminPanel.openRenameClassModal('${escapeHtml(cls)}')" title="Rename class">
+                        Rename
+                      </button>
+                      <button type="button" class="btn btn-danger btn-sm" onclick="window.AdminPanel.deleteClass('${escapeHtml(cls)}')" title="Remove class">
+                        Delete
                       </button>
                     </td>
                   </tr>
@@ -2252,6 +2315,84 @@ window.AdminPanel = (function () {
     document.getElementById('finSearchInput').oninput = renderFinRows;
     document.getElementById('finClassFilter').onchange = renderFinRows;
     document.getElementById('finStatusFilter').onchange = renderFinRows;
+    const acBtn = document.getElementById('addClassBtn');
+    if (acBtn) acBtn.onclick = openAddClassModal;
+  }
+
+  function saveStoredClasses(list) {
+    GRADE_LEVELS = [...list];
+    localStorage.setItem('sorina_custom_classes', JSON.stringify(GRADE_LEVELS));
+  }
+
+  function openAddClassModal() {
+    App.showModal({
+      title: 'Add New School Class',
+      content: `
+        <div class="form-group">
+          <label class="form-label" for="newClassNameInput">Class / Grade Level Name *</label>
+          <input type="text" id="newClassNameInput" class="input-field" placeholder="e.g. Nursery 3 or Grade 13" required>
+          <div class="form-hint">Enter the new class name. It will be immediately available across all tabs, registrations, and fee schedules.</div>
+        </div>
+      `,
+      confirmText: 'Create Class',
+      onConfirm: () => {
+        const name = (document.getElementById('newClassNameInput')?.value || '').trim();
+        if (!name) {
+          API.toastNotification('Class name is required.', true);
+          return false;
+        }
+        if (GRADE_LEVELS.some(c => c.toLowerCase() === name.toLowerCase())) {
+          API.toastNotification('A class with that name already exists.', true);
+          return false;
+        }
+        saveStoredClasses([...GRADE_LEVELS, name]);
+        API.toastSuccess(`Class "${name}" successfully created.`);
+        loadTab(currentTab);
+        return true;
+      }
+    });
+  }
+
+  function openRenameClassModal(oldName) {
+    App.showModal({
+      title: `Rename Class: ${escapeHtml(oldName)}`,
+      content: `
+        <div class="form-group">
+          <label class="form-label" for="renameClassNameInput">New Class Name *</label>
+          <input type="text" id="renameClassNameInput" class="input-field" value="${escapeHtml(oldName)}" required>
+          <div class="form-hint">Renaming updates this class across the entire portal.</div>
+        </div>
+      `,
+      confirmText: 'Rename Class',
+      onConfirm: () => {
+        const newName = (document.getElementById('renameClassNameInput')?.value || '').trim();
+        if (!newName) {
+          API.toastNotification('New class name is required.', true);
+          return false;
+        }
+        if (newName.toLowerCase() !== oldName.toLowerCase() && GRADE_LEVELS.some(c => c.toLowerCase() === newName.toLowerCase())) {
+          API.toastNotification('Another class already has that name.', true);
+          return false;
+        }
+        const updated = GRADE_LEVELS.map(c => c === oldName ? newName : c);
+        saveStoredClasses(updated);
+        API.toastSuccess(`Class renamed to "${newName}".`);
+        loadTab(currentTab);
+        return true;
+      }
+    });
+  }
+
+  function deleteClass(clsName) {
+    if (!confirm(`Are you sure you want to remove class "${clsName}"?`)) return;
+    const updated = GRADE_LEVELS.filter(c => c !== clsName);
+    if (!updated.length) {
+      API.toastNotification('Cannot delete all classes.', true);
+      return;
+    }
+    saveStoredClasses(updated);
+    API.toastSuccess(`Class "${clsName}" removed.`);
+    loadTab(currentTab);
   }
 
   async function openAddFeeItemModal(){
@@ -2397,10 +2538,19 @@ window.AdminPanel = (function () {
 
           <!-- Miscellaneous Fees Breakdown -->
           <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: #ffffff;">
-            <div style="font-weight: 700; color: var(--color-primary); font-size: 13px; margin-bottom: 8px;">Admission &amp; Activity Fees</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-weight: 700; color: var(--color-primary); font-size: 13px;">Admission &amp; Activity Fees</span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <label class="form-label" style="margin: 0; font-size: 12px;" for="epCurrency">Fee Currency:</label>
+                <select id="epCurrency" class="select-field ep-calc-input" style="padding: 3px 8px; font-weight: 700;">
+                  <option value="USD" ${currency === 'USD' ? 'selected' : ''}>USD ($)</option>
+                  <option value="LRD" ${currency === 'LRD' ? 'selected' : ''}>LRD (L$)</option>
+                </select>
+              </div>
+            </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
               <div>
-                <label class="form-label" for="epRegFee">Registration Fee ($)</label>
+                <label class="form-label" for="epRegFee">Registration Fee</label>
                 <input type="number" id="epRegFee" class="input-field ep-calc-input" value="${f.registrationFee || 0}">
                 <label style="display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; cursor: pointer;">
                   <input type="checkbox" id="epRegPaid" class="ep-calc-input" ${f.registrationPaid ? 'checked' : ''}>
@@ -2409,7 +2559,7 @@ window.AdminPanel = (function () {
               </div>
 
               <div>
-                <label class="form-label" for="epEntFee">Entrance Fee ($)</label>
+                <label class="form-label" for="epEntFee">Entrance Fee</label>
                 <input type="number" id="epEntFee" class="input-field ep-calc-input" value="${f.entranceFee || 0}">
                 <label style="display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; cursor: pointer;">
                   <input type="checkbox" id="epEntPaid" class="ep-calc-input" ${f.entranceFeePaid ? 'checked' : ''}>
@@ -2420,7 +2570,7 @@ window.AdminPanel = (function () {
 
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
               <div>
-                <label class="form-label" for="epReqFee">Requirements ($)</label>
+                <label class="form-label" for="epReqFee">Requirements</label>
                 <input type="number" id="epReqFee" class="input-field ep-calc-input" value="${f.requirementsFee || 0}">
                 <label style="display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; cursor: pointer;">
                   <input type="checkbox" id="epReqPaid" class="ep-calc-input" ${f.requirementsFeePaid ? 'checked' : ''}>
@@ -2429,7 +2579,7 @@ window.AdminPanel = (function () {
               </div>
 
               <div>
-                <label class="form-label" for="epPeFee">PE Suit ($)</label>
+                <label class="form-label" for="epPeFee">PE Suit</label>
                 <input type="number" id="epPeFee" class="input-field ep-calc-input" value="${f.peSuitFee || 0}">
                 <label style="display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; cursor: pointer;">
                   <input type="checkbox" id="epPePaid" class="ep-calc-input" ${f.peSuitFeePaid ? 'checked' : ''}>
@@ -2438,7 +2588,7 @@ window.AdminPanel = (function () {
               </div>
 
               <div>
-                <label class="form-label" for="epPortalFee">Portal Fee ($)</label>
+                <label class="form-label" for="epPortalFee">Portal Fee</label>
                 <input type="number" id="epPortalFee" class="input-field ep-calc-input" value="${f.portalFee || 0}">
                 <label style="display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; cursor: pointer;">
                   <input type="checkbox" id="epPortalPaid" class="ep-calc-input" ${f.portalFeePaid ? 'checked' : ''}>
@@ -2448,39 +2598,27 @@ window.AdminPanel = (function () {
             </div>
           </div>
 
-          <!-- Tuition Installments -->
+          <!-- Tuition Installments with (+) Add Installment -->
           <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: #ffffff;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <span style="font-weight: 700; color: var(--color-primary); font-size: 13px;">Tuition Installments Payments</span>
-              <div style="font-size: 12px;">Total Tuition Billed: <input type="number" id="epTuitionTotal" class="input-field ep-calc-input" style="width: 90px; display: inline-block; padding: 3px 6px; font-weight: 700;" value="${f.tuitionTotal || 0}"></div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-              <div class="form-group">
-                <label class="form-label" for="epInst1">1st Installment Paid ($)</label>
-                <input type="number" id="epInst1" class="input-field ep-calc-input" value="${inst[0] || 0}">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+              <div>
+                <span style="font-weight: 700; color: var(--color-primary); font-size: 13px;">Tuition Installments Payments</span>
+                <div style="font-size: 12px; color: #64748b;">Record payment amounts and timeframe dates for each installment.</div>
               </div>
-              <div class="form-group">
-                <label class="form-label" for="epInst2">2nd Installment Paid ($)</label>
-                <input type="number" id="epInst2" class="input-field ep-calc-input" value="${inst[1] || 0}">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 12px; font-weight: 600;">Total Tuition Billed:</span>
+                <input type="number" id="epTuitionTotal" class="input-field ep-calc-input" style="width: 95px; padding: 3px 6px; font-weight: 700;" value="${f.tuitionTotal || 0}">
+                <button type="button" class="btn btn-primary btn-sm" id="epAddInstallmentBtn" style="display: flex; align-items: center; gap: 4px;">
+                  <span>+</span> Add Installment
+                </button>
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-              <div class="form-group">
-                <label class="form-label" for="epInst3">3rd Installment Paid ($)</label>
-                <input type="number" id="epInst3" class="input-field ep-calc-input" value="${inst[2] || 0}">
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="epInst4">4th Installment Paid ($)</label>
-                <input type="number" id="epInst4" class="input-field ep-calc-input" value="${inst[3] || 0}">
-              </div>
-            </div>
-            <div class="form-group"><label class="form-label" for="epInst5">5th Installment Paid</label><input type="number" id="epInst5" class="input-field ep-calc-input" value="${inst[4] || 0}"></div>
-            <div style="background:#fff7ed;border:1px solid #fed7aa;padding:10px;border-radius:7px;font-size:12px;color:#9a3412;">${[0,1,2,3,4].map(i=>{const d=(getClassFeeSchedule(student.className||student.grade,student.studentCategory||'new').deadlines||[])[i]; return d && new Date(d)<new Date() && !(inst[i]>0) ? `Payment warning: The ${i+1}${i===0?'st':i===1?'nd':i===2?'rd':'th'} installment deadline has passed. Please make this payment as soon as possible.`:''}).filter(Boolean).join('<br>')}</div>
+            <!-- Dynamic Installments List -->
+            <div id="epInstallmentsList" style="display: flex; flex-direction: column; gap: 8px;"></div>
 
-            <div class="form-group" style="margin-top: 6px;">
-              <label class="form-label" for="epOther">Add Another Payment</label>
+            <div class="form-group" style="margin-top: 10px;">
+              <label class="form-label" for="epOther">Additional / Ancillary Payment</label>
               <input type="number" id="epOther" class="input-field ep-calc-input" value="${f.otherPayments || 0}">
             </div>
           </div>
@@ -2504,6 +2642,7 @@ window.AdminPanel = (function () {
       `,
       confirmText: 'Save Payment Record',
       onConfirm: async () => {
+        const selectedCur = document.getElementById('epCurrency')?.value || currency;
         const regFee = Number(document.getElementById('epRegFee').value) || 0;
         const regPaid = document.getElementById('epRegPaid').checked;
         const entFee = Number(document.getElementById('epEntFee').value) || 0;
@@ -2516,15 +2655,21 @@ window.AdminPanel = (function () {
         const portalPaid = document.getElementById('epPortalPaid').checked;
 
         const tuitionTotal = Number(document.getElementById('epTuitionTotal').value) || 0;
-        const i1 = Number(document.getElementById('epInst1').value) || 0;
-        const i2 = Number(document.getElementById('epInst2').value) || 0;
-        const i3 = Number(document.getElementById('epInst3').value) || 0;
-        const i4 = Number(document.getElementById('epInst4').value) || 0;
-        const i5 = Number(document.getElementById('epInst5').value) || 0;
         const other = Number(document.getElementById('epOther').value) || 0;
 
+        // Gather dynamic installment amounts and dates
+        const instRows = document.querySelectorAll('.ep-inst-row');
+        const installmentValues = [];
+        const installmentDates = [];
+        instRows.forEach(row => {
+          const amt = Number(row.querySelector('.ep-inst-amt')?.value) || 0;
+          const dt = row.querySelector('.ep-inst-date')?.value || '';
+          installmentValues.push(amt);
+          installmentDates.push(dt);
+        });
+
         const paymentData = {
-          currency: currency,
+          currency: selectedCur,
           tuitionTotal: tuitionTotal,
           registrationFee: regFee,
           registrationPaid: regPaid,
@@ -2537,32 +2682,84 @@ window.AdminPanel = (function () {
           peSuitFeePaid: pePaid,
           portalFee: portalFee,
           portalFeePaid: portalPaid,
-          installments: [i1, i2, i3, i4, i5],
+          installments: installmentValues,
+          installmentDates: installmentDates,
           otherPayments: other
         };
 
         const res = await API.callBackend('recordPayment', {
           studentId: studentId,
           payment: paymentData
-        }, 'Recording payment...');
+        }, 'Recording payment to database...');
 
         if (res && res.success) {
-          API.toastSuccess();
-          // Update cached student finance locally
+          API.toastSuccess('Payment ledger updated successfully.');
           const sObj = cachedStudents.find(x => x.id === studentId);
           if (sObj) {
             sObj.finance = Object.assign({}, sObj.finance, paymentData);
           }
           loadTab('finance');
         } else {
-          API.toastNotification(res.message || 'Error recording payment.', true);
+          API.toastNotification(res?.message || 'Error recording payment.', true);
         }
       }
     });
 
-    // Wire live calculation
+    // Wire live dynamic installments and calculations
     setTimeout(() => {
+      let instList = Array.isArray(f.installments) && f.installments.length ? [...f.installments] : [0, 0, 0, 0];
+      let dateList = Array.isArray(f.installmentDates) ? [...f.installmentDates] : [];
+
+      function renderInstallmentRows() {
+        const container = document.getElementById('epInstallmentsList');
+        if (!container) return;
+        container.innerHTML = instList.map((amt, idx) => {
+          const ord = idx === 0 ? '1st' : idx === 1 ? '2nd' : idx === 2 ? '3rd' : `${idx + 1}th`;
+          const dt = dateList[idx] || '';
+          return `
+            <div class="ep-inst-row" style="display: grid; grid-template-columns: 120px 1fr 1fr auto; gap: 8px; align-items: center; background: #f8fafc; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+              <span style="font-size: 12.5px; font-weight: 700; color: var(--color-primary);">${ord} Installment:</span>
+              <div>
+                <input type="number" min="0" step="0.01" class="input-field ep-calc-input ep-inst-amt" value="${amt}" placeholder="Amount" style="padding: 4px 8px;">
+              </div>
+              <div>
+                <input type="date" class="input-field ep-inst-date" value="${escapeHtml(dt)}" title="Payment Timeframe / Due Date" style="padding: 4px 8px;">
+              </div>
+              <div>
+                ${instList.length > 1 ? `<button type="button" class="btn btn-light btn-sm ep-del-inst-btn" data-idx="${idx}" style="color: #ef4444; padding: 2px 8px;">✕</button>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        container.querySelectorAll('.ep-del-inst-btn').forEach(btn => {
+          btn.onclick = () => {
+            const idx = Number(btn.dataset.idx);
+            instList.splice(idx, 1);
+            dateList.splice(idx, 1);
+            renderInstallmentRows();
+            calcLive();
+          };
+        });
+
+        container.querySelectorAll('.ep-calc-input').forEach(input => {
+          input.addEventListener('input', calcLive);
+          input.addEventListener('change', calcLive);
+        });
+      }
+
+      const addInstBtn = document.getElementById('epAddInstallmentBtn');
+      if (addInstBtn) {
+        addInstBtn.onclick = () => {
+          instList.push(0);
+          dateList.push('');
+          renderInstallmentRows();
+          calcLive();
+        };
+      }
+
       function calcLive() {
+        const cur = document.getElementById('epCurrency')?.value || currency;
         const regFee = Number(document.getElementById('epRegFee')?.value) || 0;
         const regPaid = document.getElementById('epRegPaid')?.checked;
         const entFee = Number(document.getElementById('epEntFee')?.value) || 0;
@@ -2575,34 +2772,36 @@ window.AdminPanel = (function () {
         const portPaid = document.getElementById('epPortalPaid')?.checked;
 
         const tuition = Number(document.getElementById('epTuitionTotal')?.value) || 0;
-        const i1 = Number(document.getElementById('epInst1')?.value) || 0;
-        const i2 = Number(document.getElementById('epInst2')?.value) || 0;
-        const i3 = Number(document.getElementById('epInst3')?.value) || 0;
-        const i4 = Number(document.getElementById('epInst4')?.value) || 0;
+        let sumInst = 0;
+        document.querySelectorAll('.ep-inst-amt').forEach(inp => {
+          sumInst += Number(inp.value) || 0;
+        });
         const other = Number(document.getElementById('epOther')?.value) || 0;
 
         const totBilled = tuition + regFee + entFee + reqFee + peFee + portFee;
-        const totPaid = (regPaid ? regFee : 0) + (entPaid ? entFee : 0) + (reqPaid ? reqFee : 0) + (pePaid ? peFee : 0) + (portPaid ? portFee : 0) + i1 + i2 + i3 + i4 + other;
+        const totPaid = (regPaid ? regFee : 0) + (entPaid ? entFee : 0) + (reqPaid ? reqFee : 0) + (pePaid ? peFee : 0) + (portPaid ? portFee : 0) + sumInst + other;
         const balance = Math.max(0, totBilled - totPaid);
 
         const bEl = document.getElementById('epLiveBilled');
         const pEl = document.getElementById('epLivePaid');
         const balEl = document.getElementById('epLiveBalance');
 
-        if (bEl) bEl.textContent = formatMoney(totBilled, currency);
-        if (pEl) pEl.textContent = formatMoney(totPaid, currency);
+        if (bEl) bEl.textContent = formatMoney(totBilled, cur);
+        if (pEl) pEl.textContent = formatMoney(totPaid, cur);
         if (balEl) {
-          balEl.textContent = formatMoney(balance, currency);
+          balEl.textContent = formatMoney(balance, cur);
           balEl.style.color = balance > 0 ? 'var(--color-danger)' : 'var(--color-success)';
         }
       }
 
+      renderInstallmentRows();
       document.querySelectorAll('.ep-calc-input').forEach(input => {
         input.addEventListener('input', calcLive);
         input.addEventListener('change', calcLive);
       });
       calcLive();
     }, 50);
+
   }
 
   // Alias for backward compatibility
@@ -2644,21 +2843,28 @@ window.AdminPanel = (function () {
   }
 
   async function renderExpensesTab(container) {
-    const stored = JSON.parse(localStorage.getItem('sorina_expenses') || '[]');
-    cachedExpenses = Array.isArray(stored) ? stored : [];
+    const res = await API.callBackend('getExpenses', {}, 'Fetching expenses from database...');
+    if (res && res.success && Array.isArray(res.expenses)) {
+      cachedExpenses = res.expenses;
+      localStorage.setItem('sorina_expenses', JSON.stringify(cachedExpenses));
+    } else {
+      const stored = JSON.parse(localStorage.getItem('sorina_expenses') || '[]');
+      cachedExpenses = Array.isArray(stored) ? stored : [];
+    }
+
     const total = cachedExpenses.reduce((sum, e) => sum + (Number(e.total) || 0), 0);
-    const today = new Date().toISOString().slice(0,10);
+    const today = new Date().toISOString().slice(0, 10);
     container.innerHTML = `
       <div class="content-card">
         <div class="card-header-row" style="flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-          <div><h3 class="card-title">All Expenses</h3><div style="font-size:13px;color:var(--color-text-muted);">Record and manage every school expense with complete audit-ready details.</div></div>
+          <div><h3 class="card-title">All Expenses</h3><div style="font-size:13px;color:var(--color-text-muted);">Record and manage every school expense directly in the institutional database. Automatically deducted from Revenue.</div></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button type="button" class="btn btn-light" id="downloadExpensesBtn">Download CSV</button>
             <button type="button" class="btn btn-primary" id="addExpenseBtn">+ Add Expense</button>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px;">
-          <div class="stat-card"><div class="stat-label">Total Expenses</div><div class="stat-value">$${total.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+          <div class="stat-card"><div class="stat-label">Total Expenses</div><div class="stat-value" style="color:var(--color-danger);">$${total.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
           <div class="stat-card"><div class="stat-label">Expense Entries</div><div class="stat-value">${cachedExpenses.length}</div></div>
           <div class="stat-card"><div class="stat-label">Today</div><div class="stat-value" style="font-size:18px;">${today}</div></div>
         </div>
@@ -2667,11 +2873,11 @@ window.AdminPanel = (function () {
             <thead><tr><th>Number</th><th>Description</th><th>Category</th><th>Quantity</th><th>Amount</th><th>Total</th><th>Date</th><th>Payment Method</th><th>Vendor / Payee</th><th>Reference</th><th>Notes</th><th>Actions</th></tr></thead>
             <tbody>
               ${cachedExpenses.length ? cachedExpenses.map((e,i)=>`<tr>
-                <td>${escapeHtml(e.number || String(i+1).padStart(3,'0'))}</td><td>${escapeHtml(e.description||'')}</td><td>${escapeHtml(e.category||'General')}</td>
-                <td>${Number(e.quantity||1)}</td><td>$${Number(e.amount||0).toLocaleString(undefined,{minimumFractionDigits:2})}</td><td><b>$${Number(e.total||0).toLocaleString(undefined,{minimumFractionDigits:2})}</b></td>
+                <td><b>${escapeHtml(e.number || String(i+1).padStart(3,'0'))}</b></td><td>${escapeHtml(e.description||'')}</td><td>${escapeHtml(e.category||'General')}</td>
+                <td>${Number(e.quantity||1)}</td><td>$${Number(e.amount||0).toLocaleString(undefined,{minimumFractionDigits:2})}</td><td><b style="color:var(--color-danger);">$${Number(e.total||0).toLocaleString(undefined,{minimumFractionDigits:2})}</b></td>
                 <td>${escapeHtml(e.date||'')}</td><td>${escapeHtml(e.paymentMethod||'')}</td><td>${escapeHtml(e.vendor||'')}</td><td>${escapeHtml(e.reference||'')}</td><td>${escapeHtml(e.notes||'')}</td>
                 <td><button class="btn btn-light btn-sm" onclick="window.AdminPanel.editExpense(${i})">Edit</button> <button class="btn btn-danger btn-sm" onclick="window.AdminPanel.deleteExpense(${i})">Delete</button></td>
-              </tr>`).join('') : '<tr><td colspan="12" style="text-align:center;padding:30px;color:#64748b;">No expenses recorded yet.</td></tr>'}
+              </tr>`).join('') : '<tr><td colspan="12" style="text-align:center;padding:30px;color:#64748b;">No expenses recorded yet in database.</td></tr>'}
             </tbody>
           </table>
         </div>
@@ -2685,21 +2891,63 @@ window.AdminPanel = (function () {
     App.showModal({title:index===null?'Add School Expense':'Edit School Expense',content:`
       <div class="form-group"><label class="form-label">Number</label><input id="exNumber" class="input-field" value="${escapeHtml(e.number||'')}"></div>
       <div class="form-group"><label class="form-label">Description *</label><input id="exDescription" class="input-field" value="${escapeHtml(e.description||'')}" placeholder="What was purchased or paid for?"></div>
-      <div class="form-group"><label class="form-label">Category</label><select id="exCategory" class="select-field"><option>General</option><option>Utilities</option><option>Teaching Materials</option><option>Maintenance</option><option>Transportation</option><option>Food / Cafeteria</option><option>Salary / Staff</option><option>Office Supplies</option><option>Other</option></select></div>
+      <div class="form-group"><label class="form-label">Category</label><select id="exCategory" class="select-field"><option ${e.category==='General'?'selected':''}>General</option><option ${e.category==='Utilities'?'selected':''}>Utilities</option><option ${e.category==='Teaching Materials'?'selected':''}>Teaching Materials</option><option ${e.category==='Maintenance'?'selected':''}>Maintenance</option><option ${e.category==='Transportation'?'selected':''}>Transportation</option><option ${e.category==='Food / Cafeteria'?'selected':''}>Food / Cafeteria</option><option ${e.category==='Salary / Staff'?'selected':''}>Salary / Staff</option><option ${e.category==='Office Supplies'?'selected':''}>Office Supplies</option><option ${e.category==='Other'?'selected':''}>Other</option></select></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div class="form-group"><label class="form-label">Quantity</label><input type="number" min="1" id="exQuantity" class="input-field" value="${Number(e.quantity||1)}"></div><div class="form-group"><label class="form-label">Amount (per unit)</label><input type="number" min="0" step="0.01" id="exAmount" class="input-field" value="${Number(e.amount||0)}"></div></div>
       <div class="form-group"><label class="form-label">Date</label><input type="date" id="exDate" class="input-field" value="${escapeHtml(e.date||'')}"></div>
-      <div class="form-group"><label class="form-label">Payment Method</label><select id="exPayment" class="select-field"><option>Cash</option><option>Bank Transfer</option><option>Mobile Money</option><option>Cheque</option><option>Card</option><option>Other</option></select></div>
+      <div class="form-group"><label class="form-label">Payment Method</label><select id="exPayment" class="select-field"><option ${e.paymentMethod==='Cash'?'selected':''}>Cash</option><option ${e.paymentMethod==='Bank Transfer'?'selected':''}>Bank Transfer</option><option ${e.paymentMethod==='Mobile Money'?'selected':''}>Mobile Money</option><option ${e.paymentMethod==='Cheque'?'selected':''}>Cheque</option><option ${e.paymentMethod==='Card'?'selected':''}>Card</option><option ${e.paymentMethod==='Other'?'selected':''}>Other</option></select></div>
       <div class="form-group"><label class="form-label">Vendor / Payee</label><input id="exVendor" class="input-field" value="${escapeHtml(e.vendor||'')}"></div>
       <div class="form-group"><label class="form-label">Reference / Receipt No.</label><input id="exReference" class="input-field" value="${escapeHtml(e.reference||'')}"></div>
-      <div class="form-group"><label class="form-label">Notes</label><textarea id="exNotes" class="input-field" rows="3">${escapeHtml(e.notes||'')}</textarea></div>`,confirmText:index===null?'Save Expense':'Update Expense',onConfirm:()=>{
-        const desc=document.getElementById('exDescription').value.trim(); if(!desc){API.toastNotification('Description is required.',true);return;}
-        const q=Math.max(1,Number(document.getElementById('exQuantity').value)||1), a=Math.max(0,Number(document.getElementById('exAmount').value)||0);
-        const item={number:document.getElementById('exNumber').value.trim()||String(cachedExpenses.length+1).padStart(3,'0'),description:desc,category:document.getElementById('exCategory').value,quantity:q,amount:a,total:q*a,date:document.getElementById('exDate').value,paymentMethod:document.getElementById('exPayment').value,vendor:document.getElementById('exVendor').value.trim(),reference:document.getElementById('exReference').value.trim(),notes:document.getElementById('exNotes').value.trim()};
-        if(index===null) cachedExpenses.push(item); else cachedExpenses[index]=item; localStorage.setItem('sorina_expenses',JSON.stringify(cachedExpenses)); API.toastSuccess(); loadTab('payroll');
+      <div class="form-group"><label class="form-label">Notes</label><textarea id="exNotes" class="input-field" rows="3">${escapeHtml(e.notes||'')}</textarea></div>`,confirmText:index===null?'Save Expense':'Update Expense',onConfirm:async()=>{
+        const desc=document.getElementById('exDescription').value.trim();
+        if(!desc){
+          API.toastNotification('Expense description is required.', true);
+          return false;
+        }
+        const q=Math.max(1,Number(document.getElementById('exQuantity').value)||1);
+        const a=Math.max(0,Number(document.getElementById('exAmount').value)||0);
+        const item={
+          number: document.getElementById('exNumber').value.trim() || String(cachedExpenses.length+1).padStart(3,'0'),
+          description: desc,
+          category: document.getElementById('exCategory').value,
+          quantity: q,
+          amount: a,
+          total: q * a,
+          date: document.getElementById('exDate').value,
+          paymentMethod: document.getElementById('exPayment').value,
+          vendor: document.getElementById('exVendor').value.trim(),
+          reference: document.getElementById('exReference').value.trim(),
+          notes: document.getElementById('exNotes').value.trim()
+        };
+
+        const res = await API.callBackend('saveExpense', { expense: item }, 'Saving expense to database...');
+        if (res && res.success) {
+          if (index === null) cachedExpenses.push(item);
+          else cachedExpenses[index] = item;
+          localStorage.setItem('sorina_expenses', JSON.stringify(cachedExpenses));
+          API.toastSuccess('Expense successfully recorded to database.');
+          loadTab('payroll');
+          return true;
+        } else {
+          API.toastNotification(res?.message || 'Database rejected expense submission. Check connection or fields.', true);
+          return false;
+        }
       }});
   }
   function editExpense(i){openExpenseModal(i)}
-  function deleteExpense(i){ if(!confirm('Delete this expense record?')) return; cachedExpenses.splice(i,1); localStorage.setItem('sorina_expenses',JSON.stringify(cachedExpenses)); loadTab('payroll'); }
+  async function deleteExpense(i){
+    const item = cachedExpenses[i];
+    if (!item) return;
+    if (!confirm(`Delete expense "${item.description}" (${item.number})?`)) return;
+    const res = await API.callBackend('deleteExpense', { number: item.number, id: item.number }, 'Deleting expense from database...');
+    if (res && res.success) {
+      cachedExpenses.splice(i,1);
+      localStorage.setItem('sorina_expenses', JSON.stringify(cachedExpenses));
+      API.toastSuccess('Expense record deleted from database.');
+      loadTab('payroll');
+    } else {
+      API.toastNotification(res?.message || 'Could not delete expense from database.', true);
+    }
+  }
   function downloadExpenses(){ const headers=['Number','Description','Category','Quantity','Amount','Total','Date','Payment Method','Vendor / Payee','Reference','Notes']; const rows=[headers.join(',')].concat(cachedExpenses.map(e=>[e.number,e.description,e.category,e.quantity,e.amount,e.total,e.date,e.paymentMethod,e.vendor,e.reference,e.notes].map(escapeCsv).map(x=>'"'+x+'"').join(','))); const blob=new Blob([rows.join('\r\n')],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Sorina_All_Expenses_'+new Date().toISOString().slice(0,10)+'.csv'; a.click(); URL.revokeObjectURL(a.href); }
 
   async function renderAnnouncementsTab(container) {
@@ -4554,12 +4802,38 @@ window.AdminPanel = (function () {
     const res = await API.callBackend('getReportCard', { studentId: studentId, academicYear: selectedAcademicYear }, 'Loading report card...');
     if (res && res.success && res.reportCard) {
       App.showModal({
-        title: 'Student Report Card Preview',
-        content: '<div id="adminRcMount"></div>',
-        confirmText: 'Done',
-        cancelText: 'Close'
+        title: `Official Report Card Preview: ${escapeHtml(res.reportCard.student?.name || studentId)} (${escapeHtml(selectedAcademicYear)})`,
+        content: `
+          <div class="no-print" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; background: #f0fdf4; padding: 10px 14px; border-radius: 6px; border: 1px solid #86efac;">
+            <span style="font-size: 13px; color: #166534; font-weight: 600;">Two-Page Official Report Card Preview (${escapeHtml(selectedAcademicYear)})</span>
+            <button type="button" class="btn btn-primary btn-sm" id="modalPrintReportCardBtn" style="display: flex; align-items: center; gap: 6px;">
+              <img src="assets/icons/printer.png" style="width: 14px; height: 14px; filter: brightness(0) invert(1);" alt="">
+              Print Official Report Card
+            </button>
+          </div>
+          <div id="adminRcMount" style="max-height: 75vh; overflow-y: auto; background: #e2e8f0; padding: 12px; border-radius: 8px;"></div>
+        `,
+        confirmText: 'Print',
+        cancelText: 'Close',
+        onConfirm: () => {
+          window.print();
+          return false;
+        }
       });
+
+      // Render the comprehensive two-page report card
       ReportCard.render(res.reportCard, '#adminRcMount');
+
+      // Make modal dialog wide for report preview
+      const activeOverlay = document.querySelector('#modalContainer .modal-overlay:last-child');
+      if (activeOverlay) activeOverlay.classList.add('modal-preview');
+
+      setTimeout(() => {
+        const pBtn = document.getElementById('modalPrintReportCardBtn');
+        if (pBtn) pBtn.onclick = () => window.print();
+      }, 60);
+    } else {
+      API.toastNotification((res && res.message) || 'Unable to generate report card preview for this student.', true);
     }
   }
 
