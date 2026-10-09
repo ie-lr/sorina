@@ -3161,9 +3161,13 @@ window.AdminPanel = (function () {
 
     let currentStudents=[];
     const scoreKeys=periods.map(p=>p.key);
+    
     function subjectOptionsForClass(cls){
-      const assigned=selectedCurriculumForClass(cls);
-      return Array.isArray(assigned)?assigned.filter(Boolean):[];
+      const key=Object.keys(curriculumMapCache).find(k=>String(k).trim().toLowerCase()===String(cls||'').trim().toLowerCase());
+      const assigned=key&&Array.isArray(curriculumMapCache[key])?curriculumMapCache[key]:[];
+      const active=new Set(subjectRecords.filter(r=>r.status!=='Inactive').map(r=>String(r.name).trim().toLowerCase()));
+      const seen=new Set();
+      return assigned.map(x=>String(x||'').trim()).filter(x=>{const k=x.toLowerCase();if(!x||!active.has(k)||seen.has(k))return false;seen.add(k);return true;});
     }
     function refreshSubjects(preferred){
       const cls=document.getElementById('agClass').value;
