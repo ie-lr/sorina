@@ -2979,7 +2979,7 @@ window.AdminPanel = (function () {
   // 7. SUBJECTS MANAGEMENT & CURRICULUM CATALOG
   // =========================================================================
   const SUBJECT_LEVEL_GROUPS = [
-    { key:'early', label:'Daycare to ABC', levels:['Daycare','Nursery','ABC'] },
+    { key:'early', label:'Daycare to ABC', levels:['Daycare','Nursery 1', 'Nursery 2'] },
     { key:'kindergarten', label:'K1 to K2', levels:['K1','K2'] },
     { key:'primary', label:'Grade 1 to Grade 6', levels:['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6'] },
     { key:'secondary', label:'Grade 7 to Grade 12', levels:['Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'] }
