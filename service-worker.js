@@ -15,7 +15,6 @@ const SHELL_ASSETS = [
   './teacher-login.html',
   './admin-login.html',
   './ie-portal.html',
-  './manifest.json',
   './assets/css/tokens.css',
   './assets/css/styles.css',
   './assets/js/config.js',
