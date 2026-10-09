@@ -286,6 +286,7 @@ const Auth = (function () {
       localStorage.removeItem('sorina_session_token');
       localStorage.removeItem('sorina_user_role');
       localStorage.removeItem('sorina_user_data');
+      localStorage.removeItem('ie_offline_sync_queue');
     } catch (e) {}
 
     const appRoot = document.getElementById('appRoot');
