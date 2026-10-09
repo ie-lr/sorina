@@ -687,9 +687,11 @@ window.TeacherPanel = (function () {
   }
 
   function isNurserySection(className) {
-    const norm = String(className || '').trim().toLowerCase();
-    return norm.includes('nursery') || norm.includes('daycare') || norm.includes('kindergarten') || norm.includes('k1') || norm.includes('k2') || norm.includes('abc');
-  }
+  const s = String(className || '').trim().toLowerCase().replace(/[\s\-_]+/g, '');
+  if (!s) return false;
+  return s.startsWith('nursery') || s.startsWith('kindergarten') ||
+         ['k1', 'k2', 'kg1', 'kg2', 'prek', 'daycare', 'creche', 'abc'].includes(s);
+}
 
   function readFileAsDataUrl(file) {
     return new Promise((resolve) => {
