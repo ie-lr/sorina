@@ -19,6 +19,7 @@ window.StudentPanel = (function () {
   let selectedAcademicYear = '2026-2027';
   let isSidebarCollapsed = false;
   let paymentNotifications = [];
+  let classSubjects = [];
 
   async function mount(container, user) {
     currentStudent = user;
@@ -32,6 +33,14 @@ window.StudentPanel = (function () {
     }
     const noticeRes = await API.callBackend('getStudentPaymentNotifications', { studentId: currentStudent.id }, 'Checking payment notices...');
     paymentNotifications = (noticeRes && noticeRes.success && Array.isArray(noticeRes.notifications)) ? noticeRes.notifications : [];
+
+    const cRes = await API.callBackend('getCurriculumSubjects', {}, 'Loading class subjects...');
+    const className = currentStudent.className || currentStudent.grade || '';
+    if (cRes && cRes.success && cRes.curriculum && cRes.curriculum[className]) {
+      classSubjects = cRes.curriculum[className];
+    } else {
+      classSubjects = [];
+    }
 
     renderPortalLayout(container);
     await loadTab(currentTab);
@@ -449,11 +458,11 @@ window.StudentPanel = (function () {
           <div style="padding:10px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:7px;font-size:12.5px;color:#334155;">These are the exact Student ID and password credentials registered by the school for this portal account.</div>
 
            <div style="margin-top:14px;padding:12px;background:#f8fafc;border:1px solid var(--color-border);border-radius:8px;">
-             <h4 style="margin:0 0 6px;color:var(--color-primary);font-size:14px;">Assigned Subjects</h4>
-             <div style="font-size:12px;color:#64748b;margin-bottom:8px;">These are the subjects assigned specifically to your student record and used on your report card.</div>
-             <div>${Array.isArray(currentStudent.curriculumSubjects) && currentStudent.curriculumSubjects.length
-               ? currentStudent.curriculumSubjects.map(x=>`<span class="badge badge-light" style="margin:2px;">${escapeHtml(x)}</span>`).join('')
-               : '<span style="color:#94a3b8;">No subjects have been assigned yet.</span>'}</div>
+             <h4 style="margin:0 0 6px;color:var(--color-primary);font-size:14px;">Class Curriculum Subjects</h4>
+             <div style="font-size:12px;color:#64748b;margin-bottom:8px;">These are the official curriculum subjects configured for ${escapeHtml(currentStudent.className || currentStudent.grade || 'your class')} and recorded on your report card.</div>
+             <div>${Array.isArray(classSubjects) && classSubjects.length
+               ? classSubjects.map(x=>`<span class="badge badge-light" style="margin:2px;">${escapeHtml(x)}</span>`).join('')
+               : '<span style="color:#94a3b8;">No curriculum subjects configured for this class yet.</span>'}</div>
            </div>
 
           <div style="padding:12px;background:#f8fafc;border:1px solid var(--color-border);border-radius:8px;color:#64748b;font-size:13px;">Student name, guardian phone number, and profile picture are managed by the school administration and cannot be changed from the student dashboard.</div>

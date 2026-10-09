@@ -11,19 +11,6 @@
 
 const ReportCard = (function () {
 
-  const DEFAULT_SUBJECTS = [
-    'English Language',
-    'Mathematics',
-    'General Science',
-    'Social Studies',
-    'Biology',
-    'Chemistry',
-    'Physics',
-    'History',
-    'Geography',
-    'Civics'
-  ];
-
   function formatScore(val) {
     if (val === null || val === undefined || val === '' || val === '—' || val === '-') {
       return '-';
@@ -74,6 +61,12 @@ const ReportCard = (function () {
 
     const html = `
       <div class="report-booklet-container">
+
+        ${rcData.isPartial ? `
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12.5px;color:#1e40af;" class="no-print">
+            <b>Teacher Preview:</b> Showing your assigned subjects only in ${escapeHtml(className)}. The complete report card with all subjects and official class ranks is accessible to administrators.
+          </div>
+        ` : ''}
 
         <!-- Top Action Bar (Hidden in Print) -->
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;" class="no-print">

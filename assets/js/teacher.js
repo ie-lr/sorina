@@ -254,14 +254,12 @@ window.TeacherPanel = (function () {
     await loadRosterAndGrades();
   }
 
-  // Subjects this teacher may handle in a class: the ones assigned to them.
-  // Legacy accounts with no subject list fall back to that class's curriculum, never to a generic list.
+  // Subjects this teacher may handle in a class: strictly the ones assigned to them.
   function subjectsForClass(cls) {
-    const a = currentAssignments.find(x => String(x.class).trim() === String(cls).trim());
+    const a = currentAssignments.find(x => String(x.class).trim().toLowerCase() === String(cls).trim().toLowerCase());
     if (!a) return [];
     if (Array.isArray(a.subjects) && a.subjects.length > 0) return a.subjects;
-    const cur = curriculumMap[cls];
-    return Array.isArray(cur) ? cur : [];
+    return [];
   }
 
   function updateSubjectDropdown() {
@@ -298,15 +296,20 @@ window.TeacherPanel = (function () {
     const tbody = document.getElementById('gradeTableBody');
     if (!tbody) return;
 
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 25px;">Loading students in ' + escapeHtml(selectedClass) + '...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 25px;">Loading grade sheet for ' + escapeHtml(selectedClass) + '...</td></tr>';
 
     if (!selectedSubject) {
       tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 30px; color: var(--color-text-muted);">No subject is assigned to you for ' + escapeHtml(selectedClass) + '. Please contact the administrator.</td></tr>';
       return;
     }
 
-    const res = await API.callBackend('getStudentsByClass', { className: selectedClass, teacherId: currentTeacher.id, academicYear: currentTeacher.academicYear }, 'Fetching class roster...');
-    currentRoster = (res && res.success && Array.isArray(res.students)) ? res.students : [];
+    const res = await API.callBackend('getClassGradeSheet', {
+      className: selectedClass,
+      subject: selectedSubject,
+      academicYear: currentTeacher.academicYear || '2026-2027'
+    }, 'Fetching class grade sheet...');
+
+    currentRoster = (res && res.success && Array.isArray(res.sheet)) ? res.sheet : [];
 
     if (currentRoster.length === 0) {
       tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 30px; color: var(--color-text-muted);">No enrolled students found in ' + escapeHtml(selectedClass) + '.</td></tr>';
@@ -315,25 +318,26 @@ window.TeacherPanel = (function () {
 
     const isNursery = isNurserySection(selectedClass);
 
-    tbody.innerHTML = currentRoster.map(s => {
-      const year = currentTeacher.academicYear || s.academicYear || '2026-2027';
-      const scores = (s.years && s.years[year]) || [];
-      const subScore = scores.find(sc => String(sc.subject || '').trim().toLowerCase() === selectedSubject.toLowerCase()) || {};
+    tbody.innerHTML = currentRoster.map(row => {
+      const sId = row.studentId;
+      const sName = row.studentName;
+      const scores = row.scores || {};
+      const version = row.version || 1;
 
       return `
-        <tr data-student-id="${escapeHtml(s.id)}">
-          <td><b>${escapeHtml(s.name)}</b></td>
-          <td style="font-size: 12.5px; color: var(--color-text-dim);">[${escapeHtml(s.id)}]</td>
-          ${renderScoreInput('p1', subScore.p1, isNursery)}
-          ${renderScoreInput('p2', subScore.p2, isNursery)}
-          ${renderScoreInput('p3', subScore.p3, isNursery)}
-          ${renderScoreInput('exam1', subScore.exam1, isNursery)}
-          ${renderScoreInput('p4', subScore.p4, isNursery)}
-          ${renderScoreInput('p5', subScore.p5, isNursery)}
-          ${renderScoreInput('p6', subScore.p6, isNursery)}
-          ${renderScoreInput('exam2', subScore.exam2, isNursery)}
+        <tr data-student-id="${escapeHtml(sId)}" data-version="${version}">
+          <td><b>${escapeHtml(sName)}</b></td>
+          <td style="font-size: 12.5px; color: var(--color-text-dim);">[${escapeHtml(sId)}]</td>
+          ${renderScoreInput('p1', scores.p1, isNursery)}
+          ${renderScoreInput('p2', scores.p2, isNursery)}
+          ${renderScoreInput('p3', scores.p3, isNursery)}
+          ${renderScoreInput('exam1', scores.exam1, isNursery)}
+          ${renderScoreInput('p4', scores.p4, isNursery)}
+          ${renderScoreInput('p5', scores.p5, isNursery)}
+          ${renderScoreInput('p6', scores.p6, isNursery)}
+          ${renderScoreInput('exam2', scores.exam2, isNursery)}
           <td>
-            <button type="button" class="btn btn-light btn-sm" onclick="window.TeacherPanel.viewStudentReport('${escapeHtml(s.id)}')" title="Preview Student Report Card">
+            <button type="button" class="btn btn-light btn-sm" onclick="window.TeacherPanel.viewStudentReport('${escapeHtml(sId)}')" title="Preview Student Report Card">
               <img src="assets/icons/file-text.png" style="width: 14px; height: 14px;" alt="">
             </button>
           </td>
@@ -349,12 +353,11 @@ window.TeacherPanel = (function () {
     if (isNursery) {
       return `
         <td style="text-align:center;">
-          <select class="select-field score-input ${!isOpen ? 'period-locked' : ''}" data-period="${periodKey}" ${!isOpen ? 'disabled title="Period locked - view only"' : ''} style="width: 58px; padding: 4px; text-align:center; font-weight:700;">
+          <select class="select-field score-input ${!isOpen ? 'period-locked' : ''}" data-period="${periodKey}" data-original-val="${escapeHtml(cleanVal)}" ${!isOpen ? 'disabled title="Period locked - view only"' : ''} style="width: 58px; padding: 4px; text-align:center; font-weight:700;">
             <option value="">—</option>
             <option value="A" ${cleanVal === 'A' ? 'selected' : ''}>A</option>
             <option value="B" ${cleanVal === 'B' ? 'selected' : ''}>B</option>
             <option value="C" ${cleanVal === 'C' ? 'selected' : ''}>C</option>
-            <option value="D" ${cleanVal === 'D' ? 'selected' : ''}>D</option>
           </select>
         </td>
       `;
@@ -362,7 +365,7 @@ window.TeacherPanel = (function () {
 
     return `
       <td style="text-align:center;">
-        <input type="number" min="0" max="100" class="input-field score-input ${!isOpen ? 'period-locked' : ''}" data-period="${periodKey}" value="${cleanVal}" ${!isOpen ? 'disabled title="Period locked - view only"' : ''} style="width: 62px; padding: 5px; text-align: center; font-weight: 600;" placeholder="—">
+        <input type="number" min="0" max="100" class="input-field score-input ${!isOpen ? 'period-locked' : ''}" data-period="${periodKey}" data-original-val="${escapeHtml(cleanVal)}" value="${cleanVal}" ${!isOpen ? 'disabled title="Period locked - view only"' : ''} style="width: 62px; padding: 5px; text-align: center; font-weight: 600;" placeholder="—">
       </td>
     `;
   }
@@ -385,14 +388,31 @@ window.TeacherPanel = (function () {
     const gradesPayload = [];
     rows.forEach(tr => {
       const sId = tr.dataset.studentId;
-      const sGrades = { studentId: sId };
+      const baseVersion = Number(tr.dataset.version) || 1;
+      const changes = {};
+      let hasChanges = false;
       tr.querySelectorAll('.score-input').forEach(inp => {
         const period = inp.dataset.period;
-        const val = inp.value.trim();
-        sGrades[period] = val === '' ? '' : val;
+        const originalVal = inp.dataset.originalVal || '';
+        const currentVal = inp.value.trim();
+        if (currentVal !== originalVal) {
+          changes[period] = currentVal === '' ? '' : currentVal;
+          hasChanges = true;
+        }
       });
-      gradesPayload.push(sGrades);
+      if (hasChanges) {
+        gradesPayload.push({
+          studentId: sId,
+          baseVersion: baseVersion,
+          changes: changes
+        });
+      }
     });
+
+    if (gradesPayload.length === 0) {
+      API.toastNotification('No changes detected to save.');
+      return;
+    }
 
     const res = await API.callBackend('teacherSubmitGrades', {
       teacherId: currentTeacher.id,
@@ -401,6 +421,12 @@ window.TeacherPanel = (function () {
       academicYear: currentTeacher.academicYear || '2026-2027',
       grades: gradesPayload
     }, 'Saving grade values...');
+
+    if (res && res.conflict) {
+      API.toastNotification(res.message || 'Another user modified this grade sheet. Reloading latest grades...', true);
+      await loadRosterAndGrades();
+      return;
+    }
 
     if (res && res.success) {
       API.toastSuccess();
@@ -660,7 +686,10 @@ window.TeacherPanel = (function () {
     return !!a && Array.isArray(a.subjects) && a.subjects.some(x => String(x).trim().toLowerCase() === String(subject).trim().toLowerCase());
   }
 
-  function isNurserySection(className) { return ['daycare','nursery','abc'].includes(String(className||'').trim().toLowerCase()); }
+  function isNurserySection(className) {
+    const norm = String(className || '').trim().toLowerCase();
+    return norm.includes('nursery') || norm.includes('daycare') || norm.includes('kindergarten') || norm.includes('k1') || norm.includes('k2') || norm.includes('abc');
+  }
 
   function readFileAsDataUrl(file) {
     return new Promise((resolve) => {

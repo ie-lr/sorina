@@ -805,7 +805,6 @@ window.AdminPanel = (function () {
               </div>
               <div>
                 <div style="font-weight: 600;">${escapeHtml(s.name)}</div>
-                ${Array.isArray(s.curriculumSubjects) && s.curriculumSubjects.length ? `<div style="font-size: 10.5px; color: #64748b;">${s.curriculumSubjects.length} Assigned Subjects</div>` : '<div style="font-size: 10.5px; color: #94a3b8;">No Subjects Assigned</div>'}
               </div>
             </div>
           </td>
@@ -952,10 +951,10 @@ window.AdminPanel = (function () {
                   Class: <b>${escapeHtml(s.className || s.grade)}</b> &bull; Academic Year: <b>${escapeHtml(s.academicYear || selectedAcademicYear)}</b> &bull; Category: <b>${s.studentCategory === 'old' ? 'Returning Student' : 'New Enrollee'}</b>
                 </div>
                 <div style="margin-top:7px;font-size:12px;">
-                  <b>Assigned Subjects:</b>
-                  ${Array.isArray(s.curriculumSubjects) && s.curriculumSubjects.length
-                    ? s.curriculumSubjects.map(x=>`<span class="badge badge-light" style="margin:2px;">${escapeHtml(x)}</span>`).join('')
-                    : '<span style="color:#94a3b8;"> No subjects assigned</span>'}
+                  <b>Class Curriculum Subjects:</b>
+                  ${(selectedCurriculumForClass(s.className || s.grade) || []).length
+                    ? (selectedCurriculumForClass(s.className || s.grade) || []).map(x=>`<span class="badge badge-light" style="margin:2px;">${escapeHtml(x)}</span>`).join('')
+                    : '<span style="color:#94a3b8;"> No curriculum subjects configured for this class</span>'}
                 </div>
               </div>
             </div>
@@ -1413,7 +1412,6 @@ window.AdminPanel = (function () {
             guardian: guardian,
             phone: phone,
             password: pass,
-            curriculumSubjects: assignedSubjects,
             finance: {
               tuitionTotal: totTuition,
               registrationFee: regFee,
@@ -1612,8 +1610,6 @@ window.AdminPanel = (function () {
           studentCategory: 'old',
           guardian: guardian || sourceStudent.guardian || '',
           phone: phone || sourceStudent.phone || '',
-          curriculumSubjects: assignedSubjects,
-          assignedSubjects: undefined,
           promotedFromAcademicYear: previousYear,
           previousClass: sourceStudent.className || sourceStudent.grade || '',
           promotionDate: new Date().toISOString(),
@@ -1783,11 +1779,11 @@ window.AdminPanel = (function () {
           </div>
 
           <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:12px;margin:12px 0;">
-            <div style="font-weight:700;color:var(--color-primary);margin-bottom:6px;">Assigned Subjects</div>
-            <div style="font-size:12px;color:#64748b;margin-bottom:8px;">Only these student-specific subjects appear on the student's report card.</div>
-            <div>${Array.isArray(s.curriculumSubjects) && s.curriculumSubjects.length
-              ? s.curriculumSubjects.map(x=>`<span class="badge badge-light" style="margin:2px;">${escapeHtml(x)}</span>`).join('')
-              : '<span style="color:#94a3b8;">No subjects assigned</span>'}</div>
+            <div style="font-weight:700;color:var(--color-primary);margin-bottom:6px;">Class Curriculum Subjects</div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:8px;">Subjects are defined at the class level and appear automatically on report cards.</div>
+            <div>${(selectedCurriculumForClass(s.className || s.grade) || []).length
+              ? (selectedCurriculumForClass(s.className || s.grade) || []).map(x=>`<span class="badge badge-light" style="margin:2px;">${escapeHtml(x)}</span>`).join('')
+              : '<span style="color:#94a3b8;">No curriculum subjects configured for this class</span>'}</div>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -1818,10 +1814,6 @@ window.AdminPanel = (function () {
           return;
         }
 
-        const assignedSubjects = Array.isArray(s.curriculumSubjects)
-          ? Array.from(new Set(s.curriculumSubjects.map(x=>String(x||'').trim()).filter(Boolean)))
-          : [];
-
         const res = await API.callBackend('updateStudent', {
           student: {
             id: s.id,
@@ -1833,8 +1825,7 @@ window.AdminPanel = (function () {
             dob: dob,
             photo: updatedPhoto,
             guardian: guardian,
-            phone: phone,
-            curriculumSubjects: assignedSubjects
+            phone: phone
           }
         }, 'Updating student...');
 
@@ -3178,17 +3169,17 @@ window.AdminPanel = (function () {
 
     let currentStudents=[];
     const scoreKeys=periods.map(p=>p.key);
-    function subjectOptionsForClass(cls,students){
-      const assigned=new Set(selectedCurriculumForClass(cls));
-      students.forEach(s=>(Array.isArray(s.curriculumSubjects)?s.curriculumSubjects:[]).forEach(x=>assigned.add(x)));
-      const list=[...assigned].filter(x=>allSubjects.some(a=>String(a).toLowerCase()===String(x).toLowerCase()));
-      return (list.length?list:allSubjects).filter(Boolean);
+    function subjectOptionsForClass(cls){
+      const assigned=selectedCurriculumForClass(cls);
+      return Array.isArray(assigned)?assigned.filter(Boolean):[];
     }
     function refreshSubjects(preferred){
-      const cls=document.getElementById('agClass').value; const students=cachedStudents.filter(s=>String(s.className||s.grade)===String(cls)&&(s.status||'Active')==='Active');
-      const list=subjectOptionsForClass(cls,students); const el=document.getElementById('agSubject'); el.innerHTML=list.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join(''); if(preferred&&list.includes(preferred))el.value=preferred;
+      const cls=document.getElementById('agClass').value;
+      const list=subjectOptionsForClass(cls);
+      const el=document.getElementById('agSubject');
+      el.innerHTML=list.length?list.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join(''):'<option value="">No subjects assigned</option>';
+      if(preferred&&list.includes(preferred))el.value=preferred;
     }
-    function getRec(st,sub){return ((st.years||{})[selectedAcademicYear]||[]).find(x=>String(x.subject).toLowerCase()===String(sub).toLowerCase())||{};}
     function any(rec){return scoreKeys.some(k=>String(rec[k]??'').trim()!=='');}
     function complete(rec){return scoreKeys.every(k=>String(rec[k]??'').trim()!=='');}
     function valid(v){return v===''||(Number.isFinite(Number(v))&&Number(v)>=0&&Number(v)<=100);}
@@ -3196,14 +3187,71 @@ window.AdminPanel = (function () {
     function updateSummary(){const rows=[...document.querySelectorAll('#agBody tr[data-id]')];let c=0,m=0,s=0,d=0;rows.forEach(tr=>{const r={};tr.querySelectorAll('.ag-score').forEach(i=>r[i.dataset.p]=i.value.trim());const st=statusOf(r);if(st==='complete'||st==='submitted')c++;if(st==='incomplete'||st==='notstarted')m++;if(tr.dataset.originalStatus==='submitted'||st==='submitted')s++;if(tr.dataset.dirty==='1')d++;});document.getElementById('agTotal').textContent=rows.length;document.getElementById('agComplete').textContent=c;document.getElementById('agMissing').textContent=m;document.getElementById('agSubmitted').textContent=s;document.getElementById('agDirty').textContent=d;}
     function draw(){
       const subject=document.getElementById('agSubject').value,q=document.getElementById('agSearch').value.trim().toLowerCase(),view=document.getElementById('agView').value;
-      const filtered=currentStudents.filter(st=>{const rec=getRec(st,subject),stt=statusOf(rec);const match=!q||String(st.name||'').toLowerCase().includes(q)||String(st.id||'').toLowerCase().includes(q);const mode=view==='all'||(view==='complete'&&(stt==='complete'||stt==='submitted'))||(view==='incomplete'&&(stt==='incomplete'||stt==='notstarted'))||(view==='submitted'&&stt==='submitted');return match&&mode;});
-      const body=document.getElementById('agBody'); body.innerHTML=filtered.map(st=>{const rec=getRec(st,subject),stt=statusOf(rec);const badge=stt==='submitted'?'<span class="badge badge-success">Submitted</span>':stt==='complete'?'<span class="badge badge-info">Complete</span>':stt==='incomplete'?'<span class="badge badge-warning">In Progress</span>':'<span class="badge badge-light">Not Started</span>';return `<tr data-id="${escapeHtml(st.id)}" data-dirty="0" data-original-status="${escapeHtml(stt)}"><td><div style="font-weight:700;">${escapeHtml(st.name||'Unnamed Student')}</div><div style="font-size:11px;color:#64748b;">${escapeHtml(st.id)} &bull; ${escapeHtml(st.className||st.grade||'')}</div></td>${scoreKeys.map(k=>`<td style="text-align:center;"><input type="number" min="0" max="100" step="0.01" class="input-field ag-score" ${isPeriodLocked(k)?'disabled title="Period closed by the Super Administrator"':''} data-p="${k}" value="${escapeHtml(rec[k]??'')}" style="width:82px;text-align:center;margin:auto;"></td>`).join('')}<td class="ag-status" style="font-size:12px;font-weight:700;">${badge}</td></tr>`;}).join('')||`<tr><td colspan="10" style="text-align:center;padding:30px;color:#64748b;">No students match the current filters.</td></tr>`;
-      document.querySelectorAll('.ag-score').forEach(input=>{input.addEventListener('input',()=>{const tr=input.closest('tr');if(!valid(input.value)){input.setCustomValidity('Enter a score from 0 to 100.');input.style.borderColor='#dc2626';}else{input.setCustomValidity('');input.style.borderColor='';}tr.dataset.dirty='1';const r={};tr.querySelectorAll('.ag-score').forEach(i=>r[i.dataset.p]=i.value.trim());const st=statusOf(r);tr.querySelector('.ag-status').innerHTML=st==='submitted'?'<span class="badge badge-success">Ready to Submit</span>':complete(r)?'<span class="badge badge-info">Complete</span>':any(r)?'<span class="badge badge-warning">In Progress</span>':'<span class="badge badge-light">Not Started</span>';updateSummary();});input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const a=[...document.querySelectorAll('.ag-score')],i=a.indexOf(input);if(a[i+1])a[i+1].focus();}});});updateSummary();}
-    async function loadClass(){const cls=document.getElementById('agClass').value;const r=await API.callBackend('getStudentsByClass',{className:cls,academicYear:selectedAcademicYear},'Loading class roster...');currentStudents=(r&&r.success?r.students:[]).filter(s=>(s.status||'Active')==='Active');refreshSubjects();draw();await loadLog();}
+      if(!subject){
+        document.getElementById('agBody').innerHTML='<tr><td colspan="10" style="text-align:center;padding:30px;color:#64748b;">No subjects in curriculum for this class. Add subjects in Settings &rarr; Curriculum first.</td></tr>';
+        updateSummary();
+        return;
+      }
+      const filtered=currentStudents.filter(st=>{const rec=st.scores||{},stt=st.status||statusOf(rec);const match=!q||String(st.studentName||'').toLowerCase().includes(q)||String(st.studentId||'').toLowerCase().includes(q);const mode=view==='all'||(view==='complete'&&(stt==='complete'||stt==='submitted'))||(view==='incomplete'&&(stt==='incomplete'||stt==='notstarted'))||(view==='submitted'&&stt==='submitted');return match&&mode;});
+      const body=document.getElementById('agBody');
+      body.innerHTML=filtered.map(st=>{
+        const rec=st.scores||{},stt=st.status||statusOf(rec),version=st.version||1;
+        const badge=stt==='submitted'?'<span class="badge badge-success">Submitted</span>':stt==='complete'?'<span class="badge badge-info">Complete</span>':stt==='incomplete'?'<span class="badge badge-warning">In Progress</span>':'<span class="badge badge-light">Not Started</span>';
+        return `<tr data-id="${escapeHtml(st.studentId)}" data-version="${version}" data-dirty="0" data-original-status="${escapeHtml(stt)}"><td><div style="font-weight:700;">${escapeHtml(st.studentName||'Unnamed Student')}</div><div style="font-size:11px;color:#64748b;">${escapeHtml(st.studentId)}</div></td>${scoreKeys.map(k=>{const val=(rec[k]!==null&&rec[k]!==undefined&&rec[k]!=='')?String(rec[k]):'';return `<td style="text-align:center;"><input type="number" min="0" max="100" step="0.01" class="input-field ag-score" ${isPeriodLocked(k)?'disabled title="Period closed by the Super Administrator"':''} data-p="${k}" data-original-val="${escapeHtml(val)}" value="${escapeHtml(val)}" style="width:82px;text-align:center;margin:auto;"></td>`;}).join('')}<td class="ag-status" style="font-size:12px;font-weight:700;">${badge}</td></tr>`;
+      }).join('')||'<tr><td colspan="10" style="text-align:center;padding:30px;color:#64748b;">No students match the current filters.</td></tr>';
+      document.querySelectorAll('.ag-score').forEach(input=>{input.addEventListener('input',()=>{const tr=input.closest('tr');if(!valid(input.value)){input.setCustomValidity('Enter a score from 0 to 100.');input.style.borderColor='#dc2626';}else{input.setCustomValidity('');input.style.borderColor='';}tr.dataset.dirty='1';const r={};tr.querySelectorAll('.ag-score').forEach(i=>r[i.dataset.p]=i.value.trim());const st=statusOf(r);tr.querySelector('.ag-status').innerHTML=st==='submitted'?'<span class="badge badge-success">Ready to Submit</span>':complete(r)?'<span class="badge badge-info">Complete</span>':any(r)?'<span class="badge badge-warning">In Progress</span>':'<span class="badge badge-light">Not Started</span>';updateSummary();});input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const a=[...document.querySelectorAll('.ag-score')],i=a.indexOf(input);if(a[i+1])a[i+1].focus();}});});
+      updateSummary();
+    }
+    async function loadClass(){
+      const cls=document.getElementById('agClass').value;
+      refreshSubjects();
+      const subject=document.getElementById('agSubject').value;
+      if(!subject){currentStudents=[];draw();await loadLog();return;}
+      const r=await API.callBackend('getClassGradeSheet',{className:cls,subject:subject,academicYear:selectedAcademicYear},'Loading class grade sheet...');
+      currentStudents=(r&&r.success&&Array.isArray(r.sheet))?r.sheet:[];
+      draw();
+      await loadLog();
+    }
     async function loadLog(){const r=await API.callBackend('getGradeActivityLog',{academicYear:selectedAcademicYear});const logs=r&&r.success?r.logs:[];const el=document.getElementById('agLog');el.innerHTML=logs.length?`<div style="display:grid;gap:6px;margin-top:9px;">${logs.slice(0,12).map(x=>`<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;"><span><b>${escapeHtml(x.action||'Grade activity')}</b> &mdash; ${escapeHtml(x.className||'')} / ${escapeHtml(x.subject||'')} (${escapeHtml(String(x.studentCount||0))} students)</span><span style="color:#64748b;">${escapeHtml(x.actorName||'Administrator')} &bull; ${escapeHtml(x.status||'')} &bull; ${escapeHtml(x.timestamp||'')}</span></div>`).join('')}</div>`:'<div style="padding:12px 0;color:#64748b;font-size:12px;">No grade activity recorded yet.</div>';}
-    async function saveGrades(mode){const rows=[...document.querySelectorAll('#agBody tr[data-id]')],grades=[];let invalid=false,incomplete=false;rows.forEach(tr=>{const g={studentId:tr.dataset.id};tr.querySelectorAll('.ag-score').forEach(i=>{const v=i.value.trim();if(!valid(v)){invalid=true;i.focus();}g[i.dataset.p]=v;});if(!complete(g))incomplete=true;if(tr.dataset.dirty==='1')grades.push(g);});if(invalid){API.toastNotification('Correct scores outside the 0–100 range before saving.',true);return;}if(!grades.length){API.toastNotification('No unsaved grade changes on this screen.');return;}if(mode==='submitted'&&incomplete&&!confirm('Some selected students do not have all grading periods completed. Submit these grades anyway?'))return;const r=await API.callBackend('teacherSubmitGrades',{teacherId:currentUser.id,actorRole:'admin',actorName:currentUser.name||'Administrator',className:document.getElementById('agClass').value,subject:document.getElementById('agSubject').value,academicYear:selectedAcademicYear,gradeStatus:mode,grades},mode==='submitted'?'Submitting official grades...':'Saving grade draft...');if(r&&r.success){API.toastSuccess(r.message||'Grades saved.');await loadClass();const freshR=await API.callBackend('getAllStudents',{academicYear:selectedAcademicYear});if(freshR&&freshR.success&&Array.isArray(freshR.students)){cachedStudents=freshR.students;}}else API.toastNotification((r&&r.message)||'Unable to save grades.',true);}
-    document.getElementById('agClass').onchange=loadClass;document.getElementById('agSubject').onchange=draw;document.getElementById('agSearch').oninput=draw;document.getElementById('agView').onchange=draw;document.getElementById('agReset').onclick=()=>{if(confirm('Discard unsaved changes?'))draw();};document.getElementById('agDraft').onclick=()=>saveGrades('draft');document.getElementById('agSubmit').onclick=()=>saveGrades('submitted');document.getElementById('agLogRefresh').onclick=loadLog;
-    refreshSubjects();await loadClass();
+    async function saveGrades(mode){
+      const cls=document.getElementById('agClass').value;
+      const subject=document.getElementById('agSubject').value;
+      if(!subject){API.toastNotification('No subject selected.',true);return;}
+      const rows=[...document.querySelectorAll('#agBody tr[data-id]')];
+      const grades=[];
+      let invalid=false,incomplete=false;
+      rows.forEach(tr=>{
+        const sId=tr.dataset.id;
+        const baseVersion=Number(tr.dataset.version)||1;
+        const changes={};
+        let hasChanges=false;
+        const allCurrent={};
+        tr.querySelectorAll('.ag-score').forEach(i=>{
+          const v=i.value.trim();
+          if(!valid(v)){invalid=true;i.focus();}
+          const orig=i.dataset.originalVal||'';
+          if(v!==orig){changes[i.dataset.p]=v===''? '':v;hasChanges=true;}
+          allCurrent[i.dataset.p]=v;
+        });
+        if(!complete(allCurrent))incomplete=true;
+        if(hasChanges){
+          grades.push({studentId:sId,baseVersion:baseVersion,changes:changes});
+        }
+      });
+      if(invalid){API.toastNotification('Correct scores outside the 0–100 range before saving.',true);return;}
+      if(!grades.length){API.toastNotification('No unsaved grade changes on this screen.');return;}
+      if(mode==='submitted'&&incomplete&&!confirm('Some selected students do not have all grading periods completed. Submit these grades anyway?'))return;
+      const r=await API.callBackend('teacherSubmitGrades',{teacherId:currentUser.id,actorRole:'admin',actorName:currentUser.name||'Administrator',className:cls,subject:subject,academicYear:selectedAcademicYear,gradeStatus:mode,grades:grades},mode==='submitted'?'Submitting official grades...':'Saving grade draft...');
+      if(r&&r.conflict){
+        API.toastNotification(r.message||'Another user modified this grade sheet. Reloading latest grades...',true);
+        await loadClass();
+        return;
+      }
+      if(r&&r.success){API.toastSuccess(r.message||'Grades saved.');await loadClass();}
+      else API.toastNotification((r&&r.message)||'Unable to save grades.',true);
+    }
+    document.getElementById('agClass').onchange=loadClass;document.getElementById('agSubject').onchange=loadClass;document.getElementById('agSearch').oninput=draw;document.getElementById('agView').onchange=draw;document.getElementById('agReset').onclick=()=>{if(confirm('Discard unsaved changes?'))draw();};document.getElementById('agDraft').onclick=()=>saveGrades('draft');document.getElementById('agSubmit').onclick=()=>saveGrades('submitted');document.getElementById('agLogRefresh').onclick=loadLog;
+    await loadClass();
   }
 
   async function renderAdminLessonPlansTab(container) {
