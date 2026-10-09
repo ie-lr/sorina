@@ -7,7 +7,7 @@
  * -----------------------------------------------------------------------
  */
 
-const CACHE_NAME = 'ie-school-portal-v2.5';
+const CACHE_NAME = 'ie-school-portal-v2.6';
 const SHELL_ASSETS = [
   './',
   './index.html',
