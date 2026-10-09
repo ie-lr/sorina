@@ -2866,16 +2866,11 @@ window.AdminPanel = (function () {
     }
 
     const total = cachedExpenses.reduce((sum, e) => sum + (Number(e.total) || 0), 0);
-    // Revenue comes from student payments; expenses recorded here are deducted from it.
-    let revenueCollected = null;
-    const sumRes = await API.callBackend('getFinancialSummary', { academicYear: selectedAcademicYear }, 'Calculating balance...');
-    if (sumRes && sumRes.success && sumRes.summary) revenueCollected = toNum(sumRes.summary.totalRevenue);
     const expCur = dashboardCurrency;
-    const today = new Date().toISOString().slice(0, 10);
     container.innerHTML = `
       <div class="content-card">
         <div class="card-header-row" style="flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-          <div><h3 class="card-title">All Expenses</h3><div style="font-size:13px;color:var(--color-text-muted);">Record and manage every school expense directly in the institutional database. Automatically deducted from Revenue.</div></div>
+          <div><h3 class="card-title">All Expenses</h3><div style="font-size:13px;color:var(--color-text-muted);">Record and manage every school expense directly in the institutional database.</div></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button type="button" class="btn btn-light" id="downloadExpensesBtn">Download CSV</button>
             <button type="button" class="btn btn-primary" id="addExpenseBtn">+ Add Expense</button>
@@ -2883,10 +2878,7 @@ window.AdminPanel = (function () {
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px;">
           <div class="stat-card"><div class="stat-label">Total Expenses</div><div class="stat-value" style="color:var(--color-danger);">${moneyLabel(total, expCur)}</div></div>
-          ${revenueCollected !== null ? `<div class="stat-card"><div class="stat-label">Revenue Collected</div><div class="stat-value" style="color:var(--color-success);">${moneyLabel(revenueCollected, expCur)}</div></div>
-          <div class="stat-card"><div class="stat-label">Net Balance (Revenue − Expenses)</div><div class="stat-value" style="color:${revenueCollected - total >= 0 ? 'var(--color-primary)' : 'var(--color-danger)'};">${moneyLabel(revenueCollected - total, expCur)}</div></div>` : ''}
-          <div class="stat-card"><div class="stat-label">Expense Entries</div><div class="stat-value">${cachedExpenses.length}</div></div>
-          <div class="stat-card">        </div>
+        </div>
         <div style="overflow:auto;">
           <table class="data-table">
             <thead><tr><th>Number</th><th>Description</th><th>Category</th><th>Quantity</th><th>Amount</th><th>Total</th><th>Date</th><th>Payment Method</th><th>Vendor / Payee</th><th>Reference</th><th>Notes</th><th>Actions</th></tr></thead>
