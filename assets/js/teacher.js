@@ -256,10 +256,8 @@ window.TeacherPanel = (function () {
 
   // Subjects this teacher may handle in a class: strictly the ones assigned to them.
   function subjectsForClass(cls) {
-    const a = currentAssignments.find(x => String(x.class).trim().toLowerCase() === String(cls).trim().toLowerCase());
-    if (!a) return [];
-    if (Array.isArray(a.subjects) && a.subjects.length > 0) return a.subjects;
-    return [];
+    const key = Object.keys(curriculumMap).find(k => String(k).trim().toLowerCase() === String(cls).trim().toLowerCase());
+    return key && Array.isArray(curriculumMap[key]) ? curriculumMap[key] : [];
   }
 
   function updateSubjectDropdown() {
