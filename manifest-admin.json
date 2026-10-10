@@ -1,5 +1,6 @@
 {
-  "name": "Sorina Daycare & Primary School System",
+  "id": "sorina-admin"
+  "name": "Sorina Administrators Portal",
   "short_name": "Sorina Admin",
   "description": "Sorina Daycare & Primary School System — Students, Grades, Finance, Teachers & Report Cards.",
   "start_url": "./admin-login.html",
