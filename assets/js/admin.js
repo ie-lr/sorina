@@ -1910,13 +1910,18 @@ window.AdminPanel = (function () {
         <div id="teacherDirectoryBody"></div>
       </div>`;
 
-    const renderRows = () => {
       const q=(document.getElementById('teacherSearch')?.value||'').trim().toLowerCase();
       const y=document.getElementById('teacherYearFilter')?.value||'all';
       const st=document.getElementById('teacherStatusFilter')?.value||'all';
-      const rows=cachedTeachers.filter(t=>{
+      const inYear=cachedTeachers.filter(t=>y==='all'||String(t.academicYear||'').trim()===y);
+      const setStat=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+      setStat('tsTotal',inYear.length);
+      setStat('tsActive',inYear.filter(t=>String(t.status||'Active')==='Active').length);
+      setStat('tsAssigned',inYear.filter(t=>Array.isArray(t.assignments)&&t.assignments.length).length);
+      setStat('tsYear',y==='all'?'All':y.replace('-','–'));
+      const rows=inYear.filter(t=>{
         const hay=[t.id,t.name,t.phone,t.email,t.title,t.academicYear].join(' ').toLowerCase();
-        return (!q||hay.includes(q))&&(y==='all'||!t.academicYear||String(t.academicYear)===y)&&(st==='all'||String(t.status||'Active')===st);
+        return (!q||hay.includes(q))&&(st==='all'||String(t.status||'Active')===st);
       });
       const body=document.getElementById('teacherDirectoryBody');
       if(!body)return;
