@@ -26,23 +26,49 @@ window.TeacherPanel = (function () {
 
   async function mount(container, user) {
     currentTeacher = user;
-    currentAssignments = (user.assignments || []).filter(a => !a.academicYear || String(a.academicYear) === String(user.academicYear || '2026-2027'));
-    currentTeacher.academicYear = user.academicYear || '2026-2027';
     currentTab = 'grades';
+
+    await refreshTeacherProfile();   // always load the LIVE teacher record
 
     if (currentAssignments.length > 0) {
       selectedClass = currentAssignments[0].class || '';
-      selectedSubject = (currentAssignments[0].subjects && currentAssignments[0].subjects[0]) || '';
+      selectedSubject = subjectsForClass(selectedClass)[0] || '';
     }
 
-    // Fetch open period permissions
     const pRes = await API.callBackend('getPermissions', {}, 'Loading permissions...');
     gradingPermissions = (pRes && pRes.success) ? pRes.permissions : {};
-    const cRes = await API.callBackend('getCurriculumSubjects', {}, 'Loading class subjects...');
-    curriculumMap = (cRes && cRes.success && cRes.curriculum) ? cRes.curriculum : {};
 
     renderPortalLayout(container);
     await loadTab(currentTab);
+
+    document.removeEventListener('visibilitychange', onTeacherReturn);
+    document.addEventListener('visibilitychange', onTeacherReturn);
+  }
+
+  async function refreshTeacherProfile() {
+    const r = await API.callBackend('getTeachers', {}, 'Loading your assignments...');
+    const list = (r && r.success && Array.isArray(r.teachers)) ? r.teachers : [];
+    const me = list.find(t => String(t.id).toLowerCase() === String(currentTeacher.id).toLowerCase()) || currentTeacher;
+    currentTeacher.academicYear = me.academicYear || currentTeacher.academicYear || '2026-2027';
+    currentTeacher.name = me.name || currentTeacher.name;
+    currentTeacher.title = me.title || currentTeacher.title;
+    currentAssignments = (me.assignments || []).filter(a => !a.academicYear || String(a.academicYear) === String(currentTeacher.academicYear));
+    const cRes = await API.callBackend('getCurriculumSubjects', {}, 'Loading class subjects...');
+    curriculumMap = (cRes && cRes.success && cRes.curriculum) ? cRes.curriculum : {};
+    lastProfileRefresh = Date.now();
+  }
+
+  async function onTeacherReturn() {
+    if (document.visibilityState !== 'visible' || !currentTeacher) return;
+    if (Date.now() - lastProfileRefresh < 15000) return;
+    const before = JSON.stringify(currentAssignments) + currentTeacher.academicYear;
+    await refreshTeacherProfile();
+    if (before !== JSON.stringify(currentAssignments) + currentTeacher.academicYear) {
+      if (!currentAssignments.some(a => a.class === selectedClass)) selectedClass = (currentAssignments[0] || {}).class || '';
+      selectedSubject = subjectsForClass(selectedClass)[0] || '';
+      API.toastNotification('Your class/subject assignments were updated by the administrator.');
+      await loadTab(currentTab);
+    }
   }
 
   function renderPortalLayout(container) {
