@@ -15,6 +15,9 @@ const SHELL_ASSETS = [
   './teacher-login.html',
   './admin-login.html',
   './ie-portal.html',
+  './manifest-student.json',
+  './manifest-teacher.json',
+  './manifest-admin.json',
   './assets/css/tokens.css',
   './assets/css/styles.css',
   './assets/js/config.js',
@@ -30,9 +33,6 @@ const SHELL_ASSETS = [
   './assets/images/school-logo.png',
   './assets/images/campus.jpeg',
   './assets/images/campus-2.jpeg'
-    './manifest-student.json',
-  './manifest-teacher.json',
-  './manifest-admin.json',
 ];
 
 self.addEventListener('install', event => {
