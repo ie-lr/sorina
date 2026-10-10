@@ -579,7 +579,10 @@ window.TeacherPanel = (function () {
           API.toastNotification('You can only submit a lesson plan for your assigned class and subject.', true);
           return;
         }
-
+        if (file && file.size > 20 * 1024 * 1024) {
+          API.toastNotification('Attachment is too large. Maximum size is 5 MB.', true);
+          return;
+        }
         let fileDataUrl = '';
         let fileName = '';
         if (file) {
@@ -593,7 +596,7 @@ window.TeacherPanel = (function () {
             class: cls,
             subject: sub,
             details: details,
-            attachmentUrl: fileDataUrl,
+            attachmentData: fileDataUrl,
             attachmentName: fileName,
             teacherId: currentTeacher.id,
             teacherName: currentTeacher.name,
