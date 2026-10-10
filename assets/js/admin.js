@@ -1910,6 +1910,7 @@ window.AdminPanel = (function () {
         <div id="teacherDirectoryBody"></div>
       </div>`;
 
+    const renderRows = () => {
       const q=(document.getElementById('teacherSearch')?.value||'').trim().toLowerCase();
       const y=document.getElementById('teacherYearFilter')?.value||'all';
       const st=document.getElementById('teacherStatusFilter')?.value||'all';
@@ -1936,7 +1937,8 @@ window.AdminPanel = (function () {
     renderRows();
   }
 
-  function teacherYearOptions(selected){ return TEACHER_YEARS.map(y=>`<option value="${y}" ${String(selected||'')===y?'selected':''}>${y.replace('-', '–')}</option>`).join(''); }
+  function teacherYearOptions(selected){
+  return TEACHER_YEARS.map(y=>`<option value="${y}" ${String(selected||'')===y?'selected':''}>${y.replace('-', '–')}</option>`).join(''); }
 
   // ---- Teacher assignment: each class gets its own subjects (taken from that class's curriculum) ----
   function teacherAssignPickerHtml(prefix, existing){
