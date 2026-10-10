@@ -427,7 +427,15 @@ window.TeacherPanel = (function () {
     }
 
     if (res && res.success) {
-      API.toastSuccess();
+      const failed = (res.results || []).filter(r => r.saved === false);
+      if (!res.savedCount || failed.length || (res.closedPeriods && res.closedPeriods.length)) {
+        const why = failed.length
+          ? failed.map(f => `${f.studentId}: ${f.reason}`).join(' | ')
+          : (res.closedPeriods && res.closedPeriods.length ? 'Period(s) closed by the administrator: ' + res.closedPeriods.join(', ').toUpperCase() : 'Nothing was saved.');
+        API.toastNotification((res.savedCount ? `Saved ${res.savedCount}. ` : 'Not saved. ') + why, true);
+      } else {
+        API.toastSuccess();
+      }
       await loadRosterAndGrades();
     } else {
       API.toastNotification(res.message || 'Error recording grades.', true);
@@ -654,8 +662,7 @@ window.TeacherPanel = (function () {
       return;
     }
 
-    const res = await API.callBackend('getReportCard', { studentId: studentId }, 'Loading student report...');
-    if (!(res && res.success && res.reportCard)) {
+      const res = await API.callBackend('getReportCard', { studentId: studentId, academicYear: currentTeacher.academicYear }, 'Loading student report...');    if (!(res && res.success && res.reportCard)) {
       API.toastNotification((res && res.message) || 'Unable to load this student report.', true);
       return;
     }
