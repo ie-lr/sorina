@@ -1896,10 +1896,10 @@ window.AdminPanel = (function () {
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0;">
-          <div style="padding:14px;border:1px solid var(--color-border);border-radius:10px;background:#f8fafc;"><div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Total Staff</div><div style="font-size:25px;font-weight:800;color:var(--color-primary);">${cachedTeachers.length}</div></div>
-          <div style="padding:14px;border:1px solid var(--color-border);border-radius:10px;background:#f8fafc;"><div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Active</div><div style="font-size:25px;font-weight:800;color:#15803d;">${activeCount}</div></div>
-          <div style="padding:14px;border:1px solid var(--color-border);border-radius:10px;background:#f8fafc;"><div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">With Assignments</div><div style="font-size:25px;font-weight:800;color:#7c3aed;">${assignedCount}</div></div>
-          <div style="padding:14px;border:1px solid var(--color-border);border-radius:10px;background:#f8fafc;"><div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Academic Years</div><div style="font-size:25px;font-weight:800;color:#0f766e;">${yearCounts.filter(x=>x.count).length}</div></div>
+          <div style="padding:14px;border:1px solid var(--color-border);border-radius:10px;background:#f8fafc;"><div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Total Staff</div><div id="tsTotal" style="font-size:25px;font-weight:800;color:var(--color-primary);">0</div></div>
+          <div style="padding:14px;border:1px solid var(--color-border);border-radius:10px;background:#f8fafc;"><div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Active</div><div id="tsActive" style="font-size:25px;font-weight:800;color:#15803d;">0</div></div>
+          <div style="padding:14px;border:1px solid var(--color-border);border-radius:10px;background:#f8fafc;"><div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">With Assignments</div><div id="tsAssigned" style="font-size:25px;font-weight:800;color:#7c3aed;">0</div></div>
+          <div style="padding:14px;border:1px solid var(--color-border);border-radius:10px;background:#f8fafc;"><div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Academic Year</div><div id="tsYear" style="font-size:25px;font-weight:800;color:#0f766e;">—</div></div>
         </div>
 
         <div style="display:grid;grid-template-columns:minmax(180px,1.4fr) repeat(2,minmax(150px,1fr));gap:10px;margin-bottom:14px;">
