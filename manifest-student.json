@@ -1,18 +1,12 @@
 {
-  "name": "Sorina Daycare & Primary School System",
+  "id": "sorina-student",
+  "name": "Sorina School – Student & Parent",
   "short_name": "Sorina Student",
-  "description": "Sorina Daycare & Primary School System — Students, Grades, Finance, Teachers & Report Cards.",
   "start_url": "./index.html",
-  "display": "standalone",
   "scope": "./index.html",
+  "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#003366",
   "theme_color": "#003366",
-  "icons": [
-    {
-      "src": "assets/images/school-logo.png",
-      "sizes": "192x192 512x512",
-      "type": "image/png"
-    }
-  ]
+  "icons": [{ "src": "assets/images/school-logo.png", "sizes": "192x192 512x512", "type": "image/png" }]
 }
