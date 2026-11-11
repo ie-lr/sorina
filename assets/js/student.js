@@ -547,25 +547,12 @@ window.StudentPanel = (function () {
 
   function printPaymentReceipt() {
     if (!currentStudent) return;
-    const cardHtml = buildReceiptCardHtml(currentStudent);
-    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map(el => el.outerHTML).join('');
-    const printWin = window.open('', '_blank');
-    printWin.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Payment Receipt - ${escapeHtml(currentStudent.name)}</title>${styles}
-      <style>@page { size: A4 landscape; margin: 6mm; } body{background:#fff;margin:0;padding:4mm;display:flex;justify-content:center;}</style></head><body><div class="receiptPrintGrid">${cardHtml}</div></body></html>`);
-    printWin.document.close();
-    printWin.focus();
-    setTimeout(() => { printWin.print(); }, 400);
+    Receipt.print(buildReceiptCardHtml(currentStudent), 'Payment Receipt - ' + currentStudent.name);
   }
 
   function buildReceiptRow(label, amount, currency, dateStr) {
-    if (!amount || Number(amount) <= 0) return '';
-    return `
-      <div class="receiptRow">
-        <div class="receiptRowCheck">✓</div>
-        <div class="receiptRowLabel">${escapeHtml(label)}</div>
-        <div class="receiptRowDate"><small>Payment Date</small>${escapeHtml(dateStr) || '—'}</div>
-        <div class="receiptRowAmount">${formatMoney(amount, currency)}</div>
-      </div>`;
+    if (!amount || Number(amount) <= 0) return null;
+    return { label: label, amount: amount, date: dateStr };
   }
 
   function buildReceiptCardHtml(s) {
@@ -586,8 +573,7 @@ window.StudentPanel = (function () {
     });
     rows.push(buildReceiptRow('Other Payments', f.otherPayments, currency, fallbackDate));
 
-    const rowsHtml = rows.join('') || `<p class="muted" style="padding:10px 0; color:#64748b; font-size:12px;">No payments recorded yet.</p>`;
-
+    const rows_ = rows.filter(Boolean);
     const totalPaid =
       (f.entranceFeePaid ? toNum(f.entranceFee) : 0) +
       (f.registrationPaid ? toNum(f.registrationFee) : 0) +
@@ -598,29 +584,16 @@ window.StudentPanel = (function () {
       toNum(f.otherPayments);
 
     const totalBalance = studentBalance(s);
-    return `
-      <div class="receiptCard">
-        <div class="receiptTopBrand">
-          <img class="receiptTopLogo" src="${escapeHtml(branding.logoUrl || 'assets/images/school-logo.png')}" alt="Logo" onerror="this.style.display='none'">
-          <div class="receiptTopSchoolName">${escapeHtml(branding.schoolName || 'Sorina Daycare & Primary School System')}</div>
-          <div class="receiptTopMotto">${escapeHtml(branding.schoolMotto || 'Excellence in Knowledge, Character & Integrity')}</div>
-        </div>
-        <div class="receiptHeaderRule"></div>
-        <div class="receiptStudentPhotoRow">
-          <div class="receiptStudentPhotoBox">${s.photo ? `<img src="${escapeHtml(s.photo)}" alt="Photo">` : '👤'}</div>
-        </div>
-        <div class="receiptTitle">PAYMENT RECEIPT</div>
-        <div class="receiptMetaRow">
-          <div><small>Paid For</small><b>${escapeHtml(s.name)} (${escapeHtml(s.id)})</b></div>
-          <div><small>Date</small><b>${new Date().toLocaleDateString()}</b></div>
-        </div>
-        <div class="receiptRowsWrap">${rowsHtml}</div>
-        <div class="receiptTotalsBar">
-          <div><small>Total Paid</small><b>${formatMoney(totalPaid, currency)}</b></div>
-          <div class="receiptBalanceBlock"><small>Total Balance</small><b class="${totalBalance > 0 ? 'score-red' : 'score-green'}">${formatMoney(totalBalance, currency)}</b></div>
-        </div>
-        <div class="receiptFooterNote">Payments are record-only; no payment is processed online on this website.</div>
-      </div>`;
+    return Receipt.cardHtml({
+      school: { name: branding.schoolName, motto: branding.schoolMotto, logo: branding.logoUrl, phone: branding.contactPhone, email: branding.contactEmail },
+      student: { id: s.id, name: s.name, className: s.className || s.grade, academicYear: s.academicYear, photo: s.photo },
+      rows: rows_,
+      currency: currency,
+      totalPaid: totalPaid,
+      totalBilled: toNum(s.finance && s.finance.tuitionTotal) + toNum(s.finance && s.finance.registrationFee) + toNum(s.finance && s.finance.requirementsFee) + toNum(s.finance && s.finance.peSuitFee) + toNum(s.finance && s.finance.portalFee) + toNum(s.finance && s.finance.entranceFee),
+      balance: totalBalance,
+      format: formatMoney
+    });
   }
 
   function studentBalance(s) {

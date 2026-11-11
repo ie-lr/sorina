@@ -1091,14 +1091,8 @@ window.AdminPanel = (function () {
   // PAYMENT RECEIPTS & BULK PRINTING (3 PER LANDSCAPE A4 PAGE)
   // =========================================================================
   function buildReceiptRow(label, amount, currency, dateStr) {
-    if (!amount || Number(amount) <= 0) return '';
-    return `
-      <div class="receiptRow">
-        <div class="receiptRowCheck">✓</div>
-        <div class="receiptRowLabel">${escapeHtml(label)}</div>
-        <div class="receiptRowDate"><small>Payment Date</small>${escapeHtml(dateStr) || '—'}</div>
-        <div class="receiptRowAmount">${formatMoney(amount, currency)}</div>
-      </div>`;
+    if (!amount || Number(amount) <= 0) return null;
+    return { label: label, amount: amount, date: dateStr };
   }
 
   function buildReceiptCardHtml(s) {
@@ -1119,8 +1113,7 @@ window.AdminPanel = (function () {
     });
     rows.push(buildReceiptRow('Other Payments', f.otherPayments, currency, fallbackDate));
 
-    const rowsHtml = rows.join('') || `<p class="muted" style="padding:10px 0; color:#64748b; font-size:12px;">No payments recorded yet.</p>`;
-
+    const rows_ = rows.filter(Boolean);
     const totalPaid =
       (f.entranceFeePaid ? toNum(f.entranceFee) : 0) +
       (f.registrationPaid ? toNum(f.registrationFee) : 0) +
@@ -1131,29 +1124,16 @@ window.AdminPanel = (function () {
       toNum(f.otherPayments);
 
     const totalBalance = studentBalance(s);
-    return `
-      <div class="receiptCard">
-        <div class="receiptTopBrand">
-          <img class="receiptTopLogo" src="${escapeHtml(branding.logoUrl || 'assets/images/school-logo.png')}" alt="Logo" onerror="this.style.display='none'">
-          <div class="receiptTopSchoolName">${escapeHtml(branding.schoolName || 'Sorina Daycare & Primary School System')}</div>
-          <div class="receiptTopMotto">${escapeHtml(branding.schoolMotto || 'Excellence in Knowledge, Character & Integrity')}</div>
-        </div>
-        <div class="receiptHeaderRule"></div>
-        <div class="receiptStudentPhotoRow">
-          <div class="receiptStudentPhotoBox">${s.photo ? `<img src="${escapeHtml(s.photo)}" alt="Photo">` : '👤'}</div>
-        </div>
-        <div class="receiptTitle">PAYMENT RECEIPT</div>
-        <div class="receiptMetaRow">
-          <div><small>Paid For</small><b>${escapeHtml(s.name)} (${escapeHtml(s.id)})</b></div>
-          <div><small>Date</small><b>${new Date().toLocaleDateString()}</b></div>
-        </div>
-        <div class="receiptRowsWrap">${rowsHtml}</div>
-        <div class="receiptTotalsBar">
-          <div><small>Total Paid</small><b>${formatMoney(totalPaid, currency)}</b></div>
-          <div class="receiptBalanceBlock"><small>Total Balance</small><b class="${totalBalance > 0 ? 'score-red' : 'score-green'}">${formatMoney(totalBalance, currency)}</b></div>
-        </div>
-        <div class="receiptFooterNote">Payments are record-only; no payment is processed online on this website.</div>
-      </div>`;
+    return Receipt.cardHtml({
+      school: { name: branding.schoolName, motto: branding.schoolMotto, logo: branding.logoUrl, phone: branding.contactPhone, email: branding.contactEmail },
+      student: { id: s.id, name: s.name, className: s.className || s.grade, academicYear: s.academicYear, photo: s.photo },
+      rows: rows_,
+      currency: currency,
+      totalPaid: totalPaid,
+      totalBilled: studentBilled(s),
+      balance: totalBalance,
+      format: formatMoney
+    });
   }
 
   // Billed = class fee package tied to the student's class (server applies the class fee schedule).
@@ -1238,9 +1218,7 @@ window.AdminPanel = (function () {
           </button>
         </div>
         <div id="receiptPreviewContainer" style="max-height: 70vh; overflow-y: auto; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #cbd5e1;">
-          <div class="receiptPrintGrid" style="display: flex; flex-wrap: wrap; gap: 16px; justify-content: center;">
-            ${cardsHtml}
-          </div>
+          ${Receipt.gridHtml(cardsHtml)}
         </div>
       `,
       confirmText: 'Print Now',
@@ -1258,17 +1236,7 @@ window.AdminPanel = (function () {
   }
 
   function executeReceiptPrint(cardsHtml) {
-    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map(el => el.outerHTML).join('');
-    const printWin = window.open('', '_blank');
-    if (printWin) {
-      printWin.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Payment Receipts - Sorina Daycare & Primary School System</title>${styles}
-        <style>@page { size: A4 landscape; margin: 6mm; } body{background:#fff;margin:0;padding:4mm;}</style></head><body><div class="receiptPrintGrid">${cardsHtml}</div></body></html>`);
-      printWin.document.close();
-      printWin.focus();
-      setTimeout(() => { printWin.print(); }, 400);
-    } else {
-      window.print();
-    }
+    Receipt.print(cardsHtml, 'Payment Receipts - Sorina Daycare & Primary School System');
   }
 
   function printSingleReceipt(studentId) {
@@ -3126,7 +3094,7 @@ window.AdminPanel = (function () {
     const allSubjects = getCatalogSubjects();
     const permRes = await API.callBackend('getPermissions', {});
     const periodOpenMap = (permRes && permRes.success && permRes.permissions) ? permRes.permissions : {};
-    const isPeriodLocked = (k) => currentUser.role !== 'superadmin' && periodOpenMap[k] !== true;
+    const isPeriodLocked = (k) => !(currentUser.role === 'superadmin' || hasPerm('scores:edit')) && periodOpenMap[k] !== true;
     const classes = [...new Set(cachedStudents.map(s => s.className || s.grade).filter(Boolean))];
     const periods = [
       {key:'p1',label:'1st Period'},{key:'p2',label:'2nd Period'},{key:'p3',label:'3rd Period'},{key:'exam1',label:'1st Sem. Exam'},
@@ -3190,8 +3158,9 @@ function isNurseryClass(cls){
   if(!s)return false;
   return s.startsWith('nursery')||s.startsWith('kindergarten')||['k1','k2','kg1','kg2','prek','daycare','creche','abc'].includes(s);}
 
+    function isNursery2Class(cls){return String(cls||'').trim().toLowerCase().replace(/[\s\-_]+/g,'')==='nursery2';}
     function currentIsNursery(){return isNurseryClass(document.getElementById('agClass').value);}
-function valid(v){if(v==='')return true;const c=String(document.getElementById('agClass').value||'').trim().toLowerCase().replace(/[\s\-_]+/g,'');const nur=c.startsWith('nursery')||c.startsWith('kindergarten')||['k1','k2','kg1','kg2','prek','daycare','creche','abc'].includes(c);if(nur)return ['A','B','C'].includes(String(v).trim().toUpperCase());return Number.isFinite(Number(v))&&Number(v)>=0&&Number(v)<=100;}    function statusOf(rec){if(rec.status==='submitted')return 'submitted'; if(complete(rec))return 'complete'; return any(rec)?'incomplete':'notstarted';}
+function valid(v){if(v==='')return true;const c=String(document.getElementById('agClass').value||'').trim().toLowerCase().replace(/[\s\-_]+/g,'');const nur=c.startsWith('nursery')||c.startsWith('kindergarten')||['k1','k2','kg1','kg2','prek','daycare','creche','abc'].includes(c);if(isNursery2Class(document.getElementById('agClass').value))return ['1','2','3','4','5'].includes(String(v).trim());if(nur)return ['A','B','C'].includes(String(v).trim().toUpperCase());return Number.isFinite(Number(v))&&Number(v)>=0&&Number(v)<=100;}    function statusOf(rec){if(rec.status==='submitted')return 'submitted'; if(complete(rec))return 'complete'; return any(rec)?'incomplete':'notstarted';}
     function updateSummary(){const rows=[...document.querySelectorAll('#agBody tr[data-id]')];let c=0,m=0,s=0,d=0;rows.forEach(tr=>{const r={};tr.querySelectorAll('.ag-score').forEach(i=>r[i.dataset.p]=i.value.trim());const st=statusOf(r);if(st==='complete'||st==='submitted')c++;if(st==='incomplete'||st==='notstarted')m++;if(tr.dataset.originalStatus==='submitted'||st==='submitted')s++;if(tr.dataset.dirty==='1')d++;});document.getElementById('agTotal').textContent=rows.length;document.getElementById('agComplete').textContent=c;document.getElementById('agMissing').textContent=m;document.getElementById('agSubmitted').textContent=s;document.getElementById('agDirty').textContent=d;}
     function draw(){
       const subject=document.getElementById('agSubject').value,q=document.getElementById('agSearch').value.trim().toLowerCase(),view=document.getElementById('agView').value;
@@ -3205,8 +3174,8 @@ function valid(v){if(v==='')return true;const c=String(document.getElementById('
       body.innerHTML=filtered.map(st=>{
         const rec=st.scores||{},stt=st.status||statusOf(rec),version=st.version||1;
         const badge=stt==='submitted'?'<span class="badge badge-success">Submitted</span>':stt==='complete'?'<span class="badge badge-info">Complete</span>':stt==='incomplete'?'<span class="badge badge-warning">In Progress</span>':'<span class="badge badge-light">Not Started</span>';
-        return `<tr data-id="${escapeHtml(st.studentId)}" data-version="${version}" data-dirty="0" data-original-status="${escapeHtml(stt)}"><td><div style="font-weight:700;">${escapeHtml(st.studentName||'Unnamed Student')}</div><div style="font-size:11px;color:#64748b;">${escapeHtml(st.studentId)}</div></td>${scoreKeys.map(k=>{const val=(rec[k]!==null&&rec[k]!==undefined&&rec[k]!=='')?String(rec[k]):'';const dis=isPeriodLocked(k)?'disabled title="Period closed by the Super Administrator"':'';const cn=String(document.getElementById('agClass').value||'').trim().toLowerCase().replace(/[\s\-_]+/g,'');const nur=cn.startsWith('nursery')||cn.startsWith('kindergarten')||['k1','k2','kg1','kg2','prek','daycare','creche','abc'].includes(cn);if(nur){const c=val.trim().toUpperCase();const cv=['A','B','C'].includes(c)?c:'';return `<td style="text-align:center;"><select class="select-field ag-score" ${dis} data-p="${k}" data-original-val="${escapeHtml(cv)}" style="width:82px;text-align:center;font-weight:700;margin:auto;"><option value="">—</option><option value="A" ${cv==='A'?'selected':''}>A</option><option value="B" ${cv==='B'?'selected':''}>B</option><option value="C" ${cv==='C'?'selected':''}>C</option></select></td>`;}return `<td style="text-align:center;"><input type="number" min="0" max="100" step="0.01" class="input-field ag-score" ${dis} data-p="${k}" data-original-val="${escapeHtml(val)}" value="${escapeHtml(val)}" style="width:82px;text-align:center;margin:auto;"></td>`;}).join('')}<td class="ag-status" style="font-size:12px;font-weight:700;">${badge}</td></tr>`;      }).join('')||'<tr><td colspan="10" style="text-align:center;padding:30px;color:#64748b;">No students match the current filters.</td></tr>';
-      document.querySelectorAll('.ag-score').forEach(input=>{input.addEventListener('input',()=>{const tr=input.closest('tr');if(!valid(input.value)){input.setCustomValidity('Enter a score from 0 to 100.');input.style.borderColor='#dc2626';}else{input.setCustomValidity('');input.style.borderColor='';}tr.dataset.dirty='1';const r={};tr.querySelectorAll('.ag-score').forEach(i=>r[i.dataset.p]=i.value.trim());const st=statusOf(r);tr.querySelector('.ag-status').innerHTML=st==='submitted'?'<span class="badge badge-success">Ready to Submit</span>':complete(r)?'<span class="badge badge-info">Complete</span>':any(r)?'<span class="badge badge-warning">In Progress</span>':'<span class="badge badge-light">Not Started</span>';updateSummary();});input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const a=[...document.querySelectorAll('.ag-score')],i=a.indexOf(input);if(a[i+1])a[i+1].focus();}});});
+        return `<tr data-id="${escapeHtml(st.studentId)}" data-version="${version}" data-dirty="0" data-original-status="${escapeHtml(stt)}"><td><div style="font-weight:700;">${escapeHtml(st.studentName||'Unnamed Student')}</div><div style="font-size:11px;color:#64748b;">${escapeHtml(st.studentId)}</div></td>${scoreKeys.map(k=>{const val=(rec[k]!==null&&rec[k]!==undefined&&rec[k]!=='')?String(rec[k]):'';const dis=isPeriodLocked(k)?'disabled title="Period closed by the Super Administrator"':'';const cn=String(document.getElementById('agClass').value||'').trim().toLowerCase().replace(/[\s\-_]+/g,'');const nur=cn.startsWith('nursery')||cn.startsWith('kindergarten')||['k1','k2','kg1','kg2','prek','daycare','creche','abc'].includes(cn);if(isNursery2Class(document.getElementById('agClass').value)){const cv=['1','2','3','4','5'].includes(val.trim())?val.trim():'';return `<td style="text-align:center;"><select class="select-field ag-score" ${dis} data-p="${k}" data-original-val="${escapeHtml(cv)}" style="width:82px;text-align:center;font-weight:700;margin:auto;"><option value="">—</option>${[1,2,3,4,5].map(n=>`<option value="${n}" ${cv===String(n)?'selected':''}>${n}</option>`).join('')}</select></td>`;}if(nur){const c=val.trim().toUpperCase();const cv=['A','B','C'].includes(c)?c:'';return `<td style="text-align:center;"><select class="select-field ag-score" ${dis} data-p="${k}" data-original-val="${escapeHtml(cv)}" style="width:82px;text-align:center;font-weight:700;margin:auto;"><option value="">—</option><option value="A" ${cv==='A'?'selected':''}>A</option><option value="B" ${cv==='B'?'selected':''}>B</option><option value="C" ${cv==='C'?'selected':''}>C</option></select></td>`;}return `<td style="text-align:center;"><input type="number" min="0" max="100" step="0.01" class="input-field ag-score" ${dis} data-p="${k}" data-original-val="${escapeHtml(val)}" value="${escapeHtml(val)}" style="width:82px;text-align:center;margin:auto;"></td>`;}).join('')}<td class="ag-status" style="font-size:12px;font-weight:700;">${badge}</td></tr>`;      }).join('')||'<tr><td colspan="10" style="text-align:center;padding:30px;color:#64748b;">No students match the current filters.</td></tr>';
+      document.querySelectorAll('.ag-score').forEach(input=>{input.addEventListener('input',()=>{const tr=input.closest('tr');if(!valid(input.value)){input.setCustomValidity(isNursery2Class(document.getElementById('agClass').value)?'Enter a grade from 1 to 5.':'Enter a score from 0 to 100.');input.style.borderColor='#dc2626';}else{input.setCustomValidity('');input.style.borderColor='';}tr.dataset.dirty='1';const r={};tr.querySelectorAll('.ag-score').forEach(i=>r[i.dataset.p]=i.value.trim());const st=statusOf(r);tr.querySelector('.ag-status').innerHTML=st==='submitted'?'<span class="badge badge-success">Ready to Submit</span>':complete(r)?'<span class="badge badge-info">Complete</span>':any(r)?'<span class="badge badge-warning">In Progress</span>':'<span class="badge badge-light">Not Started</span>';updateSummary();});input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const a=[...document.querySelectorAll('.ag-score')],i=a.indexOf(input);if(a[i+1])a[i+1].focus();}});});
       updateSummary();
     }
     async function loadClass(){
@@ -3245,7 +3214,7 @@ function valid(v){if(v==='')return true;const c=String(document.getElementById('
           grades.push({studentId:sId,baseVersion:baseVersion,changes:changes});
         }
       });
-      if(invalid){API.toastNotification('Correct scores outside the 0–100 range before saving.',true);return;}
+      if(invalid){API.toastNotification('Correct invalid scores (0–100, A/B/C, or 1–5 for Nursery 2) before saving.',true);return;}
       if(!grades.length){API.toastNotification('No unsaved grade changes on this screen.');return;}
       if(mode==='submitted'&&incomplete&&!confirm('Some selected students do not have all grading periods completed. Submit these grades anyway?'))return;
       const r=await API.callBackend('teacherSubmitGrades',{teacherId:currentUser.id,actorRole:'admin',actorName:currentUser.name||'Administrator',className:cls,subject:subject,academicYear:selectedAcademicYear,gradeStatus:mode,grades:grades},mode==='submitted'?'Submitting official grades...':'Saving grade draft...');
@@ -4176,41 +4145,26 @@ function valid(v){if(v==='')return true;const c=String(document.getElementById('
 
   async function viewStudentReport(studentId) {
     const res = await API.callBackend('getReportCard', { studentId: studentId, academicYear: selectedAcademicYear }, 'Loading report card...');
-    if (res && res.success && res.reportCard) {
-      App.showModal({
-        title: `Official Report Card Preview: ${escapeHtml(res.reportCard.student?.name || studentId)} (${escapeHtml(selectedAcademicYear)})`,
-        content: `
-          <div class="no-print" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; background: #f0fdf4; padding: 10px 14px; border-radius: 6px; border: 1px solid #86efac;">
-            <span style="font-size: 13px; color: #166534; font-weight: 600;">Two-Page Official Report Card Preview (${escapeHtml(selectedAcademicYear)})</span>
-            <button type="button" class="btn btn-primary btn-sm" id="modalPrintReportCardBtn" style="display: flex; align-items: center; gap: 6px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-              Print Official Report Card
-            </button>
-          </div>
-          <div id="adminRcMount" style="max-height: 75vh; overflow-y: auto; background: #e2e8f0; padding: 12px; border-radius: 8px;"></div>
-        `,
-        confirmText: 'Print',
-        cancelText: 'Close',
-        onConfirm: () => {
-          window.print();
-          return false;
-        }
-      });
-
-      // Render the comprehensive two-page report card
-      ReportCard.render(res.reportCard, '#adminRcMount');
-
-      // Make modal dialog wide for report preview
-      const activeOverlay = document.querySelector('#modalContainer .modal-overlay:last-child');
-      if (activeOverlay) activeOverlay.classList.add('modal-preview');
-
-      setTimeout(() => {
-        const pBtn = document.getElementById('modalPrintReportCardBtn');
-        if (pBtn) pBtn.onclick = () => window.print();
-      }, 60);
-    } else {
+    if (!(res && res.success && res.reportCard)) {
       API.toastNotification((res && res.message) || 'Unable to generate report card preview for this student.', true);
+      return;
     }
+    const rc = res.reportCard;
+    App.showModal({
+      title: `Report Card: ${(rc.student && rc.student.name) || studentId} (${selectedAcademicYear})`,
+      content: '<div id="adminRcMount" style="max-height: 75vh; overflow-y: auto; background: #e2e8f0; padding: 12px; border-radius: 8px;"></div>',
+      confirmText: 'Print',
+      cancelText: 'Close',
+      onConfirm: () => {
+        ReportCard.print(rc);
+        return false;
+      }
+    });
+
+    // Make the modal wide, then render the two-sheet report card into it
+    const overlays = document.querySelectorAll('#modalContainer .modal-overlay');
+    if (overlays.length) overlays[overlays.length - 1].classList.add('modal-preview');
+    ReportCard.render(rc, '#adminRcMount');
   }
 
   function switchTab(tab) {

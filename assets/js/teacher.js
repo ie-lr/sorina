@@ -341,6 +341,7 @@ window.TeacherPanel = (function () {
     }
 
     const isNursery = isNurserySection(selectedClass);
+    const isScale5 = isNursery2Section(selectedClass);
 
     tbody.innerHTML = currentRoster.map(row => {
       const sId = row.studentId;
@@ -352,14 +353,14 @@ window.TeacherPanel = (function () {
         <tr data-student-id="${escapeHtml(sId)}" data-version="${version}">
           <td><b>${escapeHtml(sName)}</b></td>
           <td style="font-size: 12.5px; color: var(--color-text-dim);">[${escapeHtml(sId)}]</td>
-          ${renderScoreInput('p1', scores.p1, isNursery)}
-          ${renderScoreInput('p2', scores.p2, isNursery)}
-          ${renderScoreInput('p3', scores.p3, isNursery)}
-          ${renderScoreInput('exam1', scores.exam1, isNursery)}
-          ${renderScoreInput('p4', scores.p4, isNursery)}
-          ${renderScoreInput('p5', scores.p5, isNursery)}
-          ${renderScoreInput('p6', scores.p6, isNursery)}
-          ${renderScoreInput('exam2', scores.exam2, isNursery)}
+          ${renderScoreInput('p1', scores.p1, isNursery, isScale5)}
+          ${renderScoreInput('p2', scores.p2, isNursery, isScale5)}
+          ${renderScoreInput('p3', scores.p3, isNursery, isScale5)}
+          ${renderScoreInput('exam1', scores.exam1, isNursery, isScale5)}
+          ${renderScoreInput('p4', scores.p4, isNursery, isScale5)}
+          ${renderScoreInput('p5', scores.p5, isNursery, isScale5)}
+          ${renderScoreInput('p6', scores.p6, isNursery, isScale5)}
+          ${renderScoreInput('exam2', scores.exam2, isNursery, isScale5)}
           <td>
             <button type="button" class="btn btn-light btn-sm" onclick="window.TeacherPanel.viewStudentReport('${escapeHtml(sId)}')" title="Preview Student Report Card">
               <img src="assets/icons/file-text.png" style="width: 14px; height: 14px;" alt="">
@@ -370,9 +371,20 @@ window.TeacherPanel = (function () {
     }).join('');
   }
 
-  function renderScoreInput(periodKey, val, isNursery) {
+  function renderScoreInput(periodKey, val, isNursery, isScale5) {
     const isOpen = gradingPermissions[periodKey] === true;
     const cleanVal = (val !== null && val !== undefined && val !== '') ? String(val) : '';
+
+    if (isScale5) {
+      return `
+        <td style="text-align:center;">
+          <select class="select-field score-input ${!isOpen ? 'period-locked' : ''}" data-period="${periodKey}" data-original-val="${escapeHtml(cleanVal)}" ${!isOpen ? 'disabled title="Period locked - view only"' : ''} style="width: 58px; padding: 4px; text-align:center; font-weight:700;">
+            <option value="">—</option>
+            ${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${cleanVal === String(n) ? 'selected' : ''}>${n}</option>`).join('')}
+          </select>
+        </td>
+      `;
+    }
 
     if (isNursery) {
       return `
@@ -718,6 +730,10 @@ window.TeacherPanel = (function () {
   function isAssignedClassAndSubject(className, subject) {
     const a = currentAssignments.find(x => String(x.class).trim() === String(className).trim());
     return !!a && Array.isArray(a.subjects) && a.subjects.some(x => String(x).trim().toLowerCase() === String(subject).trim().toLowerCase());
+  }
+
+  function isNursery2Section(className) {
+    return String(className || '').trim().toLowerCase().replace(/[\s\-_]+/g, '') === 'nursery2';
   }
 
   function isNurserySection(className) {

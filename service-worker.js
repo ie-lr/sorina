@@ -7,7 +7,7 @@
  * -----------------------------------------------------------------------
  */
 
-const CACHE_NAME = 'ie-school-portal-v2.7';
+const CACHE_NAME = 'ie-school-portal-v2.8';
 const SHELL_ASSETS = [
   './',
   './index.html',
@@ -29,6 +29,7 @@ const SHELL_ASSETS = [
   './assets/js/pwaInstall.js',
   './assets/js/app.js',
   './assets/js/reportCard.js',
+  './assets/js/receipt.js',
   './assets/js/iePortal.js',
   './assets/images/school-logo.png',
   './assets/images/campus.jpeg',
