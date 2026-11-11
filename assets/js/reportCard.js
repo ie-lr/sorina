@@ -27,66 +27,56 @@ const ReportCard = (function () {
   const CSS = `
     .rcRoot, .rcRoot * { box-sizing: border-box; }
     .rcRoot { font-family: Georgia, 'Times New Roman', serif; color: #1c1c1c; }
-    .rcSheetFrame { margin: 0 auto 18px; position: relative; }
+    .rcSheetFrame { margin: 0 auto 20px; position: relative; }
     .rcSheetScale { transform-origin: top left; }
     .rcSheet {
       width: ${SHEET_W_MM}mm; height: ${SHEET_H_MM}mm;
-      background: #fff; border: 0.5mm solid #1c1c1c;
-      padding: 5mm 6mm; display: flex; flex-direction: column; overflow: hidden;
-      box-shadow: 0 3px 14px rgba(0,0,0,.12);
+      background: #ffffff; border: 2px solid #1c1c1c;
+      padding: 8mm 9mm; overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     }
-    .rcSheetLabel { text-align: right; font: 700 9px/1 Arial, sans-serif; letter-spacing: 1px; color: #6b7280; text-transform: uppercase; margin-bottom: 2mm; }
+    .rcPageLabel { text-align: right; font-size: 10px; color: #6b7280; font-weight: 700; margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; font-family: Georgia, 'Times New Roman', serif; }
 
-    .rcFrontHead { display: flex; align-items: center; gap: 4mm; border-bottom: 0.4mm solid #1c1c1c; padding-bottom: 2mm; margin-bottom: 3mm; }
-    .rcFrontHead img { width: 13mm; height: 13mm; object-fit: contain; }
-    .rcFrontHead .rcHN { font-weight: 800; font-size: 15px; line-height: 1.15; }
-    .rcFrontHead .rcHS { font-size: 10px; font-style: italic; color: #444; }
-    .rcFrontMeta { margin-left: auto; text-align: right; font-size: 11px; line-height: 1.5; }
-    .rcFrontMeta b { font-weight: 800; }
-
-    .rcTables { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; flex: 1 1 auto; min-height: 0; }
-    .rcTableWrap { border: 0.4mm solid #1c1c1c; display: flex; flex-direction: column; min-height: 0; }
-    .rcSemTitle { text-align: center; font-style: italic; font-weight: 700; font-size: 13px; padding: 1.5mm; border-bottom: 0.4mm solid #1c1c1c; }
-    .rcTable { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--rcFont, 11px); }
-    .rcTable th, .rcTable td { border: 0.25mm solid #1c1c1c; height: var(--rcRow, 24px); padding: 0 2px; text-align: center; vertical-align: middle; overflow: hidden; white-space: nowrap; }
-    .rcTable th { font-weight: 800; background: #f3f4f6; }
-    .rcTable td.rcSub { text-align: left; padding-left: 2mm; font-weight: 700; white-space: normal; line-height: 1.1; }
-    .rcTable col.rcColSub { width: 34%; }
-    .rcTable tr.rcSum td { font-weight: 800; background: #f3f4f6; }
-    .rcTable tr.rcAvg td { font-weight: 900; background: #e8edf5; border-top: 0.5mm solid #1c1c1c; }
-
-    .rcKey { text-align: center; margin-top: 3mm; font-size: 11px; }
-    .rcKey b { font-style: italic; margin-right: 4mm; }
-    .rcKey span { margin: 0 4mm; }
+    /* FRONT — two semester tables side by side */
+    .rcSemesterGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 20px; }
+    .rcSemTableWrap { border: 2px solid #1c1c1c; border-radius: 4px; overflow: hidden; }
+    .rcSemTitle { text-align: center; font-style: italic; font-weight: 700; font-size: 15px; padding: 8px; border-bottom: 2px solid #1c1c1c; background: #ffffff; }
+    .rcSemTable { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--rcFont, 11.5px); }
+    .rcSemTable th, .rcSemTable td { border: 1px solid #1c1c1c; height: var(--rcRow, 28px); padding: 0 4px; text-align: center; vertical-align: middle; overflow: hidden; white-space: nowrap; }
+    .rcSemTable td.rcSubjectCell { text-align: left; padding-left: 8px; font-weight: 600; white-space: normal; line-height: 1.15; }
+    .rcSemTable col.rcColSub { width: 34%; }
+    .rcSemTable tr.rcSummaryRow td { font-weight: 800; background: rgba(0, 0, 0, 0.05); }
+    .rcGradeKey { text-align: center; margin-top: 6px; }
+    .rcGradeKey b.rcGradeKeyTitle { display: block; font-style: italic; margin-bottom: 6px; }
+    .rcGradeKeyGrid { display: flex; justify-content: center; gap: 50px; flex-wrap: wrap; font-size: 12.5px; }
 
     .gradeRed { color: #c0392b; font-weight: 800; }
     .gradeBlue { color: #1d4ed8; font-weight: 800; }
     .gradeGreen { color: #065f46; font-weight: 800; }
 
-    .rcBack { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; flex: 1 1 auto; min-height: 0; }
-    .rcPromo { border: 0.4mm solid #1c1c1c; padding: 5mm 6mm; display: flex; flex-direction: column; gap: 3mm; font-size: 13px; }
-    .rcPromo h3 { margin: 0 0 1mm; text-align: center; font-style: italic; font-size: 17px; }
-    .rcPromo p { margin: 0; line-height: 1.5; }
-    .rcFill { display: inline-block; min-width: 40mm; border-bottom: 0.3mm solid #1c1c1c; font-weight: 800; padding: 0 2mm; }
-    .rcOpt { padding-left: 4mm; line-height: 1.6; }
-    .rcSign { margin-top: auto; display: grid; gap: 7mm; }
-    .rcSignLine { border-top: 0.3mm solid #1c1c1c; padding-top: 1mm; font-size: 11px; }
-
-    .rcHeadBox { border: 0.4mm solid #1c1c1c; padding: 5mm 6mm; display: flex; flex-direction: column; min-height: 0; }
-    .rcSchool { display: flex; align-items: center; gap: 4mm; margin-bottom: 3mm; }
-    .rcSchool img { width: 20mm; height: 20mm; object-fit: contain; }
-    .rcSchool .rcSN { font-weight: 800; font-size: 17px; line-height: 1.15; }
-    .rcSchool .rcSS { font-size: 11px; font-style: italic; color: #444; margin-top: 1mm; }
-    .rcTitleBar { background: #1c1c1c; color: #fff; text-align: center; font-weight: 800; letter-spacing: 1px; padding: 1.5mm; margin-bottom: 3mm; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .rcStudent { display: flex; justify-content: space-between; gap: 4mm; margin-bottom: 3mm; }
-    .rcStudent p { margin: 0 0 1.2mm; font-size: 12.5px; }
-    .rcPhoto { width: 22mm; height: 27mm; border: 0.4mm solid #1c1c1c; overflow: hidden; flex-shrink: 0; }
-    .rcPhoto img { width: 100%; height: 100%; object-fit: cover; }
-    .rcNote { font-size: 11px; margin: 0 0 2mm; line-height: 1.4; }
-    .rcSignTable { width: 100%; border-collapse: collapse; font-size: 11.5px; }
-    .rcSignTable th, .rcSignTable td { border: 0.25mm solid #1c1c1c; height: 8mm; text-align: center; }
-    .rcSignTable th { background: #f3f4f6; height: 7mm; }
-    .rcFoot { font-size: 10.5px; margin: 3mm 0 0; line-height: 1.4; }
+    /* BACK — promotion statement + school header / signature table */
+    .rcBackGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 2px solid #1c1c1c; }
+    .rcPromoBox { padding: 20px 22px; border-right: 2px solid #1c1c1c; }
+    .rcPromoBox h3 { text-decoration: underline; margin: 0 0 14px; font-size: 17px; }
+    .rcPromoLine { margin: 10px 0; font-size: 13px; }
+    .rcPromoLine .fillIn { display: inline-block; min-width: 180px; border-bottom: 1px solid #1c1c1c; font-weight: 700; padding: 0 4px; }
+    .rcPromoOption { margin: 8px 0; font-size: 12.5px; }
+    .rcSignBlock { margin-top: 26px; }
+    .rcSignLine { display: block; border-bottom: 1px solid #1c1c1c; min-height: 26px; margin-bottom: 2px; }
+    .rcSignLabel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .rcHeaderBox { padding: 20px 22px; }
+    .rcSchoolHead { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+    .rcSchoolHead img { width: 56px; height: 56px; object-fit: contain; }
+    .rcSchoolHead .rcSchoolName { font-weight: 900; font-size: 15px; line-height: 1.25; text-transform: uppercase; }
+    .rcSchoolHead .rcSchoolSub { font-size: 10.5px; color: #333; }
+    .rcCardTitleBar { text-align: center; background: #1c1c1c; color: #fff; font-weight: 800; padding: 6px; margin: 10px 0 14px; letter-spacing: 1px; font-size: 13px; text-transform: uppercase; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .rcStudentMetaLine { font-size: 13.5px; margin: 6px 0; }
+    .rcStudentMetaLine b { border-bottom: 1px solid #1c1c1c; padding: 0 6px; }
+    .rcSignoffNote { text-align: center; font-weight: 700; font-size: 12px; margin: 14px 0 8px; }
+    .rcSignoffTable { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .rcSignoffTable th, .rcSignoffTable td { border: 1px solid #1c1c1c; padding: 8px; text-align: center; }
+    .rcSignoffTable th { background: #1c1c1c; color: #fff; font-style: italic; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .rcFootnote { font-size: 10.5px; color: #333; margin-top: 14px; line-height: 1.5; }
 
     .rcPreviewBar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; font-family: Arial, sans-serif; }
   `;
@@ -97,8 +87,8 @@ const ReportCard = (function () {
     .rcSheetFrame { margin: 0 !important; width: ${SHEET_W_MM}mm !important; height: ${SHEET_H_MM}mm !important; break-after: page; page-break-after: always; }
     .rcSheetFrame:last-child { break-after: auto; page-break-after: auto; }
     .rcSheetScale { transform: none !important; }
-    .rcSheet { box-shadow: none; border-width: 0.4mm; }
-    .rcSheetLabel, .no-print { display: none !important; }
+    .rcSheet { box-shadow: none; }
+    .rcPageLabel, .no-print { display: none !important; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   `;
 
@@ -164,25 +154,22 @@ const ReportCard = (function () {
   }
 
   function gradeKey(m) {
+    let items;
     if (m === 'NUMERIC_1_5') {
-      return '<b>Method of Grading</b>' +
-        '<span><b class="gradeBlue">5</b> Excellent</span><span><b class="gradeBlue">4</b> Very Good</span>' +
-        '<span><b class="gradeBlue">3</b> Good</span><span><b class="gradeBlue">2</b> Fair</span>' +
-        '<span><b class="gradeBlue">1</b> Needs Support</span>';
+      items = '<span class="gradeBlue">5 — Excellent</span><span class="gradeBlue">4 — Very Good</span><span class="gradeBlue">3 — Good</span><span class="gradeBlue">2 — Fair</span><span class="gradeBlue">1 — Needs Support</span>';
+    } else if (m === 'LETTER_ABC') {
+      items = '<span class="gradeGreen">A — Excellent</span><span class="gradeBlue">B — Good</span><span class="gradeBlue">C — Fair</span>';
+    } else {
+      items = '<span class="gradeGreen">70 – 100 — Passing</span><span class="gradeBlue">60 – 69 — Needs Improvement</span><span class="gradeRed">Below 60 — Below Passing</span>';
     }
-    if (m === 'LETTER_ABC') {
-      return '<b>Method of Grading</b>' +
-        '<span><b class="gradeGreen">A</b> Excellent</span><span><b class="gradeBlue">B</b> Good</span><span><b class="gradeBlue">C</b> Fair</span>';
-    }
-    return '<b>Method of Grading</b>' +
-      '<span class="gradeBlue">70 – 100 — Passing</span><span class="gradeRed">Below 70 — Needs Improvement</span>';
+    return `<b class="rcGradeKeyTitle">Method of Grading</b><div class="rcGradeKeyGrid">${items}</div>`;
   }
 
   function dims(n) {
     // Rows to fit on the front sheet: subjects + header + conduct + rank + average
     const total = n + 5;
-    const row = Math.max(14, Math.min(36, Math.floor(500 / total)));
-    const font = row >= 30 ? 13 : row >= 26 ? 12 : row >= 22 ? 11 : row >= 18 ? 10 : 9;
+    const row = Math.max(14, Math.min(28, Math.floor(430 / total)));
+    const font = row >= 24 ? 11.5 : row >= 20 ? 10.5 : row >= 17 ? 9.5 : 8.5;
     return { row: row, font: font };
   }
 
@@ -194,14 +181,14 @@ const ReportCard = (function () {
     const m = mode(rcData);
     const f = s => formatScore(s, m);
 
-    const schoolName = school.name || 'Sorina Daycare & Primary School System';
+    const schoolName = 'Sorina Daycare & Primary School System';
     const schoolMotto = school.motto || 'Excellence in Knowledge, Character & Integrity';
     const logoSrc = school.logo || 'assets/images/school-logo.png';
 
     const studentName = student.name || '—';
     const studentId = student.id || '—';
     const className = student.className || student.grade || '—';
-    const academicYear = student.academicYear || '';
+    const academicYear = student.academicYear || '2026/2027';
     const conduct1 = student.behaviour || summary.conduct1 || '-';
     const conduct2 = student.behaviour || summary.conduct2 || '-';
     const rank1 = summary.rankSem1 || summary.rank1 || '-';
@@ -215,44 +202,36 @@ const ReportCard = (function () {
     const front = `
       <div class="rcSheetFrame" data-rc-sheet>
         <div class="rcSheetScale">
-          <div class="rcSheet rcFront" style="${sty}">
-            <div class="rcSheetLabel">Front — Academic Record</div>
-            <div class="rcFrontHead">
-              <img src="${escapeHtml(logoSrc)}" alt="" onerror="${logoOnErr}">
-              <div><div class="rcHN">${escapeHtml(schoolName)}</div><div class="rcHS">${escapeHtml(schoolMotto)}</div></div>
-              <div class="rcFrontMeta">
-                <div><b>${escapeHtml(studentName)}</b> &nbsp;[${escapeHtml(studentId)}]</div>
-                <div>Class: <b>${escapeHtml(className)}</b> &nbsp; Year: <b>${escapeHtml(academicYear)}</b></div>
-              </div>
-            </div>
-            <div class="rcTables">
-              <div class="rcTableWrap">
+          <div class="rcSheet rcFrontPage" style="${sty}">
+            <div class="rcPageLabel">Front — Academic Record</div>
+            <div class="rcSemesterGrid">
+              <div class="rcSemTableWrap">
                 <div class="rcSemTitle">FIRST SEMESTER</div>
-                <table class="rcTable">
+                <table class="rcSemTable">
                   <colgroup><col class="rcColSub"><col><col><col><col><col></colgroup>
-                  <thead><tr><th style="text-align:left;padding-left:2mm">SUBJECTS</th><th>1st</th><th>2nd</th><th>3rd</th><th>Exam</th><th>S.Ave</th></tr></thead>
+                  <thead><tr><th>SUBJECTS</th><th>1st</th><th>2nd</th><th>3rd</th><th>Exam</th><th>S.Ave</th></tr></thead>
                   <tbody>
-                    ${rows.map(r => `<tr><td class="rcSub">${escapeHtml(r.subject)}</td><td>${f(r.p1)}</td><td>${f(r.p2)}</td><td>${f(r.p3)}</td><td>${f(r.exam1)}</td><td>${f(r.sem1Avg)}</td></tr>`).join('')}
-                    <tr class="rcSum"><td class="rcSub">Conduct</td><td colspan="4"></td><td>${escapeHtml(conduct1)}</td></tr>
-                    <tr class="rcSum"><td class="rcSub">Rank</td><td colspan="4"></td><td>${escapeHtml(rank1)}</td></tr>
-                    <tr class="rcAvg"><td class="rcSub">Average</td><td>${f(avg('p1'))}</td><td>${f(avg('p2'))}</td><td>${f(avg('p3'))}</td><td>${f(avg('exam1'))}</td><td>${f(avg('sem1Avg'))}</td></tr>
+                    ${rows.map(r => `<tr><td class="rcSubjectCell">${escapeHtml(r.subject)}</td><td>${f(r.p1)}</td><td>${f(r.p2)}</td><td>${f(r.p3)}</td><td>${f(r.exam1)}</td><td>${f(r.sem1Avg)}</td></tr>`).join('')}
+                    <tr class="rcSummaryRow"><td class="rcSubjectCell">Conduct</td><td colspan="4"></td><td>${escapeHtml(conduct1)}</td></tr>
+                    <tr class="rcSummaryRow"><td class="rcSubjectCell">Rank</td><td colspan="4"></td><td>${escapeHtml(rank1)}</td></tr>
+                    <tr class="rcSummaryRow"><td class="rcSubjectCell">Average</td><td>${f(avg('p1'))}</td><td>${f(avg('p2'))}</td><td>${f(avg('p3'))}</td><td>${f(avg('exam1'))}</td><td>${f(avg('sem1Avg'))}</td></tr>
                   </tbody>
                 </table>
               </div>
-              <div class="rcTableWrap">
+              <div class="rcSemTableWrap">
                 <div class="rcSemTitle">SECOND SEMESTER</div>
-                <table class="rcTable">
+                <table class="rcSemTable">
                   <thead><tr><th>4th</th><th>5th</th><th>6th</th><th>Exam</th><th>S.Ave</th><th>Yr.</th></tr></thead>
                   <tbody>
                     ${rows.map(r => `<tr><td>${f(r.p4)}</td><td>${f(r.p5)}</td><td>${f(r.p6)}</td><td>${f(r.exam2)}</td><td>${f(r.sem2Avg)}</td><td>${f(r.yearlyAvg)}</td></tr>`).join('')}
-                    <tr class="rcSum"><td colspan="5"></td><td>${escapeHtml(conduct2)}</td></tr>
-                    <tr class="rcSum"><td colspan="5"></td><td>${escapeHtml(rank2)}</td></tr>
-                    <tr class="rcAvg"><td>${f(avg('p4'))}</td><td>${f(avg('p5'))}</td><td>${f(avg('p6'))}</td><td>${f(avg('exam2'))}</td><td>${f(avg('sem2Avg'))}</td><td>${f(avg('yearlyAvg'))}</td></tr>
+                    <tr class="rcSummaryRow"><td colspan="5"></td><td>${escapeHtml(conduct2)}</td></tr>
+                    <tr class="rcSummaryRow"><td colspan="5"></td><td>${escapeHtml(rank2)}</td></tr>
+                    <tr class="rcSummaryRow"><td>${f(avg('p4'))}</td><td>${f(avg('p5'))}</td><td>${f(avg('p6'))}</td><td>${f(avg('exam2'))}</td><td>${f(avg('sem2Avg'))}</td><td>${f(avg('yearlyAvg'))}</td></tr>
                   </tbody>
                 </table>
               </div>
             </div>
-            <div class="rcKey">${gradeKey(m)}</div>
+            <div class="rcGradeKey">${gradeKey(m)}</div>
           </div>
         </div>
       </div>`;
@@ -264,43 +243,44 @@ const ReportCard = (function () {
     const back = `
       <div class="rcSheetFrame" data-rc-sheet>
         <div class="rcSheetScale">
-          <div class="rcSheet rcBackSheet">
-            <div class="rcSheetLabel">Back — Promotion &amp; Sign-Off</div>
-            <div class="rcBack">
-              <div class="rcPromo">
+          <div class="rcSheet rcBackPage">
+            <div class="rcPageLabel">Back — Promotion &amp; Sign-Off</div>
+            <div class="rcBackGrid">
+              <div class="rcPromoBox">
                 <h3>Promotion Statement</h3>
-                <p>This certifies that <span class="rcFill">${escapeHtml(studentName)}</span></p>
-                <p>Has satisfactorily completed the work of <span class="rcFill" style="min-width:25mm">${escapeHtml(className)}</span> and is:</p>
-                <div class="rcOpt">A. Promoted to _____________________</div>
-                <div class="rcOpt">B. Condition in _____________________</div>
-                <div class="rcOpt">C. Required to repeat the grade</div>
-                <div class="rcOpt">D. Asked not to return (NTR)</div>
-                <div class="rcSign">
-                  <div class="rcSignLine">Class Sponsor</div>
-                  <div class="rcSignLine">Principal</div>
-                  <div class="rcSignLine">Date: ______________________</div>
-                </div>
+                <p class="rcPromoLine">This certifies that <span class="fillIn">${escapeHtml(studentName)}</span></p>
+                <p class="rcPromoLine">Has satisfactorily completed the work of Grade <span class="fillIn">${escapeHtml(className)}</span> and is:</p>
+                <div class="rcPromoOption">A. Promoted to Grade _____________________</div>
+                <div class="rcPromoOption">B. Condition in _____________________</div>
+                <div class="rcPromoOption">C. Required to repeat the grade</div>
+                <div class="rcPromoOption">D. Asked not to return (NTR)</div>
+                <div class="rcSignBlock"><span class="rcSignLine"></span><div class="rcSignLabel">Class Sponsor</div></div>
+                <div class="rcSignBlock"><span class="rcSignLine"></span><div class="rcSignLabel">Principal</div></div>
+                <div class="rcSignBlock"><span class="rcSignLine">Date: ______________________</span></div>
               </div>
-              <div class="rcHeadBox">
-                <div class="rcSchool">
-                  <img src="${escapeHtml(logoSrc)}" alt="" onerror="${logoOnErr}">
-                  <div><div class="rcSN">${escapeHtml(schoolName)}</div><div class="rcSS">${escapeHtml(schoolMotto)}</div></div>
-                </div>
-                <div class="rcTitleBar">STUDENT REPORT CARD</div>
-                <div class="rcStudent">
+              <div class="rcHeaderBox">
+                <div class="rcSchoolHead">
+                  <img src="${escapeHtml(logoSrc)}" alt="Logo" onerror="${logoOnErr}">
                   <div>
-                    <p>Student's Name: <b>${escapeHtml(studentName)}</b></p>
-                    <p>Class: <b>${escapeHtml(className)}</b> &nbsp; School Year: <b>${escapeHtml(academicYear)}</b></p>
-                    <p>Student ID: <b>${escapeHtml(studentId)}</b></p>
+                    <div class="rcSchoolName">${escapeHtml(schoolName)}</div>
+                    <div class="rcSchoolSub">${escapeHtml(schoolMotto)}</div>
                   </div>
-                  ${student.photo ? `<div class="rcPhoto"><img src="${escapeHtml(student.photo)}" alt=""></div>` : ''}
                 </div>
-                <p class="rcNote">Parents or Guardian must sign each period as evidence they have seen the periodic report.</p>
-                <table class="rcSignTable">
-                  <thead><tr><th style="width:18%">Period</th><th>Class Teacher</th><th>Parent/Guardian</th></tr></thead>
-                  <tbody>${['I', 'II', 'III', 'IV', 'V', 'VI'].map(p => `<tr><td>${p}</td><td></td><td></td></tr>`).join('')}</tbody>
+                <div class="rcCardTitleBar">Student Report Card</div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                  <div>
+                    <p class="rcStudentMetaLine">Student's Name: <b>${escapeHtml(studentName)}</b></p>
+                    <p class="rcStudentMetaLine">Grade: <b>${escapeHtml(className)}</b> &nbsp; School Year: <b>${escapeHtml(academicYear)}</b></p>
+                    <p class="rcStudentMetaLine">Student ID: <b>${escapeHtml(studentId)}</b></p>
+                  </div>
+                  ${student.photo ? `<div style="width: 58px; height: 70px; border: 1.5px solid #1c1c1c; border-radius: 4px; overflow: hidden; margin-top: 4px;"><img src="${escapeHtml(student.photo)}" alt="" style="width: 100%; height: 100%; object-fit: cover;"></div>` : ''}
+                </div>
+                <p class="rcSignoffNote">Parents or Guardian must sign each period as evidence they have seen the periodic report.</p>
+                <table class="rcSignoffTable">
+                  <thead><tr><th>Period</th><th>Class Teacher</th><th>Parent/Guardian</th></tr></thead>
+                  <tbody>${['I', 'II', 'III', 'IV', 'V', 'VI'].map(p => `<tr><td>${p}</td><td>&nbsp;</td><td>&nbsp;</td></tr>`).join('')}</tbody>
                 </table>
-                <p class="rcFoot">${escapeHtml(footnote)}</p>
+                <p class="rcFootnote">${escapeHtml(footnote)}</p>
               </div>
             </div>
           </div>
