@@ -13,7 +13,7 @@
  * Grading modes (rcData.gradingScaleType):
  *   NUMERIC_100  – 0-100, red below 70
  *   LETTER_ABC   – Daycare / Nursery 1 style A, B, C
- *   NUMERIC_1_5  – Nursery 2: grades 1-5 (5 = best), never red
+ *   NUMERIC_1_5  – Nursery 1 & 2: grades 1-5 (5 = best), never red
  * -----------------------------------------------------------------------
  */
 
@@ -23,6 +23,9 @@ const ReportCard = (function () {
   const SHEET_W_MM = 281;
   const SHEET_H_MM = 192;
   const MM_PX = 96 / 25.4;
+
+  const SCHOOL_NAME = 'Sorina Daycare, Elementary and Junior High School';
+  const SCHOOL_ADDRESS = 'Upper Paynesville, Bernard Farm, Doe Estate, Montserrado County - Liberia';
 
   const CSS = `
     .rcRoot, .rcRoot * { box-sizing: border-box; }
@@ -36,6 +39,13 @@ const ReportCard = (function () {
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     }
     .rcPageLabel { text-align: right; font-size: 10px; color: #6b7280; font-weight: 700; margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; font-family: Georgia, 'Times New Roman', serif; }
+
+    /* FRONT — school header */
+    .rcFrontHead { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 12px; text-align: left; }
+    .rcFrontHead img { width: 52px; height: 52px; object-fit: contain; }
+    .rcFrontHead .rcSchoolName { font-weight: 900; font-size: 17px; line-height: 1.2; text-transform: uppercase; }
+    .rcFrontHead .rcSchoolAddr { font-size: 11px; color: #333; margin-top: 2px; }
+    .rcSchoolHead .rcSchoolAddr { font-size: 10.5px; color: #333; margin-top: 2px; }
 
     /* FRONT — two semester tables side by side */
     .rcSemesterGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 20px; }
@@ -118,7 +128,7 @@ const ReportCard = (function () {
     const num = Number(val);
 
     if (m === 'NUMERIC_1_5') {
-      // Nursery 2: blue only, never red
+      // Nursery 1 & 2: blue only, never red
       return isNaN(num) ? escapeHtml(str) : `<span class="gradeBlue">${escapeHtml(str)}</span>`;
     }
     if (isNaN(num)) {
@@ -160,7 +170,7 @@ const ReportCard = (function () {
     } else if (m === 'LETTER_ABC') {
       items = '<span class="gradeGreen">A — Excellent</span><span class="gradeBlue">B — Good</span><span class="gradeBlue">C — Fair</span>';
     } else {
-      items = '<span class="gradeGreen">70 – 100 — Passing</span><span class="gradeBlue">60 – 69 — Needs Improvement</span><span class="gradeRed">Below 60 — Below Passing</span>';
+      items = '<span class="gradeRed">60 – 69 = Fail</span><span class="gradeBlue">70 – 79 = Good</span><span class="gradeBlue">80 – 89 = V. Good</span><span class="gradeGreen">90 – 100 = Excellent</span>';
     }
     return `<b class="rcGradeKeyTitle">Method of Grading</b><div class="rcGradeKeyGrid">${items}</div>`;
   }
@@ -168,7 +178,7 @@ const ReportCard = (function () {
   function dims(n) {
     // Rows to fit on the front sheet: subjects + header + conduct + rank + average
     const total = n + 5;
-    const row = Math.max(14, Math.min(28, Math.floor(430 / total)));
+    const row = Math.max(14, Math.min(28, Math.floor(370 / total)));
     const font = row >= 24 ? 11.5 : row >= 20 ? 10.5 : row >= 17 ? 9.5 : 8.5;
     return { row: row, font: font };
   }
@@ -181,7 +191,7 @@ const ReportCard = (function () {
     const m = mode(rcData);
     const f = s => formatScore(s, m);
 
-    const schoolName = 'Sorina Daycare & Primary School System';
+    const schoolName = SCHOOL_NAME;
     const schoolMotto = school.motto || 'Excellence in Knowledge, Character & Integrity';
     const logoSrc = school.logo || 'assets/images/school-logo.png';
 
@@ -204,6 +214,13 @@ const ReportCard = (function () {
         <div class="rcSheetScale">
           <div class="rcSheet rcFrontPage" style="${sty}">
             <div class="rcPageLabel">Front — Academic Record</div>
+            <div class="rcFrontHead">
+              <img src="${escapeHtml(logoSrc)}" alt="Logo" onerror="${logoOnErr}">
+              <div>
+                <div class="rcSchoolName">${escapeHtml(schoolName)}</div>
+                <div class="rcSchoolAddr">${escapeHtml(SCHOOL_ADDRESS)}</div>
+              </div>
+            </div>
             <div class="rcSemesterGrid">
               <div class="rcSemTableWrap">
                 <div class="rcSemTitle">FIRST SEMESTER</div>
@@ -263,6 +280,7 @@ const ReportCard = (function () {
                   <img src="${escapeHtml(logoSrc)}" alt="Logo" onerror="${logoOnErr}">
                   <div>
                     <div class="rcSchoolName">${escapeHtml(schoolName)}</div>
+                    <div class="rcSchoolAddr">${escapeHtml(SCHOOL_ADDRESS)}</div>
                     <div class="rcSchoolSub">${escapeHtml(schoolMotto)}</div>
                   </div>
                 </div>

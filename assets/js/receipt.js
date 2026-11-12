@@ -21,54 +21,42 @@
  */
 const Receipt = (function () {
 
+  const SCHOOL_NAME = 'Sorina Daycare, Elementary and Junior High School';
+  const SCHOOL_ADDRESS = 'Upper Paynesville, Bernard Farm, Doe Estate, Montserrado County - Liberia';
+
   const CSS = `
     .rcptGrid, .rcptGrid *, .rcpt, .rcpt * { box-sizing: border-box; }
-    .rcptGrid { display: flex; flex-wrap: wrap; gap: 4mm; justify-content: center; align-items: flex-start; font-family: Arial, Helvetica, sans-serif; }
-    .rcpt { font-family: Arial, Helvetica, sans-serif; width: 91mm; background: #fff; border: 0.4mm solid #0b2a4a; color: #172536; position: relative; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
-    .rcpt-head { display: flex; align-items: center; gap: 3mm; padding: 3.5mm 4mm; background: #0b2a4a; color: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .rcpt-logo { width: 15mm; height: 15mm; object-fit: contain; background: #fff; border-radius: 50%; padding: 0.8mm; flex-shrink: 0; }
-    .rcpt-school { font-weight: 800; font-size: 11.5px; line-height: 1.2; }
-    .rcpt-motto { font-size: 8px; font-style: italic; opacity: .85; margin-top: .8mm; }
-    .rcpt-contact { font-size: 7.5px; opacity: .8; margin-top: .6mm; }
-    .rcpt-titlebar { display: flex; justify-content: space-between; align-items: center; padding: 2mm 4mm; background: #e8eef7; border-bottom: 0.3mm solid #0b2a4a; font-size: 9px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .rcpt-titlebar b { font-size: 12px; letter-spacing: 1.2px; color: #0b2a4a; }
-    .rcpt-titlebar span { color: #475569; }
-    .rcpt-body { padding: 3mm 4mm 3.5mm; }
-    .rcpt-student { display: flex; gap: 3mm; align-items: stretch; margin-bottom: 3mm; }
-    .rcpt-photo { width: 17mm; height: 21mm; border: 0.3mm solid #0b2a4a; background: #eef4fb; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #94a3b8; overflow: hidden; flex-shrink: 0; }
-    .rcpt-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .rcpt-info { flex: 1; border-collapse: collapse; font-size: 9.5px; }
-    .rcpt-info td { border-bottom: 0.2mm solid #cbd5e1; padding: 1mm 0; vertical-align: top; }
-    .rcpt-info td:first-child { width: 23mm; color: #64748b; font-weight: 700; text-transform: uppercase; font-size: 8px; letter-spacing: .3px; padding-top: 1.3mm; }
-    .rcpt-info td:last-child { font-weight: 700; }
-    .rcpt-table { width: 100%; border-collapse: collapse; font-size: 9.5px; margin-bottom: 2.5mm; }
-    .rcpt-table th { background: #0b2a4a; color: #fff; text-align: left; font-size: 8px; text-transform: uppercase; letter-spacing: .4px; padding: 1.2mm 1.5mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .rcpt-table td { padding: 1.4mm 1.5mm; border-bottom: 0.2mm solid #d5dde8; }
-    .rcpt-table tbody tr:nth-child(even) td { background: #f5f8fc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .rcpt-table .n { width: 5mm; color: #64748b; }
-    .rcpt-table .d { width: 20mm; color: #475569; font-size: 8.5px; }
-    .rcpt-table .a { text-align: right; font-weight: 700; white-space: nowrap; }
-    .rcpt-empty { text-align: center; color: #64748b; padding: 4mm 0 !important; font-style: italic; }
-    .rcpt-totals { border: 0.3mm solid #0b2a4a; font-size: 10px; }
-    .rcpt-totals div { display: flex; justify-content: space-between; padding: 1.3mm 2mm; }
-    .rcpt-totals div + div { border-top: 0.2mm solid #cbd5e1; }
-    .rcpt-totals .paid { font-weight: 800; background: #ecfdf3; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .rcpt-totals .bal { font-weight: 900; font-size: 11px; }
+    .rcptGrid { display: flex; flex-wrap: wrap; gap: 6mm; justify-content: center; align-items: flex-start; }
+    .rcpt { font-family: 'Courier New', Courier, monospace; width: 80mm; background: #fbfbfa; color: #222; padding: 7mm 6mm 8mm; position: relative; break-inside: avoid; page-break-inside: avoid; border: 0.2mm solid #d8d8d4; }
+    @media screen { .rcpt { border: 0; box-shadow: 0 2px 10px rgba(0,0,0,.25); filter: none; } }
+    .rcpt-c { text-align: center; }
+    .rcpt-logo { width: 17mm; height: 17mm; object-fit: contain; display: block; margin: 0 auto 2mm; }
+    .rcpt-school { font-weight: 700; font-size: 12.5px; line-height: 1.25; text-transform: uppercase; }
+    .rcpt-addr { font-size: 9.5px; line-height: 1.3; margin-top: 1mm; }
+    .rcpt-title { font-size: 16px; font-weight: 700; letter-spacing: 1.5px; margin: 3.5mm 0 2mm; }
+    .rcpt-dash { border: 0; border-top: 0.35mm dashed #444; margin: 2.5mm 0; }
+    .rcpt-solid { border: 0; border-top: 0.35mm solid #444; margin: 2mm 0; }
+    .rcpt-line { display: flex; justify-content: space-between; gap: 3mm; font-size: 11px; line-height: 1.5; }
+    .rcpt-line span:last-child { text-align: right; }
+    .rcpt-items .rcpt-line { font-size: 11.5px; padding: 0.4mm 0; }
+    .rcpt-items .rcpt-sub { display: block; font-size: 8.5px; color: #666; }
+    .rcpt-items .rcpt-line span:last-child { white-space: nowrap; }
+    .rcpt-empty { text-align: center; font-size: 10.5px; color: #666; padding: 3mm 0; }
+    .rcpt-total { display: flex; justify-content: space-between; align-items: baseline; font-size: 17px; font-weight: 700; margin: 1mm 0; }
     .rcpt-bal-due { color: #b42318; }
     .rcpt-bal-ok { color: #067647; }
-    .rcpt-stamp { text-align: center; margin: 2.5mm 0 0; }
-    .rcpt-stamp span { display: inline-block; padding: .8mm 4mm; border: 0.4mm solid; border-radius: 1mm; font-size: 9px; font-weight: 900; letter-spacing: 1.2px; transform: rotate(-3deg); }
-    .rcpt-stamp .ok { color: #067647; border-color: #067647; }
-    .rcpt-stamp .due { color: #b42318; border-color: #b42318; }
-    .rcpt-sign { display: flex; justify-content: space-between; gap: 6mm; margin-top: 7mm; font-size: 8px; color: #475569; }
-    .rcpt-sign div { flex: 1; border-top: 0.25mm solid #475569; padding-top: 1mm; text-align: center; }
-    .rcpt-foot { text-align: center; font-size: 7.5px; color: #94a3b8; padding: 0 4mm 3mm; }
+    .rcpt-status { text-align: center; font-weight: 700; font-size: 11px; letter-spacing: 1px; margin: 2.5mm 0 0; }
+    .rcpt-thanks { text-align: center; font-size: 19px; letter-spacing: 1px; margin: 5mm 0 3mm; }
+    .rcpt-barcode { display: block; margin: 0 auto; width: 100%; height: 13mm; }
+    .rcpt-no { text-align: center; font-size: 9px; letter-spacing: 2px; margin-top: 1mm; }
+    .rcpt-foot { text-align: center; font-size: 8px; color: #777; margin-top: 3mm; line-height: 1.3; }
   `;
 
   const PRINT_CSS = `
     @page { size: A4 landscape; margin: 6mm; }
     html, body { margin: 0; padding: 0; background: #fff; }
-    .rcptGrid { justify-content: flex-start; }
+    .rcptGrid { justify-content: flex-start; gap: 6mm; }
+    .rcpt { border: 0.2mm solid #bbb; }
     .rcpt:nth-child(3n+1) { break-before: page; page-break-before: always; }
     .rcpt:first-child { break-before: auto; page-break-before: auto; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -85,6 +73,20 @@ const Receipt = (function () {
     return 'RCP-' + String(student.id || '').toUpperCase() + '-' + stamp;
   }
 
+  /** Deterministic barcode (Code-39-like bars) drawn as inline SVG from the receipt number. */
+  function barcodeSvg(text) {
+    let seed = 0;
+    for (let i = 0; i < text.length; i++) seed = (seed * 31 + text.charCodeAt(i)) >>> 0;
+    let x = 0, bars = '';
+    const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    for (let i = 0; i < 46; i++) {
+      const w = 1 + Math.floor(rnd() * 3);
+      if (i % 2 === 0) bars += `<rect x="${x}" y="0" width="${w}" height="40" fill="#111"/>`;
+      x += w + (rnd() > 0.6 ? 2 : 1);
+    }
+    return `<svg class="rcpt-barcode" viewBox="0 0 ${x} 40" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">${bars}</svg>`;
+  }
+
   function cardHtml(model) {
     const school = model.school || {};
     const s = model.student || {};
@@ -92,45 +94,41 @@ const Receipt = (function () {
     const cur = model.currency;
     const rows = model.rows || [];
     const balance = Number(model.balance) || 0;
-    const contact = [school.phone, school.email].filter(Boolean).join('  |  ');
+    const now = new Date();
+    const date = now.toLocaleDateString();
+    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const no = receiptNo(s);
+    const tel = school.phone ? `Tel: ${school.phone}` : '';
 
-    const body = rows.length
-      ? rows.map((r, i) => `<tr><td class="n">${i + 1}</td><td>${esc(r.label)}</td><td class="d">${esc(r.date) || '—'}</td><td class="a">${esc(fmt(r.amount, cur))}</td></tr>`).join('')
-      : '<tr><td colspan="4" class="rcpt-empty">No payments recorded yet.</td></tr>';
+    const items = rows.length
+      ? rows.map(r => `<div class="rcpt-line"><span>${esc(r.label)}${r.date ? `<span class="rcpt-sub">${esc(r.date)}</span>` : ''}</span><span>${esc(fmt(r.amount, cur))}</span></div>`).join('')
+      : '<div class="rcpt-empty">No payments recorded yet.</div>';
 
     return `
       <div class="rcpt">
-        <div class="rcpt-head">
+        <div class="rcpt-c">
           <img class="rcpt-logo" src="${esc(school.logo || 'assets/images/school-logo.png')}" alt="" onerror="this.style.display='none'">
-          <div>
-            <div class="rcpt-school">${esc(school.name || 'Sorina Daycare & Primary School System')}</div>
-            <div class="rcpt-motto">${esc(school.motto || '')}</div>
-            ${contact ? `<div class="rcpt-contact">${esc(contact)}</div>` : ''}
-          </div>
+          <div class="rcpt-school">${esc(SCHOOL_NAME)}</div>
+          <div class="rcpt-addr">${esc(SCHOOL_ADDRESS)}${tel ? '<br>' + esc(tel) : ''}</div>
+          <div class="rcpt-title">PAYMENT RECEIPT</div>
         </div>
-        <div class="rcpt-titlebar"><b>PAYMENT RECEIPT</b><span>No. ${esc(receiptNo(s))}</span></div>
-        <div class="rcpt-body">
-          <div class="rcpt-student">
-            <div class="rcpt-photo">${s.photo ? `<img src="${esc(s.photo)}" alt="">` : '&#128100;'}</div>
-            <table class="rcpt-info">
-              <tr><td>Student</td><td>${esc(s.name)}</td></tr>
-              <tr><td>Student ID</td><td>${esc(s.id)}</td></tr>
-              <tr><td>Class</td><td>${esc(s.className)}</td></tr>
-              <tr><td>Date</td><td>${esc(new Date().toLocaleDateString())}</td></tr>
-            </table>
-          </div>
-          <table class="rcpt-table">
-            <thead><tr><th>#</th><th>Description</th><th>Date</th><th style="text-align:right">Amount</th></tr></thead>
-            <tbody>${body}</tbody>
-          </table>
-          <div class="rcpt-totals">
-            ${model.totalBilled !== undefined ? `<div><span>Total Billed</span><span>${esc(fmt(model.totalBilled, cur))}</span></div>` : ''}
-            <div class="paid"><span>Total Paid</span><span>${esc(fmt(model.totalPaid, cur))}</span></div>
-            <div class="bal"><span>Balance Due</span><span class="${balance > 0 ? 'rcpt-bal-due' : 'rcpt-bal-ok'}">${esc(fmt(balance, cur))}</span></div>
-          </div>
-          <div class="rcpt-stamp"><span class="${balance > 0 ? 'due' : 'ok'}">${balance > 0 ? 'BALANCE OUTSTANDING' : 'PAID IN FULL'}</span></div>
-          <div class="rcpt-sign"><div>Received by (Bursar)</div><div>Parent / Guardian</div></div>
-        </div>
+        <hr class="rcpt-dash">
+        <div class="rcpt-line"><span>Date: ${esc(date)}</span><span>${esc(time)}</span></div>
+        <div class="rcpt-line"><span>Student:</span><span>${esc(s.name)}</span></div>
+        <div class="rcpt-line"><span>ID:</span><span>${esc(s.id)}</span></div>
+        <div class="rcpt-line"><span>Class:</span><span>${esc(s.className)}</span></div>
+        <hr class="rcpt-dash">
+        <div class="rcpt-items">${items}</div>
+        <hr class="rcpt-dash">
+        ${model.totalBilled !== undefined ? `<div class="rcpt-line"><span>Total Billed</span><span>${esc(fmt(model.totalBilled, cur))}</span></div>` : ''}
+        <div class="rcpt-total"><span>Total Paid</span><span>${esc(fmt(model.totalPaid, cur))}</span></div>
+        <hr class="rcpt-solid">
+        <div class="rcpt-line"><span>Balance</span><span class="${balance > 0 ? 'rcpt-bal-due' : 'rcpt-bal-ok'}"><b>${esc(fmt(balance, cur))}</b></span></div>
+        <div class="rcpt-status">${balance > 0 ? '* BALANCE OUTSTANDING *' : '* PAID IN FULL *'}</div>
+        <hr class="rcpt-dash">
+        <div class="rcpt-thanks">THANK YOU</div>
+        ${barcodeSvg(no)}
+        <div class="rcpt-no">${esc(no)}</div>
         <div class="rcpt-foot">Payments are record-only; no payment is processed online on this website.</div>
       </div>`;
   }

@@ -3158,7 +3158,7 @@ function isNurseryClass(cls){
   if(!s)return false;
   return s.startsWith('nursery')||s.startsWith('kindergarten')||['k1','k2','kg1','kg2','prek','daycare','creche','abc'].includes(s);}
 
-    function isNursery2Class(cls){return String(cls||'').trim().toLowerCase().replace(/[\s\-_]+/g,'')==='nursery2';}
+    function isNursery2Class(cls){const k=String(cls||'').trim().toLowerCase().replace(/[\s\-_]+/g,'');return k==='nursery1'||k==='nursery2';}
     function currentIsNursery(){return isNurseryClass(document.getElementById('agClass').value);}
 function valid(v){if(v==='')return true;const c=String(document.getElementById('agClass').value||'').trim().toLowerCase().replace(/[\s\-_]+/g,'');const nur=c.startsWith('nursery')||c.startsWith('kindergarten')||['k1','k2','kg1','kg2','prek','daycare','creche','abc'].includes(c);if(isNursery2Class(document.getElementById('agClass').value))return ['1','2','3','4','5'].includes(String(v).trim());if(nur)return ['A','B','C'].includes(String(v).trim().toUpperCase());return Number.isFinite(Number(v))&&Number(v)>=0&&Number(v)<=100;}    function statusOf(rec){if(rec.status==='submitted')return 'submitted'; if(complete(rec))return 'complete'; return any(rec)?'incomplete':'notstarted';}
     function updateSummary(){const rows=[...document.querySelectorAll('#agBody tr[data-id]')];let c=0,m=0,s=0,d=0;rows.forEach(tr=>{const r={};tr.querySelectorAll('.ag-score').forEach(i=>r[i.dataset.p]=i.value.trim());const st=statusOf(r);if(st==='complete'||st==='submitted')c++;if(st==='incomplete'||st==='notstarted')m++;if(tr.dataset.originalStatus==='submitted'||st==='submitted')s++;if(tr.dataset.dirty==='1')d++;});document.getElementById('agTotal').textContent=rows.length;document.getElementById('agComplete').textContent=c;document.getElementById('agMissing').textContent=m;document.getElementById('agSubmitted').textContent=s;document.getElementById('agDirty').textContent=d;}
@@ -3214,7 +3214,7 @@ function valid(v){if(v==='')return true;const c=String(document.getElementById('
           grades.push({studentId:sId,baseVersion:baseVersion,changes:changes});
         }
       });
-      if(invalid){API.toastNotification('Correct invalid scores (0–100, A/B/C, or 1–5 for Nursery 2) before saving.',true);return;}
+      if(invalid){API.toastNotification('Correct invalid scores (0–100, A/B/C, or 1–5 for Nursery 1 & 2) before saving.',true);return;}
       if(!grades.length){API.toastNotification('No unsaved grade changes on this screen.');return;}
       if(mode==='submitted'&&incomplete&&!confirm('Some selected students do not have all grading periods completed. Submit these grades anyway?'))return;
       const r=await API.callBackend('teacherSubmitGrades',{teacherId:currentUser.id,actorRole:'admin',actorName:currentUser.name||'Administrator',className:cls,subject:subject,academicYear:selectedAcademicYear,gradeStatus:mode,grades:grades},mode==='submitted'?'Submitting official grades...':'Saving grade draft...');

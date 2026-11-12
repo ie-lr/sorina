@@ -733,7 +733,7 @@ window.TeacherPanel = (function () {
   }
 
   function isNursery2Section(className) {
-    return String(className || '').trim().toLowerCase().replace(/[\s\-_]+/g, '') === 'nursery2';
+    return String(className || '').trim().toLowerCase().replace(/[\s\-_]+/g, '') === 'nursery2' || String(className || '').trim().toLowerCase().replace(/[\s\-_]+/g, '') === 'nursery1';
   }
 
   function isNurserySection(className) {
